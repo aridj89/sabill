@@ -63,17 +63,22 @@ export function notifyPresenceChange(data, studentId, sessionDate, isPresent) {
 /**
  * Notifie un élève d'un paiement en attente.
  */
-export function notifyPaymentRequired(data, studentId, amount, reason) {
-  const title = "Paiement en attente";
-  let message = "";
-  
-  if (reason === "enrollment") {
-    message = `Vos frais d'inscription (${amount} DA) sont en attente de paiement.`;
-  } else {
-    message = `Votre paiement pour le cycle ${reason} (${amount} DA) est en attente.`;
+export function notifyPaymentRequired(data, studentId, amount, reason, customMessage = "") {
+  const student = (data.students || []).find(s => s.id === studentId);
+  const studentName = student ? (student.nom || student.prenom) : "";
+  const title = "Rappel de paiement";
+  let message = customMessage;
+
+  if (!message) {
+    let feeLabel = "d'inscription";
+    if (reason && reason !== "enrollment" && reason !== "d'inscription") {
+      feeLabel = String(reason).startsWith("de ") || String(reason).startsWith("d'") ? reason : `de ${reason}`;
+    }
+    const greeting = studentName ? `Bonjour ${studentName}, ` : "Bonjour, ";
+    message = `${greeting}nous vous rappelons que vos frais ${feeLabel} d'un montant de ${amount} DA sont en attente. Merci de régler votre situation au plus vite.`;
   }
 
-  const notif = createNotification(studentId, "payment", title, message);
+  const notif = createNotification(studentId, "payment", title, message, { screen: "payments" });
   return [...(data.userNotifications || []), notif];
 }
 

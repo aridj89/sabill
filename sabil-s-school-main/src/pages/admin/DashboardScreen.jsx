@@ -96,30 +96,23 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
     const student = data.students.find(s => s.id === studentId);
     if (!student) return;
 
-    const notifMsg = `Rappel : Vos frais de ${typeLabel} (${amount} DA) sont toujours en attente de paiement.`;
-
-    const privateMsg = {
-      id: uid(),
-      studentId: student.id,
-      senderId: "admin",
-      senderRole: "admin",
-      senderName: `${data.admin.prenom} ${data.admin.nom}`,
-      content: `Bonjour ${student.prenom}, nous vous rappelons que vos frais de ${typeLabel} d'un montant de ${amount} DA sont en attente. Merci de régler votre situation au plus vite.`,
-      timestamp: new Date().toISOString(),
-    };
-
+    // Envoyer uniquement dans les NOTIFICATIONS (pas dans les messages)
     setData(d => {
       const notifs = notifyPaymentRequired(d, student.id, amount, typeLabel);
       return {
         ...d,
-        privateMessages: [...(d.privateMessages || []), privateMsg],
+        // Nettoyer les éventuels anciens messages de rappel du chat
+        privateMessages: (d.privateMessages || []).filter(m => !m.content?.includes("nous vous rappelons que vos frais")),
         userNotifications: notifs,
       };
     });
 
-    setUnpaidModal(null);
-    if (toastFn) toastFn(lang === "ar" ? `تم إرسال الإشعار والتذكير لـ ${student.prenom} ✓` : `Rappel et notification envoyés à ${student.prenom} ✓`);
-    onNav({ screen: "chat", studentId: student.id });
+    if (toastFn) {
+      toastFn(lang === "ar" 
+        ? `تم إرسال إشعار التذكير بالدفع لـ ${student.prenom} ${student.nom || ""} بنجاح ✓` 
+        : `Notification de rappel envoyée à ${student.prenom} ${student.nom || ""} ✓`
+      );
+    }
   };
 
   // ── Stats ────────────────────────────────────────────────────
