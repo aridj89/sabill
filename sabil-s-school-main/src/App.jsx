@@ -7,6 +7,7 @@ import Toast from "./components/ui/Toast";
 import LoginPage from "./pages/LoginPage";
 import AdminApp from "./pages/admin/AdminApp";
 import ParentApp from "./pages/parent/ParentApp";
+import StudentApp from "./pages/student/StudentApp";
 
 export default function App() {
   const { auth, logout } = useAuth();
@@ -17,9 +18,25 @@ export default function App() {
   const toastTimer = useRef(null);
 
   useEffect(() => {
-    const d = loadDataFromStorage();
-    setDataRaw(d);
-    setLoading(false);
+    async function initData() {
+      try {
+        const local = loadDataFromStorage();
+        if (local) {
+          setDataRaw(local);
+          setLoading(false);
+        }
+        
+        const fetched = await fetchCleanData();
+        if (fetched) {
+          setDataRaw(fetched);
+        }
+      } catch (err) {
+        console.warn("Error fetching data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    initData();
   }, []);
 
   const setData = useCallback((updater) => {
@@ -49,6 +66,7 @@ export default function App() {
       {!auth.role && <LoginPage data={data} toastFn={toastFn} />}
       {auth.role === "admin" && <AdminApp data={data} setData={setData} onLogout={logout} toastFn={toastFn} />}
       {auth.role === "parent" && <ParentApp data={data} setData={setData} parentId={auth.parentId} onLogout={logout} toastFn={toastFn} />}
+      {auth.role === "student" && <StudentApp data={data} setData={setData} studentId={auth.studentId} onLogout={logout} toastFn={toastFn} />}
       <Toast toast={toast} />
     </div>
   );

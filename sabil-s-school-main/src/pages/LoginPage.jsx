@@ -14,23 +14,43 @@ export default function LoginPage({ data, toastFn }) {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
 
-  // Generalized login handler based on input
-  const handleLogin = () => {
-    // Try to find if it's admin
-    if (identifier === data.admin.username && password === data.admin.password) {
-      login("admin");
-      return;
+  // Generalized login handler using Express REST API
+  const handleLogin = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, password }),
+      });
+
+      const resData = await res.json();
+      if (res.ok && resData.success) {
+        const id = resData.role === "student" ? resData.studentId : resData.role === "parent" ? resData.parentId : null;
+        login(resData.role, id, resData.token);
+        return;
+      }
+
+      toastFn(resData.message || t("loginError"));
+    } catch (err) {
+      console.warn("Express backend error during login, falling back to local verification:", err);
+      
+      // Fallback local check
+      if (identifier === data.admin.username && password === data.admin.password) {
+        login("admin");
+        return;
+      }
+      const parent = (data.parents || []).find(pa => pa.telephone === identifier && pa.password === password);
+      if (parent) {
+        login("parent", parent.id);
+        return;
+      }
+      const student = (data.students || []).find(st => st.phone === identifier && st.password === password);
+      if (student) {
+        login("student", student.id);
+        return;
+      }
+      toastFn(t("loginError"));
     }
-    
-    // Try to find if it's a parent (using telephone as identifier)
-    const parent = data.parents.find(pa => pa.telephone === identifier && pa.password === password);
-    if (parent) {
-      login("parent", parent.id);
-      return;
-    }
-    
-    // Fallback if none match
-    toastFn(t("loginError"));
   };
 
   return (

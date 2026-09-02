@@ -44,7 +44,7 @@ const translations = {
     allGroups: "Tous les groupes",
     quickNav: "Accès Rapide",
     parentsList: "Gestion des Parents",
-    messagesNav: "Messagerie directe",
+    messagesNav: "Groupes de communication",
     settingsNav: "Paramètres du compte",
     logout: "Déconnexion",
     searchStudentPlaceholder: "Rechercher un élève…",
@@ -57,6 +57,30 @@ const translations = {
     noGroupsTitle: "Aucun groupe dans cette catégorie",
     noGroupsSubtitle: "Créez votre premier groupe pour commencer à ajouter des élèves.",
     createGroupBtn: "Créer un groupe",
+
+    // Comm Groups & Categories
+    commGroupsTitle: "Groupes de communication",
+    commGroupsSubtitle: "Canaux de communication entre l'administration et les parents",
+    addCommGroup: "+ Nouveau groupe",
+    commGroupNameLabel: "Nom du groupe",
+    commGroupNamePlaceholder: "Ex: A1, B2, Groupe avancé…",
+    commGroupCreated: "Groupe créé",
+    commGroupDeleted: "Groupe supprimé",
+    deleteCommGroupConfirm: "Supprimer ce groupe de communication ?",
+    noCommGroups: "Aucun groupe de communication",
+    noCommGroupsSubtitle: "Créez un groupe pour commencer à échanger.",
+    selectCommGroup: "Sélectionnez un groupe",
+    noGroupsInCategory: "Aucun groupe dans cette catégorie",
+    membersCount: "membre(s)",
+    pinnedToGroup: "Groupe épinglé",
+    addCommCategory: "+ Nouvelle catégorie",
+    commCategoryNameLabel: "Nom de la catégorie",
+    commCategoryNamePlaceholder: "Ex: Langue Française, Maths, Arabe…",
+    commCatCreated: "Catégorie créée",
+    commCatDeleted: "Catégorie supprimée",
+    deleteCommCategoryConfirm: "Supprimer cette catégorie et tous ses groupes ?",
+    noCommCategories: "Aucune catégorie",
+    noCommCategoriesSubtitle: "Créez une catégorie pour organiser vos groupes.",
     groupStudentsCount: "élève(s)",
     sessionsCount: "séances",
     addSessionBtn: "+ Séance supplémentaire",
@@ -203,7 +227,7 @@ const translations = {
     allGroups: "جميع الأفواج",
     quickNav: "وصول سريع",
     parentsList: "أولياء الأمور",
-    messagesNav: "المراسلة المباشرة",
+    messagesNav: "مجموعات التواصل",
     settingsNav: "إعدادات الحساب",
     logout: "تسجيل الخروج",
     searchStudentPlaceholder: "بحث عن تلميذ…",
@@ -216,6 +240,30 @@ const translations = {
     noGroupsTitle: "لا يوجد أي فوج في هذا القسم",
     noGroupsSubtitle: "أنشئ فوجك الأول للبدء في إضافة التلاميذ ومتابعتهم.",
     createGroupBtn: "إنشاء فوج",
+
+    // Comm Groups & Categories
+    commGroupsTitle: "مجموعات التواصل",
+    commGroupsSubtitle: "قنوات التواصل بين الإدارة وأولياء الأمور",
+    addCommGroup: "+ مجموعة جديدة",
+    commGroupNameLabel: "اسم المجموعة",
+    commGroupNamePlaceholder: "مثال: A1، B2، مجموعة متقدمة…",
+    commGroupCreated: "تم إنشاء المجموعة بنجاح",
+    commGroupDeleted: "تم حذف المجموعة",
+    deleteCommGroupConfirm: "هل تريد حذف مجموعة التواصل هذه؟",
+    noCommGroups: "لا توجد مجموعات تواصل",
+    noCommGroupsSubtitle: "أنشئ مجموعة للبدء في التواصل.",
+    selectCommGroup: "اختر مجموعة",
+    noGroupsInCategory: "لا توجد مجموعات في هذا التصنيف",
+    membersCount: "عضو",
+    pinnedToGroup: "مجموعة مثبتة",
+    addCommCategory: "+ تصنيف جديد",
+    commCategoryNameLabel: "اسم التصنيف",
+    commCategoryNamePlaceholder: "مثال: اللغة الفرنسية، رياضيات، عربية…",
+    commCatCreated: "تم إنشاء التصنيف بنجاح",
+    commCatDeleted: "تم حذف التصنيف",
+    deleteCommCategoryConfirm: "حذف هذا التصنيف وجميع مجموعاته؟",
+    noCommCategories: "لا توجد تصنيفات",
+    noCommCategoriesSubtitle: "أنشئ تصنيفاً لتنظيم مجموعاتك.",
     groupStudentsCount: "تلميذ",
     sessionsCount: "حصص",
     addSessionBtn: "+ حصة إضافية",
@@ -325,9 +373,9 @@ const LanguageContext = createContext(null);
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(() => {
     try {
-      return localStorage.getItem("ecole-lang") || "fr";
+      return localStorage.getItem("ecole-lang") || "ar";
     } catch {
-      return "fr";
+      return "ar";
     }
   });
 
@@ -340,12 +388,12 @@ export function LanguageProvider({ children }) {
     }
   };
 
-  const isRTL = lang === "ar";
+  const isRTL = false; // اتجاه الكتابة ثابت LTR دائماً
 
   useEffect(() => {
-    document.documentElement.dir = isRTL ? "rtl" : "ltr";
+    document.documentElement.dir = "ltr";
     document.documentElement.lang = lang;
-  }, [lang, isRTL]);
+  }, [lang]);
 
   const t = (key, params = {}) => {
     let str = translations[lang]?.[key] || translations.fr?.[key] || key;

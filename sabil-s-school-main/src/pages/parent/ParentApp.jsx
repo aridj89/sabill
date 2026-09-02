@@ -7,7 +7,7 @@ import PrimaryBtn from "../../components/ui/PrimaryBtn";
 import Pill from "../../components/ui/Pill";
 import AttendanceDots from "../../components/ui/AttendanceDots";
 import LanguageToggle from "../../components/ui/LanguageToggle";
-import ChatScreen from "../admin/ChatScreen";
+import CommGroupsScreen from "../admin/CommGroupsScreen";
 
 export default function ParentApp({ data, setData, parentId, onLogout, toastFn }) {
   const { t, isRTL, lang } = useLanguage();
@@ -83,7 +83,7 @@ export default function ParentApp({ data, setData, parentId, onLogout, toastFn }
 
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "24px 18px 60px" }}>
         {screen === "chat" ? (
-          <ChatScreen data={data} setData={setData} role="parent" parentId={parentId} onBack={() => setScreen("dashboard")} />
+          <CommGroupsScreen data={data} setData={setData} role="parent" parentId={parentId} onBack={() => setScreen("dashboard")} />
         ) : !student ? (
           <p style={{ color: C.inkSoft }}>{t("noStudentLinked")}</p>
         ) : (
@@ -127,7 +127,7 @@ export default function ParentApp({ data, setData, parentId, onLogout, toastFn }
             </div>
 
             <div style={{ marginTop: 18, textAlign: "center" }}>
-              <PrimaryBtn onClick={() => setScreen("chat")}><MessageCircle size={16} /> {isRTL ? "مراسلة الإدارة" : "Discuter avec l'administration"}</PrimaryBtn>
+              <PrimaryBtn onClick={() => setScreen("chat")}><MessageCircle size={16} /> {t("messagesNav")}</PrimaryBtn>
             </div>
           </>
         )}

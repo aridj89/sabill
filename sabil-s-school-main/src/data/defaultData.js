@@ -1,56 +1,114 @@
 import { uid } from "../theme/tokens";
 
-export function defaultData() {
-  const g1 = uid(), g2 = uid(), g3 = uid();
-  const s1 = uid(), s2 = uid(), s3 = uid(), s4 = uid();
+const API_URL = "http://localhost:5000/api/data";
 
+function getAuthHeaders() {
+  const token = localStorage.getItem("auth_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+/* ---------------------------------------------------------------
+   DEFAULT DATA  —  Base de données vierge (Clean initial state)
+--------------------------------------------------------------- */
+export function defaultData() {
   return {
     admin: {
       nom: "Bensalem",
       prenom: "Karim",
       username: "admin",
-      password: "admin1234",
       avatar: "🧑‍🏫",
     },
-    groups: [
-      { id: g1, niveau: "Lycée", annee: "2ème", type: "Normal", nom: "Groupe A" },
-      { id: g2, niveau: "Lycée", annee: "2ème", type: "Spécial", nom: "Groupe Spécial 1" },
-      { id: g3, niveau: "CEM", annee: "1ère", type: "Individuel", nom: "Élève Individuel" },
+    settings: {
+      enrollmentFee: 500,
+    },
+    langLevels: [
+      { id: "ll1", nom: "A1" },
+      { id: "ll2", nom: "A2" },
+      { id: "ll3", nom: "B1" },
     ],
-    students: [
-      { id: s1, nom: "Kaci", prenom: "Yasmine", age: 16, groupId: g1, presences: [true, true, false, true], paye: true },
-      { id: s2, nom: "Meziane", prenom: "Amine", age: 16, groupId: g1, presences: [true, true, true, true], paye: false },
-      { id: s3, nom: "Boudiaf", prenom: "Rania", age: 17, groupId: g2, presences: [true, false, true, true], paye: true },
-      { id: s4, nom: "Haddad", prenom: "Sofiane", age: 14, groupId: g3, presences: [true, true, true, false], paye: true },
-    ],
-    parents: [
-      { id: uid(), nom: "Kaci Mourad", telephone: "0550112233", password: "1234", studentId: s1 },
-      { id: uid(), nom: "Meziane Farida", telephone: "0661223344", password: "1234", studentId: s2 },
-    ],
+    subgroups: [],
+    students: [],
+    sessions: [],
+    attendances: [],
+    payments: [],
+    subgroupMessages: [],
+    privateMessages: [],
+    userNotifications: [],
+    parents: [],
     messages: [],
     notifications: [],
     extraSessions: [],
+    commCategories: [{ id: "cat1comm", nom: "Langue Française" }],
+    commGroups: [],
+    commMessages: [],
+    groups: [],
   };
 }
 
-const STORAGE_KEY = "ecole-data";
+/* ---------------------------------------------------------------
+   STORAGE & API SYNC (WITH JWT HEADER)
+--------------------------------------------------------------- */
+const STORAGE_KEY = "ecole-data-v3";
+
+export async function fetchCleanData() {
+  try {
+    const res = await fetch(API_URL, { headers: getAuthHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return data;
+    }
+  } catch (err) {
+    console.warn("Express backend unreachable, loading from localStorage fallback:", err);
+  }
+
+  // Fallback to localStorage if API unavailable
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+
+  const d = defaultData();
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+  } catch {}
+  return d;
+}
 
 export function loadDataFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
-  } catch (e) {
-    /* not found yet */
-  }
-  const d = defaultData();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
-  } catch (e) {}
-  return d;
+  } catch {}
+  return defaultData();
 }
 
-export function persistData(data) {
+export async function persistData(data) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {}
+  } catch {}
+
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+  } catch (err) {
+    console.warn("Failed to persist data to Express backend:", err);
+  }
+}
+
+export async function resetData() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    await fetch("http://localhost:5000/api/reset", {
+      method: "POST",
+      headers: getAuthHeaders(),
+    });
+  } catch {}
+  return defaultData();
 }

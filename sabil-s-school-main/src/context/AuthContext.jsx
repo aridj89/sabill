@@ -3,14 +3,20 @@ import React, { createContext, useContext, useState } from "react";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [auth, setAuth] = useState({ role: null, parentId: null });
+  const [auth, setAuth] = useState({ role: null, parentId: null, studentId: null, token: localStorage.getItem("auth_token") });
 
-  const login = (role, parentId = null) => {
-    setAuth({ role, parentId });
+  const login = (role, id = null, token = null) => {
+    if (token) {
+      localStorage.setItem("auth_token", token);
+    }
+    if (role === "parent") setAuth({ role, parentId: id, studentId: null, token });
+    else if (role === "student") setAuth({ role, parentId: null, studentId: id, token });
+    else setAuth({ role, parentId: null, studentId: null, token }); // admin
   };
 
   const logout = () => {
-    setAuth({ role: null, parentId: null });
+    localStorage.removeItem("auth_token");
+    setAuth({ role: null, parentId: null, studentId: null, token: null });
   };
 
   return (
@@ -42,5 +48,14 @@ export function RequireAdmin({ children, fallback }) {
 export function RequireParent({ children, fallback }) {
   const { auth } = useAuth();
   if (auth.role !== "parent") return fallback || null;
+  return children;
+}
+
+/**
+ * RequireStudent — wraps children and redirects to login if not student.
+ */
+export function RequireStudent({ children, fallback }) {
+  const { auth } = useAuth();
+  if (auth.role !== "student") return fallback || null;
   return children;
 }
