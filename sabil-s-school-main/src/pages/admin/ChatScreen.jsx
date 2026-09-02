@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, X } from "lucide-react";
 import { C, inputStyle, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
+import { notifyAdminParentMessage } from "../../utils/notificationEngine";
 
 export default function ChatScreen({ data, setData, role, parentId, activeParentId, setActiveParentId, onBack }) {
   const { t, isRTL } = useLanguage();
@@ -15,8 +16,21 @@ export default function ChatScreen({ data, setData, role, parentId, activeParent
 
   const send = () => {
     if (!text.trim() || !targetId) return;
-    const msg = { id: uid(), parentId: targetId, sender: role, text: text.trim(), ts: Date.now() };
-    setData(d => ({ ...d, messages: [...d.messages, msg] }));
+    const messageText = text.trim();
+    const msg = { id: uid(), parentId: targetId, sender: role, text: messageText, ts: Date.now() };
+    
+    setData(d => {
+      let notifs = d.userNotifications || [];
+      if (role === "parent") {
+        const pName = parent ? parent.nom : "Un parent";
+        notifs = notifyAdminParentMessage(d, targetId, pName, messageText);
+      }
+      return {
+        ...d,
+        messages: [...d.messages, msg],
+        userNotifications: notifs,
+      };
+    });
     setText("");
   };
 

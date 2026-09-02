@@ -59,12 +59,30 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
   const notifications = (data.userNotifications || []).filter(n => n.userId === "admin").reverse();
   const unreadNotifs = notifications.filter(n => !n.read).length;
 
-  const markNotifsRead = () => {
-    if (unreadNotifs === 0) return;
+  const markAllNotifsRead = () => {
     setData(d => ({
       ...d,
       userNotifications: (d.userNotifications || []).map(n => n.userId === "admin" ? { ...n, read: true } : n)
     }));
+  };
+
+  const handleNotifClick = (notif) => {
+    // Mark this notification as read
+    setData(d => ({
+      ...d,
+      userNotifications: (d.userNotifications || []).map(n => n.id === notif.id ? { ...n, read: true } : n)
+    }));
+    setNotifOpen(false);
+
+    if (notif.meta?.screen === "chat") {
+      setNav({
+        screen: "chat",
+        studentId: notif.meta.studentId,
+        subgroupId: notif.meta.subgroupId
+      });
+    } else if (notif.meta?.screen === "parents") {
+      setNav({ screen: "parents" });
+    }
   };
 
   return (
@@ -92,29 +110,75 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
             
             {/* Notifications Dropdown */}
             <div style={{ position: "relative" }}>
-              <IconBtn icon={Bell} onClick={() => { setNotifOpen(!notifOpen); markNotifsRead(); }} title={lang === "ar" ? "الإشعارات" : "Notifications"} badge={unreadNotifs} />
+              <IconBtn icon={Bell} onClick={() => setNotifOpen(!notifOpen)} title={lang === "ar" ? "الإشعارات" : "Notifications"} badge={unreadNotifs} />
               {notifOpen && (
                 <div style={{
                   position: "absolute", top: "calc(100% + 10px)", right: isRTL ? "auto" : 0, left: isRTL ? 0 : "auto",
-                  width: 320, maxHeight: 400, overflowY: "auto",
-                  background: "linear-gradient(160deg, rgba(22,18,71,0.96) 0%, rgba(71,48,18,0.92) 55%, rgba(18,68,71,0.96) 100%)",
+                  width: 340, maxHeight: 420, overflowY: "auto",
+                  background: "linear-gradient(160deg, rgba(22,18,71,0.98) 0%, rgba(45,30,12,0.95) 55%, rgba(18,50,60,0.98) 100%)",
                   backdropFilter: "blur(24px) saturate(1.4)", border: "1px solid rgba(255,255,255,0.22)",
-                  boxShadow: "0 24px 48px rgba(0,0,0,0.55)", borderRadius: 18, zIndex: 200, padding: 12
+                  boxShadow: "0 24px 48px rgba(0,0,0,0.65)", borderRadius: 18, zIndex: 200, padding: 14
                 }}>
-                  <h4 style={{ margin: "0 0 10px 4px", fontSize: 14, color: "#fff" }}>{lang === "ar" ? "إشعارات الإدارة" : "Notifications Admin"}</h4>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "0 4px" }}>
+                    <h4 style={{ margin: 0, fontSize: 14, color: "#fff", fontWeight: 700 }}>
+                      {lang === "ar" ? "الإشعارات" : "Notifications"}
+                      {unreadNotifs > 0 && (
+                        <span style={{ marginLeft: 6, background: C.accent, color: "#120e2e", fontSize: 11, fontWeight: 800, padding: "1px 6px", borderRadius: 999 }}>
+                          {unreadNotifs}
+                        </span>
+                      )}
+                    </h4>
+                    {unreadNotifs > 0 && (
+                      <button
+                        onClick={markAllNotifsRead}
+                        style={{ background: "none", border: "none", color: C.accent, fontSize: 11.5, fontWeight: 600, cursor: "pointer", padding: 0 }}
+                      >
+                        {lang === "ar" ? "تحديد الكل كمقروء" : "Tout marquer comme lu"}
+                      </button>
+                    )}
+                  </div>
+
                   {notifications.length === 0 ? (
-                    <div style={{ textAlign: "center", color: C.inkSoft, fontSize: 13, padding: "20px 0" }}>{lang === "ar" ? "لا توجد إشعارات" : "Aucune notification"}</div>
+                    <div style={{ textAlign: "center", color: C.inkSoft, fontSize: 13, padding: "24px 0" }}>
+                      {lang === "ar" ? "لا توجد إشعارات حالياً" : "Aucune notification pour le moment"}
+                    </div>
                   ) : (
-                    <div style={{ display: "grid", gap: 6 }}>
-                      {notifications.map(n => (
-                        <div key={n.id} style={{ background: n.read ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                            <span style={{ fontSize: 11, fontWeight: 800, color: C.accent, textTransform: "uppercase" }}>{n.title}</span>
-                            <span style={{ fontSize: 10, color: C.inkSoft }}>{n.date} {n.time}</span>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {notifications.map(n => {
+                        const isUnread = !n.read;
+                        return (
+                          <div
+                            key={n.id}
+                            onClick={() => handleNotifClick(n)}
+                            style={{
+                              background: isUnread ? "rgba(226,150,58,0.14)" : "rgba(255,255,255,0.05)",
+                              border: `1px solid ${isUnread ? "rgba(226,150,58,0.45)" : C.border}`,
+                              borderRadius: 12,
+                              padding: "10px 12px",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                              position: "relative"
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.borderColor = C.accent}
+                            onMouseLeave={e => e.currentTarget.style.borderColor = isUnread ? "rgba(226,150,58,0.45)" : C.border}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {isUnread && (
+                                  <span style={{ width: 6, height: 6, borderRadius: 999, background: C.accent, display: "inline-block" }} />
+                                )}
+                                <span style={{ fontSize: 11.5, fontWeight: 800, color: isUnread ? C.accent : "rgba(255,255,255,0.75)", textTransform: "uppercase" }}>
+                                  {n.title}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: 10, color: C.inkSoft }}>{n.date} {n.time}</span>
+                            </div>
+                            <div style={{ fontSize: 12.5, color: isUnread ? "#fff" : C.ink, lineHeight: 1.4 }}>
+                              {n.message}
+                            </div>
                           </div>
-                          <div style={{ fontSize: 13, color: C.ink }}>{n.message}</div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

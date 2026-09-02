@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, Plus, Trash2, X, Users, MessageSquare, ChevronDown, ChevronRight, FolderOpen, Folder, BookOpen } from "lucide-react";
 import { C, inputStyle, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
+import { notifyAdminCommGroupMessage } from "../../utils/notificationEngine";
 
 // ─── Category accent colors ────────────────────────────────────────────────
 const CAT_COLORS = [
@@ -86,15 +87,28 @@ export default function CommGroupsScreen({ data, setData, role, toastFn, onBack 
 
   const send = () => {
     if (!text.trim() || !activeGroupId) return;
+    const messageText = text.trim();
+    const senderLabel = role === "admin" ? t("admin") : t("parent");
     const msg = {
       id: uid(),
       groupId: activeGroupId,
       sender: role,
-      senderLabel: role === "admin" ? t("admin") : t("parent"),
-      text: text.trim(),
+      senderLabel: senderLabel,
+      text: messageText,
       ts: Date.now(),
     };
-    setData(d => ({ ...d, commMessages: [...(d.commMessages || []), msg] }));
+    
+    setData(d => {
+      let notifs = d.userNotifications || [];
+      if (role !== "admin") {
+        notifs = notifyAdminCommGroupMessage(d, activeGroupId, activeGroup?.nom, senderLabel, messageText);
+      }
+      return {
+        ...d,
+        commMessages: [...(d.commMessages || []), msg],
+        userNotifications: notifs,
+      };
+    });
     setText("");
   };
 

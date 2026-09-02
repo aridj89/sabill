@@ -14,6 +14,16 @@ export default function CommunicationScreen({ data, setData, initialTarget, onBa
   const [selectedSubgroupId, setSelectedSubgroupId] = useState(initialTarget?.subgroupId || data.subgroups[0]?.id || null);
   const [selectedStudentId, setSelectedStudentId]   = useState(initialTarget?.studentId || data.students[0]?.id || null);
 
+  useEffect(() => {
+    if (initialTarget?.studentId) {
+      setSection("private");
+      setSelectedStudentId(initialTarget.studentId);
+    } else if (initialTarget?.subgroupId) {
+      setSection("groups");
+      setSelectedSubgroupId(initialTarget.subgroupId);
+    }
+  }, [initialTarget?.studentId, initialTarget?.subgroupId]);
+
   // Filters for subgroups
   const [catFilter, setCatFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");

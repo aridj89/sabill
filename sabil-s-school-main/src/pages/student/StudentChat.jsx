@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Send, Users, User, MessageSquare } from "lucide-react";
 import { C, uid, inputStyle } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
-import { notifyAdminPrivateMessage } from "../../utils/notificationEngine";
+import { notifyAdminPrivateMessage, notifyAdminSubgroupMessage } from "../../utils/notificationEngine";
 
 export default function StudentChat({ student, subgroup, data, setData }) {
   const { lang } = useLanguage();
@@ -26,25 +26,32 @@ export default function StudentChat({ student, subgroup, data, setData }) {
   const handleSend = () => {
     if (!text.trim()) return;
 
+    const messageContent = text.trim();
+    const studentFullName = `${student.prenom} ${student.nom}`;
+
     const msgObj = {
       id: uid(),
       senderId: student.id,
       senderRole: "student",
-      senderName: `${student.prenom} ${student.nom}`,
-      content: text.trim(),
+      senderName: studentFullName,
+      content: messageContent,
       timestamp: new Date().toISOString(),
     };
 
     if (tab === "group") {
       msgObj.subgroupId = subgroup.id;
-      setData(d => ({
-        ...d,
-        subgroupMessages: [...(d.subgroupMessages || []), msgObj]
-      }));
+      setData(d => {
+        const notifs = notifyAdminSubgroupMessage(d, subgroup.id, subgroup.nom, studentFullName, messageContent);
+        return {
+          ...d,
+          subgroupMessages: [...(d.subgroupMessages || []), msgObj],
+          userNotifications: notifs,
+        };
+      });
     } else {
       msgObj.studentId = student.id;
       setData(d => {
-        const notifs = notifyAdminPrivateMessage(d, `${student.prenom} ${student.nom}`);
+        const notifs = notifyAdminPrivateMessage(d, student.id, studentFullName, messageContent);
         return {
           ...d,
           privateMessages: [...(d.privateMessages || []), msgObj],
