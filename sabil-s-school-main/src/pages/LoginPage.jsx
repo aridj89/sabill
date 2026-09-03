@@ -5,7 +5,7 @@ import { useLanguage } from "../context/LanguageContext";
 import LanguageToggle from "../components/ui/LanguageToggle";
 import "./LoginPage.css";
 
-export default function LoginPage({ data, toastFn }) {
+export default function LoginPage({ data, setData, toastFn }) {
   const { login } = useAuth();
   const { t, isRTL } = useLanguage();
   
@@ -46,6 +46,31 @@ export default function LoginPage({ data, toastFn }) {
       }
       const student = (data.students || []).find(st => st.phone === identifier && st.password === password);
       if (student) {
+        // Update lastLogin date + send welcome notification
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10);
+        const timeStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+        if (setData) {
+          setData(d => ({
+            ...d,
+            students: (d.students || []).map(s =>
+              s.id === student.id ? { ...s, lastLogin: now.toISOString() } : s
+            ),
+            userNotifications: [
+              ...(d.userNotifications || []),
+              {
+                id: Math.random().toString(36).slice(2, 10),
+                userId: student.id,
+                type: "info",
+                title: "مرحباً بعودتك 👋",
+                message: `تم تسجيل دخولك بتاريخ ${dateStr} الساعة ${timeStr}. إذا لم تكن أنت، قم بتغيير كلمة مرورك فوراً.`,
+                date: dateStr,
+                time: timeStr,
+                read: false,
+              }
+            ]
+          }));
+        }
         login("student", student.id);
         return;
       }

@@ -14,6 +14,7 @@ export default function StudentFormModal({ subgroupId, initial, enrollmentFee, o
     prenom: initial.prenom,
     phone: initial.phone || "",
     password: initial.password || "",
+    nfcCardId: initial.nfcCardId || "",
     enrollmentPaid: initial.enrollmentPaid,
     enrollmentDate: initial.enrollmentDate || new Date().toISOString().slice(0, 10),
   } : {
@@ -21,6 +22,7 @@ export default function StudentFormModal({ subgroupId, initial, enrollmentFee, o
     prenom: "",
     phone: "",
     password: uid().slice(0, 6), // auto-générer un mot de passe à 6 caractères
+    nfcCardId: "",
     enrollmentPaid: false,
     enrollmentDate: new Date().toISOString().slice(0, 10),
   });
@@ -35,6 +37,7 @@ export default function StudentFormModal({ subgroupId, initial, enrollmentFee, o
       prenom: form.prenom.trim(),
       phone: form.phone.trim(),
       password: form.password,
+      nfcCardId: (form.nfcCardId || "").trim(),
       subgroupId: subgroupId ?? initial?.subgroupId,
       enrollmentPaid: form.enrollmentPaid,
       enrollmentDate: form.enrollmentDate,
@@ -79,9 +82,14 @@ export default function StudentFormModal({ subgroupId, initial, enrollmentFee, o
         </Field>
       </div>
 
-      <Field label={lang === "ar" ? "تاريخ التسجيل" : "Date d'inscription"}>
-        <input type="date" style={inputStyle} value={form.enrollmentDate} onChange={e => set("enrollmentDate", e.target.value)} />
-      </Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label={lang === "ar" ? "تاريخ التسجيل" : "Date d'inscription"}>
+          <input type="date" style={inputStyle} value={form.enrollmentDate} onChange={e => set("enrollmentDate", e.target.value)} />
+        </Field>
+        <Field label={lang === "ar" ? "بطاقة NFC / الرمز (UID)" : "Puce / Carte NFC"}>
+          <input style={inputStyle} placeholder="UID: 04A1B2..." value={form.nfcCardId} onChange={e => set("nfcCardId", e.target.value)} />
+        </Field>
+      </div>
 
       {/* Frais d'inscription */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 12, background: form.enrollmentPaid ? "rgba(74,222,128,0.1)" : "rgba(251,191,36,0.1)", border: `1px solid ${form.enrollmentPaid ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}`, marginTop: 4 }}>

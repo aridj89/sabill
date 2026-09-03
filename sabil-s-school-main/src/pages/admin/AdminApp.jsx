@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Menu, Search, CalendarClock, Users, MessageCircle, LogOut, Settings, ChevronDown, Bell } from "lucide-react";
+import { Menu, Search, CalendarClock, Users, MessageCircle, LogOut, Settings, ChevronDown, Bell, Radio } from "lucide-react";
 import { C, CAT_BY_ID } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import IconBtn from "../../components/ui/IconBtn";
@@ -16,6 +16,7 @@ import StudentScreen from "./StudentScreen";
 import CalendarScreen from "./CalendarScreen";
 import CommunicationScreen from "./CommunicationScreen";
 import FinancialScreen from "./FinancialScreen";
+import NfcAttendanceScreen from "./NfcAttendanceScreen";
 
 // Anciennes pages (conservées)
 import ParentsScreen from "./ParentsScreen";
@@ -97,6 +98,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
           <GlobalSearch data={data} onNav={handleNav} />
           
           <div style={{ display: "flex", gap: 8, marginLeft: isRTL ? 0 : "auto", marginRight: isRTL ? "auto" : 0, alignItems: "center" }}>
+            <IconBtn icon={Radio} onClick={() => handleNav({ screen: "nfc" })} title={lang === "ar" ? "تسجيل الحضور بالبطاقة (NFC)" : "Pointage NFC"} />
             <LanguageToggle />
             
             {/* Notifications Dropdown */}
@@ -256,6 +258,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
         {nav.screen === "calendar" && <CalendarScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
         {nav.screen === "chat" && <CommunicationScreen data={data} setData={setData} initialTarget={nav} onBack={goBack} />}
         {nav.screen === "finance" && <FinancialScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
+        {nav.screen === "nfc" && <NfcAttendanceScreen data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
 
         {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} />}
         {nav.screen === "settings" && <SettingsScreen admin={data.admin} toastFn={toastFn} onSave={(a) => setData(d => ({ ...d, admin: a }))} onBack={goBack} />}

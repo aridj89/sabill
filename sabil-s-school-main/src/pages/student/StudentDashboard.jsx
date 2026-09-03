@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { CheckCircle2, XCircle, AlertTriangle, CalendarClock, Clock, CreditCard, Users, TrendingUp } from "lucide-react";
-import { C, CAT_BY_ID, computeCycles } from "../../theme/tokens";
+import { C, CAT_BY_ID, computeCycles, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function StudentDashboard({ student, subgroup, data }) {
@@ -88,7 +88,7 @@ export default function StudentDashboard({ student, subgroup, data }) {
             </div>
             
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              <div style={{ fontSize: 13, color: C.inkSoft, marginBottom: 8 }}>{lang === "ar" ? "تقدم الدورة الحالية (الدورة" : "Progression cycle actuel (Cycle"} {stats.currentCycle})</div>
+              <div style={{ fontSize: 13, color: C.inkSoft, marginBottom: 8 }}>{lang === "ar" ? "تقدم الحصص المنجزة" : "Progression des séances"}</div>
               <div style={{ height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 999, overflow: "hidden" }}>
                 <div style={{ height: "100%", background: C.accent, width: `${(stats.sessionsInCurrentCycle / (subgroup.sessionsPerCycle || 4)) * 100}%` }} />
               </div>
@@ -109,14 +109,14 @@ export default function StudentDashboard({ student, subgroup, data }) {
             ) : (
               <div style={{ display: "grid", gap: 10 }}>
                 {stats.upcoming.map(sess => (
-                  <div key={sess.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "rgba(255,255,255,0.05)", borderRadius: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                      <Clock size={12} color="#818cf8" />
-                      <span style={{ fontSize: 11, fontWeight: 800, color: "#818cf8", marginTop: 2 }}>{sess.time}</span>
+                  <div key={sess.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: C.accentSoft, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: C.accent }}>{sess.date.slice(8, 10)}</span>
+                      <span style={{ fontSize: 9, color: C.inkSoft, textTransform: "uppercase" }}>{new Date(sess.date).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { month: "short" })}</span>
                     </div>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
-                        {new Date(sess.date + "T12:00").toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { weekday: "long", day: "numeric", month: "short" })}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>{sess.time}</span>
                         {sess.isExtra && (
                           <span style={{ fontSize: 10.5, fontWeight: 800, color: C.accent, background: C.accentSoft, border: `1px solid rgba(226,150,58,0.3)`, padding: "2px 7px", borderRadius: 6 }}>
                             {lang === "ar" ? "حصة إضافية" : "Extra"}
@@ -138,31 +138,61 @@ export default function StudentDashboard({ student, subgroup, data }) {
         <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
           
           {/* Card: Paiements */}
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: 20 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: C.ink, margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
-              <CreditCard size={18} color="#f87171" />
-              {lang === "ar" ? "حالة الدفع" : "Mes paiements"}
-            </h3>
-            {stats.payments.length === 0 ? (
-              <div style={{ fontSize: 13, color: C.inkSoft }}>{lang === "ar" ? "لا توجد دورات مكتملة" : "Aucun cycle de paiement complété."}</div>
-            ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                {stats.payments.map(p => (
-                  <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: p.paid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.08)", border: `1px solid ${p.paid ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.3)"}`, borderRadius: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{lang === "ar" ? "دورة" : "Cycle"} {p.cycleNum}</div>
-                      <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{p.amount} DA</div>
+          {(() => {
+            const fin = getStudentFinancialSummary(data, student.id);
+            return (
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: C.ink, margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <CreditCard size={18} color={fin.totalUnpaid > 0 ? "#f87171" : "#4ade80"} />
+                  {lang === "ar" ? "الوضعية المالية والمدفوعات" : "Mes paiements"}
+                </h3>
+
+                {/* Summary box: Total Payé vs Total Restant */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+                  background: "rgba(255,255,255,0.04)", padding: "12px", borderRadius: 14,
+                  border: `1px solid ${C.border}`, marginBottom: 14
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", textTransform: "uppercase" }}>
+                      {lang === "ar" ? "المسدد (سلكت)" : "Total payé"}
                     </div>
-                    {p.paid ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", display: "flex", alignItems: "center", gap: 4 }}><CheckCircle2 size={16} /> {lang === "ar" ? "مدفوع" : "Payé"}</span>
-                    ) : (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171", display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle size={16} /> {lang === "ar" ? "غير مدفوع" : "En attente"}</span>
-                    )}
+                    <div className="f-mono" style={{ fontSize: 16, fontWeight: 800, color: "#4ade80", marginTop: 2 }}>
+                      {fin.totalPaid.toLocaleString()} DA
+                    </div>
                   </div>
-                ))}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>
+                      {lang === "ar" ? "المتبقي (باقيلك)" : "Reste à payer"}
+                    </div>
+                    <div className="f-mono" style={{ fontSize: 16, fontWeight: 800, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", marginTop: 2 }}>
+                      {fin.totalUnpaid > 0 ? `${fin.totalUnpaid.toLocaleString()} DA` : (lang === "ar" ? "مستوفى الكل ✓" : "À jour ✓")}
+                    </div>
+                  </div>
+                </div>
+
+                {stats.payments.length === 0 ? (
+                  <div style={{ fontSize: 13, color: C.inkSoft }}>{lang === "ar" ? "لا توجد دفعات مسجلة بعد." : "Aucun paiement enregistré."}</div>
+                ) : (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {stats.payments.map(p => (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: p.paid ? "rgba(74,222,128,0.05)" : "rgba(248,113,113,0.08)", border: `1px solid ${p.paid ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.3)"}`, borderRadius: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{lang === "ar" ? "دفعة" : "Paiement"} #{p.cycleNum || 1}</div>
+                          <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{p.amount} DA</div>
+                        </div>
+                        {p.paid ? (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", display: "flex", alignItems: "center", gap: 4 }}><CheckCircle2 size={16} /> {lang === "ar" ? "مدفوع" : "Payé"}</span>
+                        ) : (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171", display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle size={16} /> {lang === "ar" ? "غير مدفوع" : "En attente"}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
           
         </div>
       </div>

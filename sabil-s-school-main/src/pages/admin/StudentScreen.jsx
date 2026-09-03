@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { ArrowLeft, Edit2, CheckCircle2, XCircle, CreditCard, CalendarDays, TrendingUp } from "lucide-react";
-import { C, CAT_BY_ID, computeCycles } from "../../theme/tokens";
+import { C, CAT_BY_ID, computeCycles, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import StudentFormModal from "./StudentFormModal";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
+import { notifyPaymentReceived, notifyAccountUpdated } from "../../utils/notificationEngine";
 
 export default function StudentScreen({ studentId, data, setData, toastFn, onBack }) {
   const { lang } = useLanguage();
@@ -26,16 +27,48 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
   const unpaidPmtCount = payments.filter(p => !p.paid).length;
 
   const saveStudent = (student) => {
-    setData(d => ({ ...d, students: d.students.map(s => s.id === student.id ? student : s) }));
+    setData(d => {
+      const notifs = notifyAccountUpdated(d, student.id, lang === "ar" ? "تم تعديل وتحديث بيانات حسابك من قبل الإدارة." : "Votre profil a été mis à jour par l'administration.", lang);
+      return {
+        ...d,
+        students: d.students.map(s => s.id === student.id ? student : s),
+        userNotifications: notifs,
+      };
+    });
     setShowEdit(false);
-    if (toastFn) toastFn(lang === "ar" ? "تم تعديل التلميذ ✓" : "Élève modifié ✓");
+    if (toastFn) toastFn(lang === "ar" ? "تم تعديل التلميذ وإشعاره ✓" : "Élève modifié & notifié ✓");
   };
 
   const togglePaid = (pId) => {
-    setData(d => ({
-      ...d,
-      payments: d.payments.map(p => p.id === pId ? { ...p, paid: !p.paid, paidDate: !p.paid ? new Date().toISOString().slice(0, 10) : null } : p),
-    }));
+    const targetPmt = payments.find(p => p.id === pId);
+    const isNowPaid = targetPmt ? !targetPmt.paid : true;
+
+    setData(d => {
+      let notifs = d.userNotifications || [];
+      if (isNowPaid && targetPmt) {
+        notifs = notifyPaymentReceived(d, st.id, targetPmt.amount || (sg?.price || 0), {
+          type: "course",
+          subgroupId: st.subgroupId,
+          cycleNum: targetPmt.cycleNum
+        }, lang);
+      }
+      return {
+        ...d,
+        payments: d.payments.map(p => p.id === pId ? {
+          ...p,
+          paid: isNowPaid,
+          paidDate: isNowPaid ? new Date().toISOString().slice(0, 10) : null
+        } : p),
+        userNotifications: notifs,
+      };
+    });
+
+    if (toastFn) {
+      toastFn(isNowPaid
+        ? (lang === "ar" ? "تم تأكيد الدفع وإشعار التلميذ ✓" : "Paiement validé & élève notifié ✓")
+        : (lang === "ar" ? "تم إلغاء حالة الدفع" : "Paiement annulé")
+      );
+    }
   };
 
   return (
@@ -83,33 +116,51 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
       </div>
 
       {/* ── Status badges ──────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
-        {/* Enrollment */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: st.enrollmentPaid ? "rgba(74,222,128,0.12)" : "rgba(251,191,36,0.12)", border: `1px solid ${st.enrollmentPaid ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}` }}>
-          {st.enrollmentPaid ? <CheckCircle2 size={18} color="#4ade80" /> : <AlertTriangle size={18} color="#fbbf24" />}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: st.enrollmentPaid ? "#4ade80" : "#fbbf24", textTransform: "uppercase" }}>
-              {lang === "ar" ? "التسجيل" : "Inscription"}
+      {(() => {
+        const fin = getStudentFinancialSummary(data, st.id);
+        return (
+          <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
+            {/* Enrollment */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: st.enrollmentPaid ? "rgba(74,222,128,0.12)" : "rgba(251,191,36,0.12)", border: `1px solid ${st.enrollmentPaid ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}` }}>
+              {st.enrollmentPaid ? <CheckCircle2 size={18} color="#4ade80" /> : <AlertTriangle size={18} color="#fbbf24" />}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: st.enrollmentPaid ? "#4ade80" : "#fbbf24", textTransform: "uppercase" }}>
+                  {lang === "ar" ? "التسجيل" : "Inscription"}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+                  {st.enrollmentPaid ? (lang === "ar" ? "مدفوع ✓" : "Payé ✓") : (lang === "ar" ? "غير مدفوع ⚠" : "Impayé ⚠")}
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
-              {st.enrollmentPaid ? (lang === "ar" ? "مدفوع ✓" : "Payé ✓") : (lang === "ar" ? "غير مدفوع ⚠" : "Impayé ⚠")}
-            </div>
-          </div>
-        </div>
 
-        {/* Courses Payments */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: unpaidPmtCount === 0 ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.12)", border: `1px solid ${unpaidPmtCount === 0 ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}` }}>
-          {unpaidPmtCount === 0 ? <CheckCircle2 size={18} color="#4ade80" /> : <XCircle size={18} color="#f87171" />}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: unpaidPmtCount === 0 ? "#4ade80" : "#f87171", textTransform: "uppercase" }}>
-              {lang === "ar" ? "الدورات" : "Cours"}
+            {/* Total Paid / شحال سلك */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)" }}>
+              <CheckCircle2 size={18} color="#4ade80" />
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#4ade80", textTransform: "uppercase" }}>
+                  {lang === "ar" ? "المسدد (سلك)" : "Total payé"}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#4ade80" }}>
+                  {fin.totalPaid.toLocaleString()} DA
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
-              {unpaidPmtCount === 0 ? (lang === "ar" ? "مدفوع ✓" : "À jour ✓") : `${unpaidPmtCount} ${lang === "ar" ? "غير مدفوع ⚠" : "impayé(s) ⚠"}`}
+
+            {/* Total Unpaid / شحال ماسلكش */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: fin.totalUnpaid > 0 ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.12)", border: `1px solid ${fin.totalUnpaid > 0 ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)"}` }}>
+              {fin.totalUnpaid > 0 ? <AlertTriangle size={18} color="#f87171" /> : <CheckCircle2 size={18} color="#4ade80" />}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>
+                  {lang === "ar" ? "المتبقي (ماسلكش)" : "Reste à payer"}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80" }}>
+                  {fin.totalUnpaid > 0 ? `${fin.totalUnpaid.toLocaleString()} DA` : (lang === "ar" ? "مستوفى الكل ✓" : "À jour ✓")}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       <div className="student-screen-cols" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {/* ── Left col: Stats & Attendance ────────────────────── */}
@@ -156,18 +207,18 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
         {/* ── Right col: Payments ────────────────────────────── */}
         <div>
           <h3 className="f-display" style={{ margin: "0 0 14px", fontSize: 18, color: C.ink, fontWeight: 600 }}>
-            {lang === "ar" ? "تاريخ المدفوعات (الدورات)" : "Historique des paiements"}
+            {lang === "ar" ? "سجل المدفوعات" : "Historique des paiements"}
           </h3>
           <div style={{ display: "grid", gap: 10 }}>
             {payments.length === 0 ? (
               <div style={{ textAlign: "center", color: C.inkSoft, padding: "20px 0", fontSize: 13, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14 }}>
-                {lang === "ar" ? "لا توجد دورات مكتملة" : "Aucun cycle complété"}
+                {lang === "ar" ? "لا توجد دفعات مسجلة" : "Aucun paiement enregistré"}
               </div>
             ) : (
               payments.map(p => (
                 <div key={p.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontSize: 14.5, fontWeight: 700, color: C.ink }}>{lang === "ar" ? "دورة" : "Cycle"} {p.cycleNum}</div>
+                    <div style={{ fontSize: 14.5, fontWeight: 700, color: C.ink }}>{lang === "ar" ? "دفعة" : "Paiement"} #{p.cycleNum || 1}</div>
                     <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{p.amount} DA</div>
                   </div>
                   <button

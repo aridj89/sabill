@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import {
   X, ChevronRight, ChevronDown,
   MessageCircle, LayoutDashboard, Calendar, Landmark,
-  Users, Settings, BookOpen, Languages, GraduationCap,
+  Users, Settings, BookOpen, Languages, GraduationCap, Radio,
 } from "lucide-react";
 import { C, SCHOOL_CATS, CAT_BY_ID } from "../theme/tokens";
 import { useLanguage } from "../context/LanguageContext";
@@ -116,6 +116,11 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
         <button style={itemStyle(isActive("finance"))} onClick={() => go({ screen: "finance" })}>
           <Landmark size={16} color={C.accent} />
           {t("financeNav")}
+        </button>
+
+        <button style={itemStyle(isActive("nfc"))} onClick={() => go({ screen: "nfc" })}>
+          <Radio size={16} color="#4ade80" />
+          {lang === "ar" ? "تسجيل الحضور (NFC)" : "Pointage NFC"}
         </button>
 
         <button style={itemStyle(isActive("calendar"))} onClick={() => go({ screen: "calendar" })}>

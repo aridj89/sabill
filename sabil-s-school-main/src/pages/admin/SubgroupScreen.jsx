@@ -2,9 +2,9 @@ import React, { useState, useMemo } from "react";
 import {
   ArrowLeft, Plus, Trash2, Users, Calendar, CreditCard,
   CheckCircle2, XCircle, Edit2, Clock, AlertTriangle,
-  ChevronRight, BookOpen, Save,
+  ChevronRight, BookOpen, Save, Radio,
 } from "lucide-react";
-import { C, uid, CAT_BY_ID, computeCycles, DAY_SHORT } from "../../theme/tokens";
+import { C, uid, CAT_BY_ID, computeCycles, DAY_SHORT, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
 import Modal from "../../components/ui/Modal";
@@ -13,7 +13,7 @@ import StudentFormModal from "./StudentFormModal";
 import SessionDetailModal from "./SessionDetailModal";
 import SubgroupFormModal from "./SubgroupFormModal";
 import ExtraSessionModal from "./ExtraSessionModal";
-import { notifyPresenceChange, notifyPaymentRequired, notifyExtraSessionAdded } from "../../utils/notificationEngine";
+import { notifyPresenceChange, notifyPaymentRequired, notifyExtraSessionAdded, notifyPaymentReceived, notifyAccountUpdated } from "../../utils/notificationEngine";
 
 /* ── TAB button ──────────────────────────────────────────────── */
 function Tab({ label, icon: Icon, active, onClick, badge }) {
@@ -308,7 +308,18 @@ function PaymentsTab({ subgroup, students, data, setData }) {
       const newPayments = existing
         ? d.payments.map(p => p.id === pmtData.id ? pmtData : p)
         : [...d.payments, pmtData];
-      return { ...d, payments: newPayments };
+      
+      let nextNotifs = d.userNotifications || [];
+      if (pmtData.status === "paid" || (pmtData.status === "partial" && pmtData.paidAmount > 0)) {
+        const amount = pmtData.status === "paid" ? (pmtData.expectedAmount || subgroup.price) : pmtData.paidAmount;
+        nextNotifs = notifyPaymentReceived(d, pmtData.studentId, amount, {
+          type: "course",
+          subgroupId: subgroup.id,
+          month: selectedMonth
+        }, lang);
+      }
+
+      return { ...d, payments: newPayments, userNotifications: nextNotifs };
     });
     setEditSt(null);
   };
@@ -406,21 +417,31 @@ function PaymentsTab({ subgroup, students, data, setData }) {
 }
 
 /* ── Presences tab ───────────────────────────────────────────── */
-function PresencesTab({ subgroup, students, data }) {
+function PresencesTab({ subgroup, students, data, onNav }) {
   const { lang } = useLanguage();
   const doneSessions = data.sessions
     .filter(s => s.subgroupId === subgroup.id && s.status === "done")
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (doneSessions.length === 0) {
-    return <div style={{ textAlign: "center", color: C.inkSoft, padding: "30px 0" }}>
-      {lang === "ar" ? "لا توجد حصص منجزة بعد" : "Aucune séance effectuée"}
-    </div>;
-  }
-
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ fontSize: 13, color: C.inkSoft, fontWeight: 700 }}>
+          {lang === "ar" ? "جدول الحضور والغياب" : "Tableau des présences"}
+        </div>
+        <PrimaryBtn onClick={() => onNav && onNav({ screen: "nfc" })}>
+          <Radio size={15} />
+          {lang === "ar" ? "تسجيل الحضور NFC" : "Pointage NFC"}
+        </PrimaryBtn>
+      </div>
+
+      {doneSessions.length === 0 ? (
+        <div style={{ textAlign: "center", color: C.inkSoft, padding: "30px 0" }}>
+          {lang === "ar" ? "لا توجد حصص منجزة بعد" : "Aucune séance effectuée"}
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr>
             <th style={{ textAlign: "left", padding: "10px 12px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
@@ -468,6 +489,8 @@ function PresencesTab({ subgroup, students, data }) {
         </tbody>
       </table>
     </div>
+      )}
+    </div>
   );
 }
 
@@ -493,11 +516,19 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
   const saveStudent = (student) => {
     setData(d => {
       const exists = d.students.some(s => s.id === student.id);
-      return { ...d, students: exists ? d.students.map(s => s.id === student.id ? student : s) : [...d.students, student] };
+      let notifs = d.userNotifications || [];
+      if (exists) {
+        notifs = notifyAccountUpdated(d, student.id, lang === "ar" ? "تم تعديل وتحديث بيانات حسابك من قبل الإدارة." : "Votre profil a été mis à jour par l'administration.", lang);
+      }
+      return {
+        ...d,
+        students: exists ? d.students.map(s => s.id === student.id ? student : s) : [...d.students, student],
+        userNotifications: notifs
+      };
     });
     setShowAddStudent(false);
     setEditingStudent(null);
-    if (toastFn) toastFn(lang === "ar" ? "تم حفظ التلميذ ✓" : "Élève enregistré ✓");
+    if (toastFn) toastFn(lang === "ar" ? "تم حفظ التلميذ وإشعاره ✓" : "Élève enregistré & notifié ✓");
   };
 
   const deleteStudent = (id) => {
@@ -513,10 +544,33 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
   };
 
   const toggleEnrollment = (studentId) => {
-    setData(d => ({
-      ...d,
-      students: d.students.map(s => s.id === studentId ? { ...s, enrollmentPaid: !s.enrollmentPaid } : s),
-    }));
+    const feeAmount = data.settings?.enrollmentFee || 500;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const targetStudent = students.find(s => s.id === studentId);
+    const isNowPaid = targetStudent ? !targetStudent.enrollmentPaid : true;
+
+    setData(d => {
+      let notifs = d.userNotifications || [];
+      if (isNowPaid) {
+        notifs = notifyPaymentReceived(d, studentId, feeAmount, { type: "enrollment" }, lang);
+      }
+      return {
+        ...d,
+        students: d.students.map(s => s.id === studentId ? {
+          ...s,
+          enrollmentPaid: isNowPaid,
+          enrollmentDate: isNowPaid ? todayStr : s.enrollmentDate
+        } : s),
+        userNotifications: notifs,
+      };
+    });
+
+    if (toastFn) {
+      toastFn(isNowPaid
+        ? (lang === "ar" ? "تم تسديد حقوق التسجيل وإشعار التلميذ ✓" : "Frais payés & élève notifié ✓")
+        : (lang === "ar" ? "تم إلغاء تأكيد دفع التسجيل" : "Frais d'inscription annulés")
+      );
+    }
   };
 
   return (
@@ -535,7 +589,7 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
           </div>
           <h2 className="f-display" style={{ fontSize: 24, fontWeight: 700, color: C.ink, margin: 0 }}>{sg.nom}</h2>
           <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 4 }}>
-            {sg.days?.join(", ")} · {sg.time} · {sg.price} DA / {lang === "ar" ? "دورة" : "cycle"} ({sg.sessionsPerCycle} {lang === "ar" ? "حصص" : "séances"})
+            {sg.days?.join(", ")} · {sg.time} · {sg.price} DA ({sg.sessionsPerCycle} {lang === "ar" ? "حصص" : "séances"})
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -612,9 +666,31 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
                     background: st.enrollmentPaid ? "rgba(74,222,128,0.15)" : "rgba(251,191,36,0.15)",
                     color: st.enrollmentPaid ? "#4ade80" : "#fbbf24",
                   }}
+                  title={lang === "ar" ? "حقوق التسجيل" : "Frais d'inscription"}
                 >
                   {st.enrollmentPaid ? "✓ " + (lang === "ar" ? "تسجيل" : "Inscr.") : "⚠ " + (lang === "ar" ? "تسجيل" : "Inscr.")}
                 </button>
+
+                {/* Financial status pill: شحال سلك / شحال ماسلكش */}
+                {(() => {
+                  const fin = getStudentFinancialSummary(data, st.id);
+                  return (
+                    <div style={{
+                      fontSize: 11.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8,
+                      background: fin.totalUnpaid > 0 ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.1)",
+                      border: `1px solid ${fin.totalUnpaid > 0 ? "rgba(248,113,113,0.28)" : "rgba(74,222,128,0.28)"}`,
+                      color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", display: "flex", alignItems: "center", gap: 6
+                    }}>
+                      <span style={{ color: "#4ade80" }}>{lang === "ar" ? "سلك:" : "Payé:"} {fin.totalPaid.toLocaleString()} DA</span>
+                      {fin.totalUnpaid > 0 ? (
+                        <span style={{ color: "#f87171" }}>· {lang === "ar" ? "باقي:" : "Reste:"} {fin.totalUnpaid.toLocaleString()} DA</span>
+                      ) : (
+                        <span style={{ color: "#4ade80" }}>· {lang === "ar" ? "مستوفى ✓" : "À jour ✓"}</span>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Actions */}
                 <div style={{ display: "flex", gap: 4 }}>
                   <button onClick={() => onNav({ screen: "student", studentId: st.id })} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, cursor: "pointer" }}><ChevronRight size={14} /></button>
@@ -629,7 +705,7 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
       )}
 
       {tab === "presences" && (
-        <PresencesTab subgroup={sg} students={students} data={data} />
+        <PresencesTab subgroup={sg} students={students} data={data} onNav={onNav} />
       )}
 
       {tab === "payments" && (

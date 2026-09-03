@@ -130,12 +130,12 @@ export default function SubgroupFormModal({
         </div>
       </Field>
 
-      {/* Heure + Séances/cycle */}
+      {/* Heure + Séances */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label={lang === "ar" ? "التوقيت" : "Heure"}>
           <input type="time" style={inputStyle} value={form.time} onChange={e => set("time", e.target.value)} />
         </Field>
-        <Field label={lang === "ar" ? "حصص / دورة" : "Séances / cycle"}>
+        <Field label={lang === "ar" ? "عدد الحصص" : "Nb de séances"}>
           <input type="number" min={1} max={20} style={inputStyle} value={form.sessionsPerCycle} onChange={e => set("sessionsPerCycle", e.target.value)} />
         </Field>
       </div>
@@ -151,7 +151,7 @@ export default function SubgroupFormModal({
       </div>
 
       {/* Prix */}
-      <Field label={lang === "ar" ? "السعر (دج / دورة)" : "Prix (DA / cycle)"}>
+      <Field label={lang === "ar" ? "السعر (DA)" : "Prix (DA)"}>
         <input type="number" min={0} style={inputStyle} value={form.price} onChange={e => set("price", e.target.value)} />
       </Field>
 
@@ -159,12 +159,7 @@ export default function SubgroupFormModal({
       {previewCount > 0 && (
         <div style={{ background: "rgba(226,150,58,0.1)", border: "1px solid rgba(226,150,58,0.3)", borderRadius: 10, padding: "10px 14px", marginTop: 4, fontSize: 13, color: C.inkSoft }}>
           <span style={{ color: C.accent, fontWeight: 700 }}>{previewCount}</span>
-          {" "}{lang === "ar" ? "حصة ستُنشأ تلقائياً" : "séances seront générées automatiquement"}
-          {" · "}
-          <span style={{ color: C.accent, fontWeight: 700 }}>
-            {Math.floor(previewCount / (form.sessionsPerCycle || 4))}
-          </span>
-          {" "}{lang === "ar" ? "دورة" : "cycle(s)"}
+          {" "}{lang === "ar" ? "حصة ستُنشأ تلقائياً في البرنامج" : "séances seront générées automatiquement"}
         </div>
       )}
 

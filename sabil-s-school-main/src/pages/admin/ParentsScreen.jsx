@@ -4,13 +4,14 @@ import {
   Bell, Pencil, Trash2, Search, Plus, Filter, ShieldCheck, AlertCircle,
   CheckCircle2, X, RefreshCw, Send, Share2, GraduationCap, ChevronDown
 } from "lucide-react";
-import { C, uid, inputStyle, CAT_BY_ID } from "../../theme/tokens";
+import { C, uid, inputStyle, CAT_BY_ID, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
 import IconBtn from "../../components/ui/IconBtn";
 import Pill from "../../components/ui/Pill";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
+import { notifyPaymentReceived, notifyAccountUpdated } from "../../utils/notificationEngine";
 
 /* ── Modal: Modifier le mot de passe ── */
 function PasswordModal({ student, onClose, onSave }) {
@@ -397,6 +398,14 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       if (statusFilter === "no_pass" && s.password && s.password.trim()) return false;
       if (statusFilter === "paid" && !s.enrollmentPaid) return false;
       if (statusFilter === "unpaid" && s.enrollmentPaid) return false;
+      if (statusFilter === "debt") {
+        const fin = getStudentFinancialSummary(data, s.id);
+        if (fin.totalUnpaid === 0) return false;
+      }
+      if (statusFilter === "settled") {
+        const fin = getStudentFinancialSummary(data, s.id);
+        if (fin.totalUnpaid > 0) return false;
+      }
 
       // Text search
       if (search.trim()) {
@@ -472,21 +481,50 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   };
 
   const handleSaveStudentAccount = (studentData) => {
+    const isEdit = !!(editTarget);
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
     setData(d => {
       const exists = (d.students || []).some(s => s.id === studentData.id);
       let updatedStudents;
-      if (exists) {
-        updatedStudents = d.students.map(s => s.id === studentData.id ? { ...s, ...studentData } : s);
-      } else {
-        updatedStudents = [...(d.students || []), studentData];
+      const enrichedData = { ...studentData, lastModified: now.toISOString() };
+      if (!exists) {
+        enrichedData.createdAt = now.toISOString();
       }
-      return { ...d, students: updatedStudents };
+
+      if (exists) {
+        updatedStudents = d.students.map(s => s.id === studentData.id ? { ...s, ...enrichedData } : s);
+      } else {
+        updatedStudents = [...(d.students || []), enrichedData];
+      }
+
+      // Send notification to the student when their account is modified
+      let updatedNotifs = d.userNotifications || [];
+      if (isEdit) {
+        const notif = {
+          id: uid(),
+          userId: studentData.id,
+          type: "info",
+          title: lang === "ar" ? "تحديث بيانات حسابك 📝" : "Mise à jour de votre compte 📝",
+          message: lang === "ar"
+            ? `تم تعديل بيانات حسابك من قبل الإدارة بتاريخ ${dateStr} الساعة ${timeStr}.`
+            : `Les informations de votre compte ont été modifiées par l'administration le ${dateStr} à ${timeStr}.`,
+          date: dateStr,
+          time: timeStr,
+          read: false,
+        };
+        updatedNotifs = [...updatedNotifs, notif];
+      }
+
+      return { ...d, students: updatedStudents, userNotifications: updatedNotifs };
     });
 
     setShowAddModal(false);
     setEditTarget(null);
     toastFn(
-      editTarget
+      isEdit
         ? (lang === "ar" ? "تم تعديل حساب التلميذ ✓" : "Compte modifié ✓")
         : (lang === "ar" ? "تم إنشاء حساب التلميذ بنجاح ✓" : "Compte créé ✓")
     );
@@ -519,13 +557,23 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   };
 
   const toggleEnrollmentStatus = (student) => {
-    setData(d => ({
-      ...d,
-      students: d.students.map(s => s.id === student.id ? { ...s, enrollmentPaid: !s.enrollmentPaid } : s)
-    }));
+    const isNowPaid = !student.enrollmentPaid;
+    const feeAmount = data.settings?.enrollmentFee || 500;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    setData(d => {
+      let nextNotifications = d.userNotifications || [];
+      if (isNowPaid) {
+        nextNotifications = notifyPaymentReceived(d, student.id, feeAmount, { type: "enrollment" }, lang);
+      }
+      return {
+        ...d,
+        students: (d.students || []).map(s => s.id === student.id ? { ...s, enrollmentPaid: isNowPaid, enrollmentDate: isNowPaid ? todayStr : s.enrollmentDate } : s),
+        userNotifications: nextNotifications,
+      };
+    });
     toastFn(
-      !student.enrollmentPaid
-        ? (lang === "ar" ? "تم تحديد حقوق التسجيل كمدفوعة ✓" : "Frais d'inscription marqués payés ✓")
+      isNowPaid
+        ? (lang === "ar" ? "تم تسديد حقوق التسجيل وإشعار التلميذ ✓" : "Frais réglés & notification envoyée ✓")
         : (lang === "ar" ? "تم تحديد حقوق التسجيل كغير مدفوعة" : "Frais d'inscription marqués non payés")
     );
   };
@@ -682,12 +730,14 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
           </div>
 
           {/* Status filter tabs */}
-          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.05)", padding: 3, borderRadius: 10, border: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.05)", padding: 3, borderRadius: 10, border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
             {[
               { id: "all", label: lang === "ar" ? "الكل" : "Tous" },
               { id: "has_pass", label: lang === "ar" ? "بكلمة مرور" : "Avec MDP" },
               { id: "paid", label: lang === "ar" ? "التسجيل مسدد" : "Inscrits" },
               { id: "unpaid", label: lang === "ar" ? "التسجيل معلق" : "Non inscrits" },
+              { id: "debt", label: lang === "ar" ? "عليهم ديون (ماسلكوش)" : "Impayés" },
+              { id: "settled", label: lang === "ar" ? "مستوفين (سلكو)" : "À jour" },
             ].map(item => (
               <button
                 key={item.id}
@@ -713,12 +763,13 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
           const cat = sg ? CAT_BY_ID[sg.categoryId] : null;
           const isRevealed = !!revealedPasswords[st.id];
           const initials = `${(st.prenom || "")[0] || ""}${(st.nom || "")[0] || ""}`.toUpperCase() || "ST";
+          const fin = getStudentFinancialSummary(data, st.id);
 
           return (
             <div
               key={st.id}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16,
+                background: C.surface, border: `1px solid ${fin.totalUnpaid > 0 ? "rgba(248,113,113,0.3)" : C.border}`, borderRadius: 16,
                 padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between",
                 gap: 16, flexWrap: "wrap", transition: "border 0.2s, background 0.2s"
               }}
@@ -812,6 +863,38 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
                         {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Box: شحال سلك / شحال ماسلكش */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                background: fin.totalUnpaid > 0 ? "rgba(248,113,113,0.06)" : "rgba(74,222,128,0.06)",
+                border: `1px solid ${fin.totalUnpaid > 0 ? "rgba(248,113,113,0.28)" : "rgba(74,222,128,0.28)"}`,
+                padding: "8px 14px", borderRadius: 12, maxWidth: "100%", boxSizing: "border-box"
+              }}>
+                {/* Paid / شحال سلك */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#4ade80", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 4 }}>
+                    <CheckCircle2 size={11} />
+                    {lang === "ar" ? "المسدد (سلك)" : "Payé"}
+                  </div>
+                  <div className="f-mono" style={{ fontSize: 13.5, fontWeight: 800, color: "#4ade80", marginTop: 1 }}>
+                    {fin.totalPaid.toLocaleString()} DA
+                  </div>
+                </div>
+
+                <div style={{ width: 1, height: 26, background: fin.totalUnpaid > 0 ? "rgba(248,113,113,0.25)" : "rgba(74,222,128,0.25)" }} />
+
+                {/* Unpaid / شحال ماسلكش */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 4 }}>
+                    {fin.totalUnpaid > 0 ? <AlertCircle size={11} /> : <CheckCircle2 size={11} />}
+                    {lang === "ar" ? "المتبقي (ماسلكش)" : "Reste à payer"}
+                  </div>
+                  <div className="f-mono" style={{ fontSize: 13.5, fontWeight: 800, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", marginTop: 1 }}>
+                    {fin.totalUnpaid > 0 ? `${fin.totalUnpaid.toLocaleString()} DA` : (lang === "ar" ? "مستوفى الكل ✓" : "À jour ✓")}
                   </div>
                 </div>
               </div>

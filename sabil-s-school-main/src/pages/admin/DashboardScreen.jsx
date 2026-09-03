@@ -288,7 +288,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
       {unpaidModal && (
         <Modal
           title={unpaidModal === "courses" 
-            ? (lang === "ar" ? "قائمة غير المسددين للدورات" : "Liste des impayés de cours")
+            ? (lang === "ar" ? "قائمة غير المسددين للدروس" : "Liste des impayés de cours")
             : (lang === "ar" ? "قائمة غير المسددين للتسجيل" : "Liste des inscriptions non payées")
           }
           onClose={() => setUnpaidModal(null)}
@@ -297,7 +297,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
           {unpaidModal === "courses" ? (
             stats.courseUnpaidList.length === 0 ? (
               <div style={{ textAlign: "center", color: C.good, padding: "20px 0", fontWeight: 700 }}>
-                {lang === "ar" ? "الجميع مسدد لجميع الدورات! ✓" : "Tous les étudiants sont à jour de paiement ! ✓"}
+                {lang === "ar" ? "الجميع مسدد لجميع المستحقات! ✓" : "Tous les étudiants sont à jour de paiement ! ✓"}
               </div>
             ) : (
               <div style={{ display: "grid", gap: 10, maxHeight: 400, overflowY: "auto" }}>
@@ -306,7 +306,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{item.student.prenom} {item.student.nom}</div>
                       <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
-                        {item.subgroup.nom} · <span style={{ color: "#f87171", fontWeight: 700 }}>{lang === "ar" ? "دورة" : "Cycle"} {item.cycleNum} ({item.amount} DA)</span>
+                        {item.subgroup.nom} · <span style={{ color: "#f87171", fontWeight: 700 }}>{item.amount} DA</span>
                       </div>
                       <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }} className="f-mono">{item.student.phone}</div>
                     </div>
@@ -318,7 +318,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
                         {lang === "ar" ? "الملف" : "Fiche"}
                       </button>
                       <button
-                        onClick={() => handleSendReminder(item.student.id, item.amount, `cours (Cycle ${item.cycleNum})`)}
+                        onClick={() => handleSendReminder(item.student.id, item.amount, "de cours")}
                         style={{ padding: "6px 12px", borderRadius: 8, background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
                       >
                         <MessageCircle size={13} />

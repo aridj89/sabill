@@ -100,6 +100,53 @@ export function notifyPresenceChange(data, studentId, sessionDate, isPresent) {
 }
 
 /**
+ * Notifie un élève d'un paiement effectué avec succès (inscription ou mensualité/cycle).
+ */
+export function notifyPaymentReceived(data, studentId, amount, details = {}, lang = "ar") {
+  const { type = "course", subgroupId = null, month = "", cycleNum = null } = details;
+  const sg = subgroupId ? (data.subgroups || []).find(s => s.id === subgroupId) : null;
+  const sgName = sg ? sg.nom : "";
+
+  let title = "";
+  let message = "";
+
+  if (type === "enrollment") {
+    title = lang === "ar" ? "تأكيد تسديد حقوق التسجيل 🧾" : "Reçu de paiement d'inscription 🧾";
+    message = lang === "ar"
+      ? `تم استلام وتسجيل دفع حقوق التسجيل بمبلغ ${amount} دج بنجاح. شكراً لك!`
+      : `Le règlement de vos frais d'inscription d'un montant de ${amount} DA a bien été enregistré. Merci !`;
+  } else {
+    const period = cycleNum ? (lang === "ar" ? `(دفعة #${cycleNum})` : `(Paiement #${cycleNum})`) : (month ? `(شهر ${month})` : "");
+    title = lang === "ar" ? "تأكيد استلام الدفع 💳" : "Reçu de paiement de cours 💳";
+    message = lang === "ar"
+      ? `تم تأكيد دفع مستحقات الدروس ${sgName ? `(فوج ${sgName}) ` : ""}${period} بمبلغ ${amount} دج. حسابك محيّن ومستوفى.`
+      : `Le paiement de vos cours ${sgName ? `(${sgName}) ` : ""}${period} d'un montant de ${amount} DA a été validé avec succès.`;
+  }
+
+  const notif = createNotification(studentId, "payment", title, message, {
+    screen: "payments",
+    amount,
+    type,
+    subgroupId,
+  });
+
+  return [...(data.userNotifications || []), notif];
+}
+
+/**
+ * Notifie un élève d'une mise à jour de son compte (infos, groupe, etc.).
+ */
+export function notifyAccountUpdated(data, studentId, summary = "", lang = "ar") {
+  const title = lang === "ar" ? "تحديث في بيانات حسابك 🔄" : "Compte mis à jour 🔄";
+  const message = summary || (lang === "ar"
+    ? "تم تحديث معلومات حسابك من قبل الإدارة."
+    : "Les informations de votre compte ont été mises à jour par l'administration.");
+
+  const notif = createNotification(studentId, "info", title, message, { screen: "dashboard" });
+  return [...(data.userNotifications || []), notif];
+}
+
+/**
  * Notifie un élève d'un paiement en attente.
  */
 export function notifyPaymentRequired(data, studentId, amount, reason, customMessage = "") {

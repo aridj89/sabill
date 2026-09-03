@@ -148,6 +148,54 @@ export function computeCycles(sessions, subgroup) {
   return Math.floor(done / (subgroup.sessionsPerCycle || 4));
 }
 
+/**
+ * Returns a complete financial summary for a student: totalPaid and totalUnpaid (reste)
+ */
+export function getStudentFinancialSummary(data, studentId) {
+  if (!data) return { totalPaid: 0, totalUnpaid: 0, isSettled: true, enrollmentPaid: false };
+  const st = (data.students || []).find(s => s.id === studentId);
+  if (!st) return { totalPaid: 0, totalUnpaid: 0, isSettled: true, enrollmentPaid: false };
+
+  const sg = (data.subgroups || []).find(s => s.id === st.subgroupId);
+  const price = sg?.price || 0;
+  const enrollmentFee = data.settings?.enrollmentFee || 500;
+
+  let totalPaid = 0;
+  let totalUnpaid = 0;
+
+  // 1. Enrollment fee
+  if (st.enrollmentPaid) {
+    totalPaid += enrollmentFee;
+  } else {
+    totalUnpaid += enrollmentFee;
+  }
+
+  // 2. Payments recorded in data.payments
+  const stPayments = (data.payments || []).filter(p => p.studentId === studentId);
+  
+  if (stPayments.length > 0) {
+    stPayments.forEach(p => {
+      const expected = p.expectedAmount || p.amount || price;
+      const paid = (p.paid === true || p.status === "paid") ? expected : (p.paidAmount || 0);
+      totalPaid += paid;
+      const remaining = expected - paid;
+      if (remaining > 0) totalUnpaid += remaining;
+    });
+  } else if (sg) {
+    // If no payment records generated yet, check done cycles
+    const doneSessions = (data.sessions || []).filter(s => s.subgroupId === sg.id && s.status === "done").length;
+    const cycles = Math.max(1, Math.floor(doneSessions / (sg.sessionsPerCycle || 4)));
+    totalUnpaid += (cycles * price);
+  }
+
+  return {
+    totalPaid,
+    totalUnpaid,
+    isSettled: totalUnpaid === 0,
+    enrollmentPaid: !!st.enrollmentPaid,
+  };
+}
+
 /* ---------------------------------------------------------------
    LEGACY (kept for backward compatibility with CommGroups etc.)
 --------------------------------------------------------------- */

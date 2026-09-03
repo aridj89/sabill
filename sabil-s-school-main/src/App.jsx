@@ -63,7 +63,7 @@ export default function App() {
 
   return (
     <div>
-      {!auth.role && <LoginPage data={data} toastFn={toastFn} />}
+      {!auth.role && <LoginPage data={data} setData={setData} toastFn={toastFn} />}
       {auth.role === "admin" && <AdminApp data={data} setData={setData} onLogout={logout} toastFn={toastFn} />}
       {auth.role === "parent" && <ParentApp data={data} setData={setData} parentId={auth.parentId} onLogout={logout} toastFn={toastFn} />}
       {auth.role === "student" && <StudentApp data={data} setData={setData} studentId={auth.studentId} onLogout={logout} toastFn={toastFn} />}

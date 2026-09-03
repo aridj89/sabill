@@ -8,6 +8,7 @@ import { C, CAT_BY_ID, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
+import { notifyPaymentReceived } from "../../utils/notificationEngine";
 
 /* ─── helpers ──────────────────────────────────────────────── */
 const DA = (n) => `${(n || 0).toLocaleString("fr-DZ")} DA`;
@@ -354,10 +355,21 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
       const newPayments = existing
         ? d.payments.map(p => p.id === pmtData.id ? pmtData : p)
         : [...d.payments, pmtData];
-      return { ...d, payments: newPayments };
+      
+      let nextNotifs = d.userNotifications || [];
+      if (pmtData.status === "paid" || (pmtData.status === "partial" && pmtData.paidAmount > 0)) {
+        const amount = pmtData.status === "paid" ? (pmtData.expectedAmount || pmtData.paidAmount) : pmtData.paidAmount;
+        nextNotifs = notifyPaymentReceived(d, pmtData.studentId, amount, {
+          type: "course",
+          subgroupId: pmtData.subgroupId,
+          month: pmtData.month
+        }, lang);
+      }
+
+      return { ...d, payments: newPayments, userNotifications: nextNotifs };
     });
     setEditPayment(null);
-    if (toastFn) toastFn(lang === "ar" ? "تم حفظ الدفع ✓" : "Paiement enregistré ✓");
+    if (toastFn) toastFn(lang === "ar" ? "تم حفظ الدفع وإشعار التلميذ ✓" : "Paiement enregistré & élève notifié ✓");
   };
 
   // ── Quick mark all as paid ───────────────────────────────────
@@ -367,6 +379,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
     const sgStudents = data.students.filter(s => s.subgroupId === sgId);
     setData(d => {
       let payments = [...d.payments];
+      let notifs = d.userNotifications || [];
       sgStudents.forEach(st => {
         const idx = payments.findIndex(p => p.studentId === st.id && p.subgroupId === sgId && p.month === selectedMonth);
         const pmt = {
@@ -377,10 +390,16 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
         };
         if (idx >= 0) payments[idx] = pmt;
         else payments.push(pmt);
+
+        notifs = notifyPaymentReceived({ ...d, userNotifications: notifs }, st.id, sg.price, {
+          type: "course",
+          subgroupId: sgId,
+          month: selectedMonth
+        }, lang);
       });
-      return { ...d, payments };
+      return { ...d, payments, userNotifications: notifs };
     });
-    if (toastFn) toastFn(lang === "ar" ? "تم تحديد الكل كمدفوع ✓" : "Tous marqués comme payés ✓");
+    if (toastFn) toastFn(lang === "ar" ? "تم تأكيد دفع الجميع وإرسال الإشعارات ✓" : "Tous marqués payés & élèves notifiés ✓");
   };
 
   const statusPill = (pmt, price) => {
