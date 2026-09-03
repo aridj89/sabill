@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { loadDataFromStorage, persistData } from "./data/defaultData";
+import { loadDataFromStorage, persistData, fetchCleanData } from "./data/defaultData";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import { C } from "./theme/tokens";

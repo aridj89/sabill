@@ -6,6 +6,7 @@ import IconBtn from "../../components/ui/IconBtn";
 import AvatarDisplay from "../../components/ui/AvatarDisplay";
 import LanguageToggle from "../../components/ui/LanguageToggle";
 import AppSidebar from "../../components/AppSidebar";
+import GlobalSearch from "../../components/GlobalSearch";
 
 // Nouvelles pages
 import DashboardScreen from "./DashboardScreen";
@@ -14,6 +15,7 @@ import SubgroupScreen from "./SubgroupScreen";
 import StudentScreen from "./StudentScreen";
 import CalendarScreen from "./CalendarScreen";
 import CommunicationScreen from "./CommunicationScreen";
+import FinancialScreen from "./FinancialScreen";
 
 // Anciennes pages (conservées)
 import ParentsScreen from "./ParentsScreen";
@@ -89,21 +91,10 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
     <div className="f-body" style={{ minHeight: "100vh", background: C.bg }}>
       {/* ── Topbar ─────────────────────────────────────────── */}
       <div style={{ position: "sticky", top: 0, zIndex: 40, ...C.glassStyle, borderRadius: 0, borderLeft: "none", borderRight: "none", borderTop: "none", padding: "12px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+        <div className="topbar-inner" style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
           <IconBtn icon={Menu} onClick={() => setSidebarOpen(true)} title={lang === "ar" ? "القائمة" : "Menu"} />
           
-          <div style={{ position: "relative", flex: 1, maxWidth: 320, marginLeft: isRTL ? 0 : 6, marginRight: isRTL ? 6 : 0, height: 40, display: "flex", alignItems: "center" }}>
-            <Search size={16} color={C.inkSoft} style={{ position: "absolute", left: isRTL ? "auto" : 12, right: isRTL ? 12 : "auto", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-            <input
-              placeholder={lang === "ar" ? "بحث عن تلميذ، أب، فوج…" : "Rechercher un élève, groupe..."}
-              style={{
-                width: "100%", height: 40, borderRadius: 12, border: `1px solid ${C.border}`,
-                fontSize: 13.5, color: C.ink, outline: "none",
-                background: "rgba(255,255,255,0.1)", backdropFilter: "blur(4px)",
-                paddingLeft: isRTL ? 12 : 36, paddingRight: isRTL ? 36 : 12,
-              }}
-            />
-          </div>
+          <GlobalSearch data={data} onNav={handleNav} />
           
           <div style={{ display: "flex", gap: 8, marginLeft: isRTL ? 0 : "auto", marginRight: isRTL ? "auto" : 0, alignItems: "center" }}>
             <LanguageToggle />
@@ -114,7 +105,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
               {notifOpen && (
                 <div style={{
                   position: "absolute", top: "calc(100% + 10px)", right: isRTL ? "auto" : 0, left: isRTL ? 0 : "auto",
-                  width: 340, maxHeight: 420, overflowY: "auto",
+                  width: 340, maxWidth: "calc(100vw - 24px)", maxHeight: 420, overflowY: "auto",
                   background: "linear-gradient(160deg, rgba(22,18,71,0.98) 0%, rgba(45,30,12,0.95) 55%, rgba(18,50,60,0.98) 100%)",
                   backdropFilter: "blur(24px) saturate(1.4)", border: "1px solid rgba(255,255,255,0.22)",
                   boxShadow: "0 24px 48px rgba(0,0,0,0.65)", borderRadius: 18, zIndex: 200, padding: 14
@@ -185,8 +176,12 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
               )}
             </div>
 
-            <IconBtn icon={CalendarClock} onClick={() => setNav({ screen: "calendar" })} active={nav.screen === "calendar"} title={lang === "ar" ? "الجدول الزمني" : "Calendrier"} />
-            <IconBtn icon={MessageCircle} onClick={() => setNav({ screen: "chat" })} active={nav.screen === "chat"} title={t("messagesNav")} />
+            <span className="hide-on-mobile-sm">
+              <IconBtn icon={CalendarClock} onClick={() => setNav({ screen: "calendar" })} active={nav.screen === "calendar"} title={lang === "ar" ? "الجدول الزمني" : "Calendrier"} />
+            </span>
+            <span className="hide-on-mobile-sm">
+              <IconBtn icon={MessageCircle} onClick={() => setNav({ screen: "chat" })} active={nav.screen === "chat"} title={t("messagesNav")} />
+            </span>
             
             {/* Profile Dropdown */}
             <div ref={profileRef} style={{ position: "relative" }}>
@@ -201,7 +196,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
                 }}
               >
                 <AvatarDisplay avatar={data.admin.avatar} size={26} style={{ border: "none", boxShadow: "none", background: "transparent" }} />
-                <div style={{ textAlign: isRTL ? "right" : "left", lineHeight: 1.15 }}>
+                <div className="hide-on-mobile-xs" style={{ textAlign: isRTL ? "right" : "left", lineHeight: 1.15 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>{data.admin.prenom} {data.admin.nom}</div>
                   <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.55)" }}>@{data.admin.username}</div>
                 </div>
@@ -211,7 +206,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
               {profileOpen && (
                 <div style={{
                   position: "absolute", top: "calc(100% + 10px)", right: isRTL ? "auto" : 0, left: isRTL ? 0 : "auto",
-                  width: 220, background: "linear-gradient(160deg, rgba(22,18,71,0.96) 0%, rgba(71,48,18,0.92) 55%, rgba(18,68,71,0.96) 100%)",
+                  width: 220, maxWidth: "calc(100vw - 24px)", background: "linear-gradient(160deg, rgba(22,18,71,0.96) 0%, rgba(71,48,18,0.92) 55%, rgba(18,68,71,0.96) 100%)",
                   backdropFilter: "blur(24px) saturate(1.4)", border: "1px solid rgba(255,255,255,0.22)",
                   boxShadow: "0 24px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.1)", borderRadius: 18, overflow: "hidden", zIndex: 200,
                 }}>
@@ -253,15 +248,16 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
       />
 
       {/* ── Main content area ── */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 80px" }}>
+      <div className="main-content-layout" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 80px" }}>
         {nav.screen === "dashboard" && <DashboardScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
         {nav.screen === "structure" && <SchoolStructureScreen catId={nav.catId} levelId={nav.levelId} groupType={nav.groupType} data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
         {nav.screen === "subgroup" && <SubgroupScreen subgroupId={nav.subgroupId} openSessionId={nav.openSessionId} data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
         {nav.screen === "student" && <StudentScreen studentId={nav.studentId} data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
         {nav.screen === "calendar" && <CalendarScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
         {nav.screen === "chat" && <CommunicationScreen data={data} setData={setData} initialTarget={nav} onBack={goBack} />}
+        {nav.screen === "finance" && <FinancialScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
 
-        {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(pid) => handleNav({ screen: "chat", parentId: pid })} onBack={goBack} />}
+        {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} />}
         {nav.screen === "settings" && <SettingsScreen admin={data.admin} toastFn={toastFn} onSave={(a) => setData(d => ({ ...d, admin: a }))} onBack={goBack} />}
       </div>
     </div>

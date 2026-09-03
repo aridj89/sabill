@@ -78,8 +78,13 @@ export default function StudentCalendar({ student, subgroup, data }) {
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 8 }}>
                     {new Date(sess.date + "T12:00").toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                    {sess.isExtra && (
+                      <span style={{ fontSize: 11, fontWeight: 800, color: C.accent, background: C.accentSoft, border: `1px solid rgba(226,150,58,0.35)`, padding: "2px 8px", borderRadius: 6 }}>
+                        {lang === "ar" ? "حصة إضافية" : "Extra"}
+                      </span>
+                    )}
                   </div>
                   {sess.note && <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 2 }}>{sess.note}</div>}
                 </div>

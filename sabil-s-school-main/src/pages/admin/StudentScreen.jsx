@@ -111,7 +111,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="student-screen-cols" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {/* ── Left col: Stats & Attendance ────────────────────── */}
         <div>
           <h3 className="f-display" style={{ margin: "0 0 14px", fontSize: 18, color: C.ink, fontWeight: 600 }}>

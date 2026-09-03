@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import {
   X, ChevronRight, ChevronDown,
-  MessageCircle, LayoutDashboard, Calendar,
-  Users, Settings, BookOpen, Languages,
+  MessageCircle, LayoutDashboard, Calendar, Landmark,
+  Users, Settings, BookOpen, Languages, GraduationCap,
 } from "lucide-react";
 import { C, SCHOOL_CATS, CAT_BY_ID } from "../theme/tokens";
 import { useLanguage } from "../context/LanguageContext";
@@ -73,6 +73,7 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
           position: "fixed",
           top: 65, left: 18,
           width: 300,
+          maxWidth: "calc(100vw - 28px)",
           maxHeight: "calc(100vh - 100px)",
           zIndex: 95,
           overflowY: "auto",
@@ -110,6 +111,11 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
         <button style={itemStyle(isActive("dashboard"))} onClick={() => go({ screen: "dashboard" })}>
           <LayoutDashboard size={16} color={C.accent} />
           {lang === "ar" ? "لوحة القيادة" : "Tableau de bord"}
+        </button>
+
+        <button style={itemStyle(isActive("finance"))} onClick={() => go({ screen: "finance" })}>
+          <Landmark size={16} color={C.accent} />
+          {t("financeNav")}
         </button>
 
         <button style={itemStyle(isActive("calendar"))} onClick={() => go({ screen: "calendar" })}>
@@ -222,7 +228,7 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
         {sectionLabel(lang === "ar" ? "أقسام أخرى" : "Autres")}
 
         <button style={itemStyle(isActive("parents"))} onClick={() => go({ screen: "parents" })}>
-          <Users size={16} color={C.accent} />
+          <GraduationCap size={16} color={C.accent} />
           {t("parentsList")}
         </button>
 

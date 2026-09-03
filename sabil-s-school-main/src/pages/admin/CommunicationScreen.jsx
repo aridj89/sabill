@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Users, User, Send, Filter, Search, ArrowLeft } from "lucide-react";
 import { C, uid, inputStyle, SCHOOL_CATS, CAT_BY_ID } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -144,7 +144,7 @@ export default function CommunicationScreen({ data, setData, initialTarget, onBa
       </div>
 
       {/* ── Main Layout ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20, height: 550 }}>
+      <div className="comm-main-grid" style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20, height: 550 }}>
         
         {/* Left Column: Selector */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: 16, display: "flex", flexDirection: "column" }}>

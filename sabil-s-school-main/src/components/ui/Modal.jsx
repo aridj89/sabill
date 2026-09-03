@@ -6,12 +6,13 @@ export default function Modal({ title, onClose, children, wide }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 100,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "12px",
       backdropFilter: "blur(14px) brightness(0.5)",
       WebkitBackdropFilter: "blur(14px) brightness(0.5)",
       background: "rgba(10,8,30,0.5)",
+      boxSizing: "border-box",
     }} onClick={onClose}>
-      <div className="f-body" onClick={e => e.stopPropagation()} style={{
+      <div className="f-body modal-card-content" onClick={e => e.stopPropagation()} style={{
         ...C.glassStyle,
         borderRadius: 20,
         width: "100%",
@@ -19,6 +20,7 @@ export default function Modal({ title, onClose, children, wide }) {
         padding: 24,
         maxHeight: "88vh",
         overflowY: "auto",
+        boxSizing: "border-box",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h3 className="f-display" style={{ margin: 0, fontSize: 20, color: C.ink, fontWeight: 600 }}>{title}</h3>

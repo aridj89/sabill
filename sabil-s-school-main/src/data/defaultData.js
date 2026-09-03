@@ -41,6 +41,7 @@ export function defaultData() {
     messages: [],
     notifications: [],
     extraSessions: [],
+    extraSessionPayments: [],
     commCategories: [{ id: "cat1comm", nom: "Langue Française" }],
     commGroups: [],
     commMessages: [],

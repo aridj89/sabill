@@ -21,29 +21,68 @@ function createNotification(userId, type, title, message, meta = {}) {
 }
 
 /**
+ * Notifie tous les élèves d'un sous-groupe qu'une séance supplémentaire a été ajoutée.
+ */
+export function notifyExtraSessionAdded(data, subgroupId, extraSession, lang = "ar") {
+  const students = (data.students || []).filter(s => s.subgroupId === subgroupId);
+  if (students.length === 0) return data.userNotifications || [];
+
+  const dateFormatted = extraSession.date;
+  const timeFormatted = extraSession.time;
+  const noteText = extraSession.note ? extraSession.note.trim() : "";
+
+  const title = lang === "ar" ? "حصة إضافية جديدة 📅" : "Nouvelle séance supplémentaire 📅";
+  const message = lang === "ar"
+    ? `تمت برمجة حصة إضافية جديدة يوم ${dateFormatted} على الساعة ${timeFormatted}.${noteText ? ` الموضوع: ${noteText}` : ""}`
+    : `Une séance supplémentaire a été programmée le ${dateFormatted} à ${timeFormatted}.${noteText ? ` Sujet : ${noteText}` : ""}`;
+
+  const newNotifs = students.map(st => createNotification(
+    st.id,
+    "session",
+    title,
+    message,
+    { screen: "calendar", subgroupId, date: extraSession.date, time: extraSession.time }
+  ));
+
+  return [...(data.userNotifications || []), ...newNotifs];
+}
+
+/**
  * Notifie tous les élèves d'un sous-groupe qu'une séance a été ajoutée/modifiée/annulée.
  */
-export function notifySessionChange(data, subgroupId, actionType, sessionDetails) {
-  const students = data.students.filter(s => s.subgroupId === subgroupId);
-  if (students.length === 0) return data.userNotifications;
+export function notifySessionChange(data, subgroupId, actionType, sessionDetails, lang = "ar") {
+  const students = (data.students || []).filter(s => s.subgroupId === subgroupId);
+  if (students.length === 0) return data.userNotifications || [];
 
   let title = "";
   let message = "";
 
   if (actionType === "added") {
-    title = "Nouvelle séance";
-    message = `Une séance supplémentaire a été ajoutée le ${sessionDetails.date} à ${sessionDetails.time}.`;
+    title = lang === "ar" ? "حصة جديدة مبرمجة 📅" : "Nouvelle séance programmée 📅";
+    message = lang === "ar"
+      ? `أضاف الأستاذ حصة جديدة يوم ${sessionDetails.date} على الساعة ${sessionDetails.time}.`
+      : `Une séance a été ajoutée le ${sessionDetails.date} à ${sessionDetails.time}.`;
   } else if (actionType === "modified") {
-    title = "Séance modifiée";
-    message = `La séance du ${sessionDetails.date} à ${sessionDetails.time} a été modifiée.`;
+    title = lang === "ar" ? "تعديل في توقيت الحصة ⏰" : "Séance modifiée ⏰";
+    message = lang === "ar"
+      ? `تم تعديل الحصة لتصبح يوم ${sessionDetails.date} على الساعة ${sessionDetails.time}.`
+      : `La séance a été modifiée : ${sessionDetails.date} à ${sessionDetails.time}.`;
   } else if (actionType === "cancelled") {
-    title = "Séance annulée";
-    message = `La séance prévue le ${sessionDetails.date} à ${sessionDetails.time} a été annulée.`;
+    title = lang === "ar" ? "إلغاء حصة ⚠️" : "Séance annulée ⚠️";
+    message = lang === "ar"
+      ? `تم إلغاء الحصة المقررة يوم ${sessionDetails.date} على الساعة ${sessionDetails.time}.`
+      : `La séance prévue le ${sessionDetails.date} à ${sessionDetails.time} a été annulée.`;
   } else {
-    return data.userNotifications;
+    return data.userNotifications || [];
   }
 
-  const newNotifs = students.map(st => createNotification(st.id, "session", title, message));
+  const newNotifs = students.map(st => createNotification(
+    st.id,
+    "session",
+    title,
+    message,
+    { screen: "calendar", subgroupId, date: sessionDetails.date, time: sessionDetails.time }
+  ));
   return [...(data.userNotifications || []), ...newNotifs];
 }
 

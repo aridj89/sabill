@@ -115,11 +115,16 @@ export default function StudentDashboard({ student, subgroup, data }) {
                       <span style={{ fontSize: 11, fontWeight: 800, color: "#818cf8", marginTop: 2 }}>{sess.time}</span>
                     </div>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
                         {new Date(sess.date + "T12:00").toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { weekday: "long", day: "numeric", month: "short" })}
+                        {sess.isExtra && (
+                          <span style={{ fontSize: 10.5, fontWeight: 800, color: C.accent, background: C.accentSoft, border: `1px solid rgba(226,150,58,0.3)`, padding: "2px 7px", borderRadius: 6 }}>
+                            {lang === "ar" ? "حصة إضافية" : "Extra"}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
-                        {subgroup.nom} {cat ? `· ${cat.label}` : ""}
+                        {subgroup.nom} {cat ? `· ${cat.label}` : ""} {sess.note ? `· ${sess.note}` : ""}
                       </div>
                     </div>
                   </div>

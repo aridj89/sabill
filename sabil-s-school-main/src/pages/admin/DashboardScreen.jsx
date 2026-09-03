@@ -186,9 +186,10 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginBottom: 30 }}>
         <StatCard
           icon={Users}
-          label={lang === "ar" ? "إجمالي التلاميذ" : "Total élèves"}
+          label={lang === "ar" ? "إجمالي التلاميذ (انقر لفتح الحسابات)" : "Total élèves (cliquer pour gérer)"}
           value={stats.totalStudents}
           color="#818cf8" bg="rgba(99,102,241,0.2)" border="rgba(99,102,241,0.35)"
+          onClick={() => onNav && onNav({ screen: "parents" })}
         />
         <StatCard
           icon={CalendarCheck}

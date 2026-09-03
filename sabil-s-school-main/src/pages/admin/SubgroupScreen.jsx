@@ -2,16 +2,18 @@ import React, { useState, useMemo } from "react";
 import {
   ArrowLeft, Plus, Trash2, Users, Calendar, CreditCard,
   CheckCircle2, XCircle, Edit2, Clock, AlertTriangle,
-  ChevronRight, BookOpen,
+  ChevronRight, BookOpen, Save,
 } from "lucide-react";
 import { C, uid, CAT_BY_ID, computeCycles, DAY_SHORT } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
+import Modal from "../../components/ui/Modal";
 import Pill from "../../components/ui/Pill";
 import StudentFormModal from "./StudentFormModal";
 import SessionDetailModal from "./SessionDetailModal";
 import SubgroupFormModal from "./SubgroupFormModal";
-import { notifyPresenceChange, notifyPaymentRequired } from "../../utils/notificationEngine";
+import ExtraSessionModal from "./ExtraSessionModal";
+import { notifyPresenceChange, notifyPaymentRequired, notifyExtraSessionAdded } from "../../utils/notificationEngine";
 
 /* ── TAB button ──────────────────────────────────────────────── */
 function Tab({ label, icon: Icon, active, onClick, badge }) {
@@ -41,8 +43,9 @@ function Tab({ label, icon: Icon, active, onClick, badge }) {
 
 /* ── Upcoming sessions mini calendar ─────────────────────────── */
 function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const [openSession, setOpenSession] = useState(null);
+  const [showExtraModal, setShowExtraModal] = useState(false);
   const sorted = [...sessions].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const saveSession = (updatedSess, newAttendances) => {
@@ -99,44 +102,80 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
     cancelled: { bg: "rgba(248,113,113,0.12)", border: "rgba(248,113,113,0.3)", color: "#f87171" },
   }[s] || {});
 
+  const saveExtraSession = (es) => {
+    setData(d => {
+      const extraSessions = [...(d.extraSessions || []), es];
+      // Create session object so it shows up in calendar and student dashboard
+      const sessionEntry = {
+        id: es.id,
+        subgroupId: es.subgroupId,
+        date: es.date,
+        time: es.time,
+        isExtra: true,
+        price: es.price,
+        isGroupPrice: es.isGroupPrice,
+        note: es.note,
+        status: "planned",
+      };
+      const sessions = [...(d.sessions || []), sessionEntry];
+      // Notify all students in this subgroup
+      const userNotifications = notifyExtraSessionAdded(d, subgroup.id, es, lang);
+      return {
+        ...d,
+        extraSessions,
+        sessions,
+        userNotifications,
+      };
+    });
+    setShowExtraModal(false);
+    if (toastFn) toastFn(lang === "ar" ? "تمت إضافة الحصة الإضافية وإشعار جميع التلاميذ بنجاح ✓" : "Séance suppl. ajoutée et élèves notifiés ✓");
+  };
+
   return (
     <>
+      {/* ── Sessions List ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+        <PrimaryBtn onClick={() => setShowExtraModal(true)}><Plus size={16} /> {t("addExtraSession")}</PrimaryBtn>
+      </div>
       <div style={{ display: "grid", gap: 8 }}>
         {sorted.map(sess => {
           const ss = statusStyle(sess.status);
           const att = data.attendances.filter(a => a.sessionId === sess.id);
           const presentCnt = att.filter(a => a.present).length;
           const sgStudents = students.length;
+          const isExtra = sess.isExtra; // Note: extra sessions logic
+          
           return (
             <div
               key={sess.id}
-              onClick={() => setOpenSession(sess)}
+              onClick={() => !isExtra ? setOpenSession(sess) : null} // TODO: Extra session detail
               style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
-                borderRadius: 13, cursor: "pointer",
+                borderRadius: 13, cursor: isExtra ? "default" : "pointer",
                 background: ss.bg || "rgba(255,255,255,0.05)",
-                border: `1px solid ${ss.border || C.border}`,
+                border: `1px solid ${isExtra ? C.accent : (ss.border || C.border)}`,
                 transition: "all 0.15s",
               }}
               onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
               onMouseLeave={e => e.currentTarget.style.opacity = "1"}
             >
-              <div style={{ width: 44, height: 44, borderRadius: 11, background: ss.bg, border: `1px solid ${ss.border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Clock size={12} color={ss.color} />
-                <span style={{ fontSize: 11, fontWeight: 800, color: ss.color, marginTop: 1 }}>{sess.time}</span>
+              <div style={{ width: 44, height: 44, borderRadius: 11, background: isExtra ? "rgba(226,150,58,0.2)" : ss.bg, border: `1px solid ${isExtra ? "rgba(226,150,58,0.4)" : ss.border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Clock size={12} color={isExtra ? C.accent : ss.color} />
+                <span style={{ fontSize: 11, fontWeight: 800, color: isExtra ? C.accent : ss.color, marginTop: 1 }}>{sess.time}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
                   {new Date(sess.date + "T12:00").toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { weekday: "short", day: "numeric", month: "short" })}
+                  {isExtra && <span style={{ background: C.accentSoft, color: C.accent, fontSize: 10, padding: "2px 6px", borderRadius: 4 }}>{lang === "ar" ? "إضافية" : "Extra"}</span>}
                 </div>
                 {sess.note && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sess.note}</div>}
               </div>
-              {sess.status === "done" && (
+              {sess.status === "done" && !isExtra && (
                 <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>
                   {presentCnt}/{sgStudents}
                 </span>
               )}
-              <ChevronRight size={14} color={C.inkSoft} />
+              {!isExtra && <ChevronRight size={14} color={C.inkSoft} />}
             </div>
           );
         })}
@@ -157,72 +196,211 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
           onSave={saveSession}
         />
       )}
+
+      {showExtraModal && (
+        <ExtraSessionModal
+          subgroupId={subgroup.id}
+          onClose={() => setShowExtraModal(false)}
+          onSave={saveExtraSession}
+        />
+      )}
     </>
+  );
+}
+
+/* ── Payment Edit Modal (inline) ─────────────────────────────── */
+function PayEditModal({ student, subgroup, payment, month, onClose, onSave }) {
+  const { lang } = useLanguage();
+  const price = subgroup.price || 0;
+  const [status, setStatus] = useState(payment?.status || "unpaid");
+  const [paidAmount, setPaidAmount] = useState(
+    payment?.status === "paid" ? price : (payment?.paidAmount || 0)
+  );
+  const [paidDate, setPaidDate] = useState(payment?.paidDate || new Date().toISOString().slice(0, 10));
+
+  const handleSave = () => {
+    const finalPaid = status === "paid" ? price : status === "partial" ? Number(paidAmount) : 0;
+    onSave({
+      id: payment?.id || uid(),
+      studentId: student.id,
+      subgroupId: subgroup.id,
+      month,
+      expectedAmount: price,
+      paidAmount: finalPaid,
+      status,
+      paidDate: status !== "unpaid" ? paidDate : null,
+    });
+  };
+
+  const inp = {
+    width: "100%", padding: "10px 12px", borderRadius: 10,
+    border: `1px solid ${C.border}`, fontSize: 14, color: C.ink,
+    outline: "none", background: "rgba(255,255,255,0.1)", backdropFilter: "blur(4px)", boxSizing: "border-box",
+  };
+
+  const statusOpts = [
+    { v: "paid",    l: lang === "ar" ? "مدفوع ✓"     : "Payé ✓",     c: "#4ade80", b: "rgba(74,222,128,0.15)", br: "rgba(74,222,128,0.4)" },
+    { v: "partial", l: lang === "ar" ? "جزئي ○"      : "Partiel ○",  c: C.accent,  b: "rgba(226,150,58,0.15)", br: "rgba(226,150,58,0.4)" },
+    { v: "unpaid",  l: lang === "ar" ? "غير مدفوع ✗" : "Impayé ✗",  c: "#f87171", b: "rgba(248,113,113,0.15)", br: "rgba(248,113,113,0.4)" },
+  ];
+
+  return (
+    <Modal
+      title={`${lang === "ar" ? "دفع" : "Paiement"} — ${student.prenom} ${student.nom}`}
+      onClose={onClose}
+    >
+      <div style={{ display: "grid", gap: 16 }}>
+        <div style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 14px" }}>
+          <div style={{ fontSize: 12, color: C.inkSoft }}>
+            {lang === "ar" ? "السعر الشهري" : "Mensualité"}: <strong style={{ color: C.accent }}>{price} DA</strong>
+          </div>
+        </div>
+        <div>
+          <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", marginBottom: 8 }}>
+            {lang === "ar" ? "الحالة" : "Statut"}
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {statusOpts.map(opt => (
+              <button key={opt.v} onClick={() => { setStatus(opt.v); if (opt.v === "paid") setPaidAmount(price); if (opt.v === "unpaid") setPaidAmount(0); }}
+                style={{ flex: 1, padding: "7px 4px", borderRadius: 10, fontSize: 11.5, fontWeight: 700, border: `1.5px solid ${status === opt.v ? opt.br : "rgba(255,255,255,0.15)"}`, background: status === opt.v ? opt.b : "rgba(255,255,255,0.04)", color: status === opt.v ? opt.c : "rgba(255,255,255,0.5)", cursor: "pointer", transition: "all 0.15s" }}
+              >{opt.l}</button>
+            ))}
+          </div>
+        </div>
+        {status === "partial" && (
+          <div>
+            <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", marginBottom: 8 }}>
+              {lang === "ar" ? "المبلغ المدفوع (DA)" : "Montant payé (DA)"}
+            </label>
+            <input type="number" value={paidAmount} min={0} max={price} onChange={e => setPaidAmount(e.target.value)} style={inp} />
+            <div style={{ fontSize: 11.5, color: C.accent, marginTop: 6, fontWeight: 600 }}>
+              {lang === "ar" ? "المتبقي" : "Reste"}: {price - Number(paidAmount)} DA
+            </div>
+          </div>
+        )}
+        {status !== "unpaid" && (
+          <div>
+            <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", marginBottom: 8 }}>
+              {lang === "ar" ? "تاريخ الدفع" : "Date du paiement"}
+            </label>
+            <input type="date" value={paidDate} onChange={e => setPaidDate(e.target.value)} style={inp} />
+          </div>
+        )}
+        <PrimaryBtn full onClick={handleSave}>
+          <Save size={15} /> {lang === "ar" ? "حفظ الدفع" : "Enregistrer"}
+        </PrimaryBtn>
+      </div>
+    </Modal>
   );
 }
 
 /* ── Payments tab ────────────────────────────────────────────── */
 function PaymentsTab({ subgroup, students, data, setData }) {
-  const { lang } = useLanguage();
-  const payments = data.payments.filter(p => p.subgroupId === subgroup.id);
-  const cycles   = computeCycles(data.sessions, subgroup);
+  const { lang, t } = useLanguage();
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  const [editSt, setEditSt] = useState(null);
+  const payments = data.payments.filter(p => p.subgroupId === subgroup.id && p.month === selectedMonth);
 
-  const togglePaid = (pId) => {
-    setData(d => ({
-      ...d,
-      payments: d.payments.map(p => p.id === pId ? { ...p, paid: !p.paid, paidDate: !p.paid ? new Date().toISOString().slice(0, 10) : null } : p),
-    }));
+  const handleSavePayment = (pmtData) => {
+    setData(d => {
+      const existing = d.payments.find(p => p.id === pmtData.id);
+      const newPayments = existing
+        ? d.payments.map(p => p.id === pmtData.id ? pmtData : p)
+        : [...d.payments, pmtData];
+      return { ...d, payments: newPayments };
+    });
+    setEditSt(null);
+  };
+
+  let totalPaid = 0;
+  const totalExpected = students.length * (subgroup.price || 0);
+  payments.forEach(p => {
+    if (p.status === "paid") totalPaid += p.expectedAmount || subgroup.price;
+    else if (p.status === "partial") totalPaid += p.paidAmount || 0;
+  });
+  const collRate = totalExpected > 0 ? Math.min(100, Math.round(totalPaid / totalExpected * 100)) : 0;
+
+  const thSt = {
+    textAlign: "left", padding: "10px 12px", color: C.inkSoft, fontWeight: 700,
+    borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)",
+    fontSize: 12, whiteSpace: "nowrap",
   };
 
   return (
-    <div style={{ display: "grid", gap: 10 }}>
-      {students.map(st => {
-        const stPayments = payments.filter(p => p.studentId === st.id).sort((a, b) => a.cycleNum - b.cycleNum);
-        const enrollOk   = st.enrollmentPaid;
-        return (
-          <div key={st.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px" }}>
-            {/* Student header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: C.accent }}>
-                {st.prenom[0]}{st.nom[0]}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14.5, color: C.ink }}>{st.prenom} {st.nom}</div>
-                <div style={{ fontSize: 11.5, color: C.inkSoft }}>
-                  {lang === "ar" ? "تسجيل" : "Inscription"}: {" "}
-                  <span style={{ color: enrollOk ? "#4ade80" : "#fbbf24", fontWeight: 700 }}>
-                    {enrollOk ? "✓ " + (lang === "ar" ? "مدفوع" : "Payé") : "⚠ " + (lang === "ar" ? "غير مدفوع" : "Impayé")} ({data.settings?.enrollmentFee || 500} DA)
-                  </span>
-                </div>
-              </div>
-            </div>
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: C.inkSoft }}>{lang === "ar" ? "متوقع" : "Attendu"}: <strong style={{ color: C.ink }}>{totalExpected} DA</strong></span>
+          <span style={{ fontSize: 12, color: C.inkSoft }}>{lang === "ar" ? "محصل" : "Encaissé"}: <strong style={{ color: "#4ade80" }}>{totalPaid} DA</strong></span>
+          <span style={{ fontSize: 12, color: C.inkSoft }}>{lang === "ar" ? "متبقي" : "Reste"}: <strong style={{ color: "#f87171" }}>{totalExpected - totalPaid} DA</strong></span>
+          <span style={{ fontSize: 12, color: C.accent, fontWeight: 700 }}>{collRate}%</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "5px 10px" }}>
+          <Calendar size={14} color={C.accent} />
+          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+            style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", colorScheme: "dark" }} />
+        </div>
+      </div>
 
-            {/* Cycle payments */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {stPayments.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => togglePaid(p.id)}
-                  style={{
-                    padding: "6px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700,
-                    border: `1px solid ${p.paid ? "rgba(74,222,128,0.4)" : "rgba(248,113,113,0.4)"}`,
-                    background: p.paid ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
-                    color: p.paid ? "#4ade80" : "#f87171",
-                    cursor: "pointer", transition: "all 0.15s",
-                  }}
+      <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 5, marginBottom: 16, overflow: "hidden" }}>
+        <div style={{ width: `${collRate}%`, height: "100%", background: "linear-gradient(90deg, #4ade80, #22c55e)", borderRadius: 6, transition: "width 0.4s ease" }} />
+      </div>
+
+      <div style={{ overflowX: "auto", borderRadius: 14, border: `1px solid ${C.border}` }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr>
+            <th style={thSt}>{lang === "ar" ? "التلميذ" : "Élève"}</th>
+            <th style={{ ...thSt, textAlign: "center" }}>{lang === "ar" ? "السعر" : "Prix"}</th>
+            <th style={{ ...thSt, textAlign: "center" }}>{lang === "ar" ? "الحالة" : "Statut"}</th>
+            <th style={{ ...thSt, textAlign: "center" }}>{lang === "ar" ? "المدفوع" : "Payé"}</th>
+            <th style={{ ...thSt, textAlign: "center" }}>{lang === "ar" ? "المتبقي" : "Reste"}</th>
+            <th style={{ ...thSt, textAlign: "center" }}>{lang === "ar" ? "التاريخ" : "Date"}</th>
+            <th style={{ ...thSt, textAlign: "center" }}>{lang === "ar" ? "إجراء" : "Action"}</th>
+          </tr></thead>
+          <tbody>
+            {students.map(st => {
+              const pmt = payments.find(p => p.studentId === st.id);
+              const price = subgroup.price || 0;
+              const paid = !pmt || pmt.status === "unpaid" ? 0 : pmt.status === "paid" ? price : (pmt.paidAmount || 0);
+              const rest = price - paid;
+              const sStat = !pmt || pmt.status === "unpaid" ? "unpaid" : pmt.status;
+              const sColor = sStat === "paid" ? "#4ade80" : sStat === "partial" ? C.accent : "#f87171";
+              const sBg = sStat === "paid" ? "rgba(74,222,128,0.15)" : sStat === "partial" ? "rgba(226,150,58,0.15)" : "rgba(248,113,113,0.15)";
+              const sLabel = sStat === "paid" ? (lang === "ar" ? "مدفوع ✓" : "Payé ✓") : sStat === "partial" ? (lang === "ar" ? "جزئي ○" : "Partiel ○") : (lang === "ar" ? "غير مدفوع ✗" : "Impayé ✗");
+              return (
+                <tr key={st.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.06)`, transition: "background 0.12s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                 >
-                  {lang === "ar" ? "دورة" : "Cycle"} {p.cycleNum} · {p.amount} DA {p.paid ? "✓" : "✗"}
-                </button>
-              ))}
-              {stPayments.length === 0 && (
-                <span style={{ fontSize: 12, color: C.inkSoft, fontStyle: "italic" }}>
-                  {lang === "ar" ? "لا توجد دورات مكتملة بعد" : "Aucun cycle complété"}
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      })}
+                  <td style={{ padding: "10px 12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, color: C.accent, flexShrink: 0 }}>{st.prenom?.[0]}{st.nom?.[0]}</div>
+                      <div style={{ fontWeight: 600, color: C.ink }}>{st.prenom} {st.nom}</div>
+                    </div>
+                  </td>
+                  <td style={{ padding: "10px 12px", textAlign: "center", color: C.inkSoft }}>{price} DA</td>
+                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: sColor, background: sBg, padding: "2px 9px", borderRadius: 999 }}>{sLabel}</span>
+                  </td>
+                  <td style={{ padding: "10px 12px", textAlign: "center", color: paid > 0 ? "#4ade80" : C.inkSoft, fontWeight: paid > 0 ? 700 : 400 }}>{paid} DA</td>
+                  <td style={{ padding: "10px 12px", textAlign: "center", color: rest > 0 ? "#f87171" : C.inkSoft, fontWeight: rest > 0 ? 700 : 400 }}>{rest} DA</td>
+                  <td style={{ padding: "10px 12px", textAlign: "center", color: C.inkSoft, fontSize: 11.5 }}>{pmt?.paidDate || "—"}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                    <button onClick={() => setEditSt({ student: st, payment: pmt })}
+                      style={{ background: "rgba(226,150,58,0.12)", border: "1px solid rgba(226,150,58,0.35)", borderRadius: 8, padding: "4px 9px", color: C.accent, fontSize: 11.5, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, margin: "0 auto" }}
+                    ><Edit2 size={11} /> {lang === "ar" ? "تعديل" : "Modifier"}</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {editSt && (
+        <PayEditModal student={editSt.student} subgroup={subgroup} payment={editSt.payment} month={selectedMonth} onClose={() => setEditSt(null)} onSave={handleSavePayment} />
+      )}
     </div>
   );
 }
@@ -387,8 +565,8 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
 
         <div onClick={() => setTab("payments")} style={{ background: unpaidPmt > 0 ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.05)", border: `1px solid ${unpaidPmt > 0 ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.2)"}`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>{lang === "ar" ? "دورات غير مدفوعة" : "Cycles impayés"}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", marginTop: 2 }}>{unpaidPmt} {lang === "ar" ? "دورات" : "cycles"}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>{lang === "ar" ? "دفعات معلقة" : "Paiements en attente"}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", marginTop: 2 }}>{unpaidPmt} {lang === "ar" ? "دفعات" : "impayés"}</div>
           </div>
           <CreditCard size={20} color={unpaidPmt > 0 ? "#f87171" : "#4ade80"} />
         </div>
@@ -404,7 +582,9 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
 
       {/* ── Tab content ────────────────────────────────────── */}
       {tab === "sessions" && (
-        <SessionsList sessions={sessions} subgroup={sg} students={students} data={data} setData={setData} toastFn={toastFn} />
+        <>
+          <SessionsList sessions={[...sessions, ...(data.extraSessions || []).filter(es => es.subgroupId === sg.id).map(es => ({ ...es, isExtra: true, status: 'planned', time: es.time || '00:00' }))]} subgroup={sg} students={students} data={data} setData={setData} toastFn={toastFn} />
+        </>
       )}
 
       {tab === "students" && (

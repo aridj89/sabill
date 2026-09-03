@@ -31,7 +31,7 @@ function StudentSidebar({ open, onClose, nav, onNav }) {
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 90, backdropFilter: open ? "blur(12px) brightness(0.55)" : "blur(0px)", background: open ? "rgba(10,8,30,0.45)" : "transparent", transition: "all .35s ease", pointerEvents: open ? "auto" : "none" }} />
-      <div className="f-body" style={{ position: "fixed", top: 65, left: 18, width: 280, maxHeight: "calc(100vh - 100px)", zIndex: 95, overflowY: "auto", padding: "16px 14px 40px", borderRadius: "24px 24px 120px 120px", background: "linear-gradient(160deg,rgba(22,18,71,0.96) 0%,rgba(71,48,18,0.92) 55%,rgba(18,68,71,0.96) 100%)", backdropFilter: "blur(20px) saturate(1.4)", border: "1px solid rgba(255,255,255,0.22)", boxShadow: "0 32px 64px rgba(0,0,0,0.45)", transform: open ? "translateX(0)" : "translateX(-360px)", opacity: open ? 1 : 0, transition: "transform .32s cubic-bezier(.22,1,.36,1), opacity .25s ease", pointerEvents: open ? "auto" : "none" }}>
+      <div className="f-body" style={{ position: "fixed", top: 65, left: 18, width: 280, maxWidth: "calc(100vw - 28px)", maxHeight: "calc(100vh - 100px)", zIndex: 95, overflowY: "auto", padding: "16px 14px 40px", borderRadius: "24px 24px 120px 120px", background: "linear-gradient(160deg,rgba(22,18,71,0.96) 0%,rgba(71,48,18,0.92) 55%,rgba(18,68,71,0.96) 100%)", backdropFilter: "blur(20px) saturate(1.4)", border: "1px solid rgba(255,255,255,0.22)", boxShadow: "0 32px 64px rgba(0,0,0,0.45)", transform: open ? "translateX(0)" : "translateX(-360px)", opacity: open ? 1 : 0, transition: "transform .32s cubic-bezier(.22,1,.36,1), opacity .25s ease", pointerEvents: open ? "auto" : "none" }}>
         
         <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.38)", textTransform: "uppercase", padding: "14px 12px 6px" }}>
           {lang === "ar" ? "القائمة الرئيسية" : "Menu principal"}
@@ -91,7 +91,7 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
     <div className="f-body" style={{ minHeight: "100vh", background: C.bg }}>
       {/* ── Topbar ─────────────────────────────────────────── */}
       <div style={{ position: "sticky", top: 0, zIndex: 40, ...C.glassStyle, borderRadius: 0, borderLeft: "none", borderRight: "none", borderTop: "none", padding: "12px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+        <div className="topbar-inner" style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
           <IconBtn icon={Menu} onClick={() => setSidebarOpen(true)} title={lang === "ar" ? "القائمة" : "Menu"} />
           
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`, borderRadius: 12 }}>
@@ -113,7 +113,7 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
               {notifOpen && (
                 <div style={{
                   position: "absolute", top: "calc(100% + 10px)", right: isRTL ? "auto" : 0, left: isRTL ? 0 : "auto",
-                  width: 320, maxHeight: 400, overflowY: "auto",
+                  width: 320, maxWidth: "calc(100vw - 24px)", maxHeight: 400, overflowY: "auto",
                   background: "linear-gradient(160deg, rgba(22,18,71,0.96) 0%, rgba(71,48,18,0.92) 55%, rgba(18,68,71,0.96) 100%)",
                   backdropFilter: "blur(24px) saturate(1.4)", border: "1px solid rgba(255,255,255,0.22)",
                   boxShadow: "0 24px 48px rgba(0,0,0,0.55)", borderRadius: 18, zIndex: 200,
@@ -163,7 +163,7 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
                 <div style={{ width: 26, height: 26, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, color: C.accent }}>
                   {student.prenom[0]}{student.nom[0]}
                 </div>
-                <div style={{ textAlign: isRTL ? "right" : "left", lineHeight: 1.15 }}>
+                <div className="hide-on-mobile-xs" style={{ textAlign: isRTL ? "right" : "left", lineHeight: 1.15 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>{student.prenom} {student.nom}</div>
                 </div>
                 <ChevronDown size={13} color="rgba(255,255,255,0.6)" style={{ transform: profileOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
@@ -191,7 +191,7 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
 
       <StudentSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} nav={nav} onNav={setNav} />
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 80px" }}>
+      <div className="main-content-layout" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 80px" }}>
         {nav.screen === "dashboard" && <StudentDashboard student={student} subgroup={sg} data={data} />}
         {nav.screen === "calendar" && <StudentCalendar student={student} subgroup={sg} data={data} />}
         {nav.screen === "chat" && <StudentChat student={student} subgroup={sg} data={data} setData={setData} />}
