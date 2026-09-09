@@ -11,6 +11,9 @@ import { generateToken } from "./utils/jwt.js";
 import { authenticateToken, requireRole } from "./middleware/auth.js";
 import { loginRateLimiter, apiRateLimiter } from "./middleware/rateLimiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { loadDatabase, saveDatabase, INITIAL_DATA, sanitizeAndHashDatabase } from "./utils/db.js";
+import nfcRoutes from "./routes/nfcRoutes.js";
+import { nfcReaderService } from "./services/nfcReaderService.js";
 
 dotenv.config();
 
@@ -19,7 +22,6 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const DB_FILE = path.join(__dirname, "database.json");
 
 // ─── HTTP Security Headers & CORS ────────────────────────────
 app.use(helmet());
@@ -40,89 +42,8 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use(apiRateLimiter);
 
-// ─── Initial Clean Data Template ─────────────────────────────
-const INITIAL_DATA = {
-  admin: {
-    nom: "Bensalem",
-    prenom: "Karim",
-    username: "admin",
-    password: "admin1234",
-    avatar: "🧑‍🏫",
-  },
-  settings: {
-    enrollmentFee: 500,
-  },
-  langLevels: [
-    { id: "ll1", nom: "A1" },
-    { id: "ll2", nom: "A2" },
-    { id: "ll3", nom: "B1" },
-  ],
-  subgroups: [],
-  students: [],
-  sessions: [],
-  attendances: [],
-  payments: [],
-  subgroupMessages: [],
-  privateMessages: [],
-  userNotifications: [],
-  parents: [],
-  messages: [],
-  notifications: [],
-  extraSessions: [],
-  commCategories: [{ id: "cat1comm", nom: "Langue Française" }],
-  commGroups: [],
-  commMessages: [],
-  groups: [],
-};
-
-// Auto-hash plain text passwords safely on boot
-function sanitizeAndHashDatabase(data) {
-  if (data.admin && data.admin.password) {
-    data.admin.password = hashPasswordSync(data.admin.password);
-  }
-  if (Array.isArray(data.students)) {
-    data.students.forEach(st => {
-      if (st.password) {
-        st.password = hashPasswordSync(st.password);
-      }
-    });
-  }
-  if (Array.isArray(data.parents)) {
-    data.parents.forEach(p => {
-      if (p.password) {
-        p.password = hashPasswordSync(p.password);
-      }
-    });
-  }
-  return data;
-}
-
-function loadDatabase() {
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, "utf-8");
-      const parsed = JSON.parse(raw);
-      const sanitized = sanitizeAndHashDatabase(parsed);
-      saveDatabase(sanitized);
-      return sanitized;
-    }
-  } catch (err) {
-    console.error("Erreur de lecture du fichier database.json:", err);
-  }
-  const clean = sanitizeAndHashDatabase(INITIAL_DATA);
-  saveDatabase(clean);
-  return clean;
-}
-
-function saveDatabase(data) {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-    return true;
-  } catch (err) {
-    console.error("Erreur d'écriture dans database.json:", err);
-    return false;
-  }
-}
+// ─── NFC Hardware Attendance API ─────────────────────────────
+app.use("/api/nfc", nfcRoutes);
 
 // ─── API Routes ───────────────────────────────────────────────
 
@@ -266,6 +187,20 @@ app.post("/api/reset", authenticateToken, requireRole("admin"), (req, res) => {
 // Global Error Handler Middleware
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🔒 Serveur Express sécurisé démarré sur http://localhost:${PORT}`);
+  // Start 5YOA NFC Reader Hardware Listener
+  nfcReaderService.start();
 });
+
+// Graceful cleanup
+function cleanup() {
+  console.log("Fermeture du serveur et libération du lecteur NFC...");
+  nfcReaderService.stop();
+  server.close(() => {
+    process.exit(0);
+  });
+}
+
+process.on("SIGINT", cleanup);
+process.on("SIGTERM", cleanup);

@@ -3,7 +3,7 @@ import {
   Radio, CheckCircle2, XCircle, AlertTriangle, Users,
   Calendar, Clock, Search, ArrowLeft, RefreshCw, Smartphone,
   CreditCard, ShieldCheck, Volume2, VolumeX, Sparkles, UserCheck,
-  Send, Plus, Trash2, Check, AlertCircle, Eye, ChevronRight
+  Send, Plus, Trash2, Check, AlertCircle, Eye, ChevronRight, Usb
 } from "lucide-react";
 import { C, CAT_BY_ID, uid, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -12,8 +12,10 @@ import IconBtn from "../../components/ui/IconBtn";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
 
+const API_BASE_URL = "http://localhost:5000/api/nfc";
+
 /* ── Web Audio Beep generator ── */
-function playTone(success = true) {
+function playTone(type = "success") {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
@@ -21,7 +23,7 @@ function playTone(success = true) {
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    if (success) {
+    if (type === "success") {
       osc.type = "sine";
       osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
       osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
@@ -29,6 +31,14 @@ function playTone(success = true) {
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
       osc.start();
       osc.stop(ctx.currentTime + 0.28);
+    } else if (type === "warning") {
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.setValueAtTime(440, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
     } else {
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(220, ctx.currentTime); // A3
@@ -48,7 +58,7 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // States
-  const [selectedSubgroupId, setSelectedSubgroupId] = useState("auto"); // "auto" or specific sg.id
+  const [selectedSubgroupId, setSelectedSubgroupId] = useState("auto");
   const [selectedSessionId, setSelectedSessionId] = useState("auto");
   const [manualCode, setManualCode] = useState("");
   const [lastScanned, setLastScanned] = useState(null);
@@ -61,202 +71,258 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
   const [assignCardInput, setAssignCardInput] = useState("");
   const [quickSearch, setQuickSearch] = useState("");
 
-  const inputRef = useRef(null);
+  // 5YOA Hardware Reader State
+  const [hardwareConnected, setHardwareConnected] = useState(false);
+  const [hardwareDevice, setHardwareDevice] = useState(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
 
-  // Check Web NFC API availability
+  const inputRef = useRef(null);
+  const assignModalStudentRef = useRef(assignModalStudent);
+  const dataRef = useRef(data);
+
+  useEffect(() => {
+    assignModalStudentRef.current = assignModalStudent;
+  }, [assignModalStudent]);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  // Subgroups list
+  const subgroups = data.subgroups || [];
+  const todaySessions = (data.sessions || []).filter(s => s.date === todayStr);
+
+  const activeSubgroup = selectedSubgroupId !== "auto"
+    ? subgroups.find(s => s.id === selectedSubgroupId)
+    : null;
+
+  // ── 1. Connect to Hardware Reader via SSE ──
+  useEffect(() => {
+    let eventSource = null;
+
+    // Check initial status
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/status`);
+        const json = await res.json();
+        if (json.success && json.reader) {
+          setHardwareConnected(!!json.reader.connected);
+          setHardwareDevice(json.reader.device);
+        }
+      } catch (err) {
+        setHardwareConnected(false);
+      } finally {
+        setIsCheckingStatus(false);
+      }
+    };
+    checkStatus();
+
+    // Connect to real-time events stream
+    try {
+      eventSource = new EventSource(`${API_BASE_URL}/stream`);
+
+      eventSource.addEventListener("connected", (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload.readerStatus) {
+            setHardwareConnected(!!payload.readerStatus.connected);
+            setHardwareDevice(payload.readerStatus.device);
+          }
+        } catch (_) {}
+      });
+
+      eventSource.addEventListener("status_change", (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          setHardwareConnected(!!payload.connected);
+          if (payload.device) setHardwareDevice(payload.device);
+        } catch (_) {}
+      });
+
+      eventSource.addEventListener("card_scanned", (e) => {
+        try {
+          const result = JSON.parse(e.data);
+          handleBackendScanEvent(result);
+        } catch (err) {
+          console.error("Error processing SSE card event:", err);
+        }
+      });
+
+      eventSource.onerror = () => {
+        setHardwareConnected(false);
+      };
+    } catch (err) {
+      console.warn("SSE connection error:", err);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, []);
+
+  // ── Handle Backend Scan Events (SSE or manual scan) ──
+  const handleBackendScanEvent = (result) => {
+    // If Assign Modal is open, auto-fill the card UID in the modal input
+    if (assignModalStudentRef.current) {
+      setAssignCardInput(result.cardUid);
+      if (soundEnabled) playTone("success");
+      toastFn(lang === "ar" ? `تم التقاط رمز البطاقة: ${result.cardUid}` : `Badge détecté : ${result.cardUid}`);
+      return;
+    }
+
+    const currentData = dataRef.current;
+
+    // Case 1: Valid attendance recorded
+    if (result.success && result.student) {
+      if (soundEnabled) playTone("success");
+
+      const targetSg = (currentData.subgroups || []).find(sg => sg.id === result.student.subgroupId);
+      const fin = getStudentFinancialSummary(currentData, result.student.id);
+
+      const scanResult = {
+        success: true,
+        isDuplicate: false,
+        student: result.student,
+        subgroup: targetSg,
+        timestamp: result.timestamp || new Date().toLocaleTimeString("fr-FR"),
+        financial: fin,
+      };
+
+      setLastScanned(scanResult);
+      setRecentScans(prev => [scanResult, ...prev.filter(r => r.student?.id !== result.student.id)].slice(0, 15));
+
+      // Sync React state attendances
+      if (result.attendance) {
+        setData(d => {
+          const other = (d.attendances || []).filter(
+            a => a.id !== result.attendance.id && !(a.studentId === result.student.id && a.date === result.attendance.date)
+          );
+          return {
+            ...d,
+            attendances: [...other, result.attendance],
+            userNotifications: result.notification
+              ? [...(d.userNotifications || []), result.notification]
+              : d.userNotifications,
+          };
+        });
+      }
+
+      toastFn(
+        lang === "ar"
+          ? `تم تسجيل حضور: ${result.student.prenom} ${result.student.nom} ✓`
+          : `Présence validée : ${result.student.prenom} ${result.student.nom} ✓`
+      );
+      return;
+    }
+
+    // Case 2: Duplicate scan within cooldown
+    if (result.isDuplicate && result.student) {
+      if (soundEnabled) playTone("warning");
+
+      const targetSg = (currentData.subgroups || []).find(sg => sg.id === result.student.subgroupId);
+      const fin = getStudentFinancialSummary(currentData, result.student.id);
+
+      const scanResult = {
+        success: true,
+        isDuplicate: true,
+        student: result.student,
+        subgroup: targetSg,
+        timestamp: result.timestamp || new Date().toLocaleTimeString("fr-FR"),
+        financial: fin,
+        remainingSeconds: result.remainingSeconds,
+        message: result.message,
+      };
+
+      setLastScanned(scanResult);
+      toastFn(
+        lang === "ar"
+          ? `تنبيه: تم تسجيل حضور ${result.student.prenom} مسبقاً (انتظر ${result.remainingSeconds}ث)`
+          : `Pointage déjà validé pour ${result.student.prenom} (patientez ${result.remainingSeconds}s)`
+      );
+      return;
+    }
+
+    // Case 3: Unknown / Unregistered card
+    if (result.reason === "unregistered_card" || !result.success) {
+      if (soundEnabled) playTone("error");
+      setLastScanned({
+        success: false,
+        isDuplicate: false,
+        isUnknown: true,
+        code: result.cardUid,
+        message: lang === "ar" ? "بطاقة NFC غير مسجلة لأي تلميذ!" : "Carte NFC non reconnue !",
+        timestamp: result.timestamp || new Date().toLocaleTimeString("fr-FR"),
+      });
+      toastFn(lang === "ar" ? "بطاقة غير مسجلة! اضغط لربطها بتلميذ" : "Carte non attribuée ! Cliquez pour l'assigner");
+    }
+  };
+
+  // Check Web NFC API availability (for mobile Chrome)
   useEffect(() => {
     if ("NDEFReader" in window) {
       setNfcSupported(true);
     }
   }, []);
 
-  // Keep input focused for USB barcode / NFC RFID keyboard wedge scanners
+  // Keep input focused for manual keyboard wedge scanners if needed
   useEffect(() => {
     const focusTimer = setInterval(() => {
       if (inputRef.current && document.activeElement !== inputRef.current && !assignModalStudent) {
-        // Only focus if not interacting with another text input or modal
         const tag = document.activeElement?.tagName?.toLowerCase();
         if (tag !== "input" && tag !== "textarea" && tag !== "select") {
           inputRef.current.focus();
         }
       }
-    }, 1500);
+    }, 2000);
     return () => clearInterval(focusTimer);
   }, [assignModalStudent]);
 
-  // Subgroups and sessions list
-  const subgroups = data.subgroups || [];
-  const todaySessions = (data.sessions || []).filter(s => s.date === todayStr);
-
-  // Active target subgroup & session if selected
-  const activeSubgroup = selectedSubgroupId !== "auto"
-    ? subgroups.find(s => s.id === selectedSubgroupId)
-    : null;
-
-  const activeGroupSessions = activeSubgroup
-    ? (data.sessions || []).filter(s => s.subgroupId === activeSubgroup.id && s.date === todayStr)
-    : todaySessions;
-
-  // ── Start Web NFC Scan (Mobile sensor) ──
-  const startMobileNfc = async () => {
-    setNfcError("");
-    if (!("NDEFReader" in window)) {
-      setNfcError(lang === "ar" ? "جهازك أو متصفحك لا يدعم Web NFC" : "Web NFC non supporté sur ce navigateur");
-      return;
-    }
-    try {
-      const ndef = new window.NDEFReader();
-      await ndef.scan();
-      setNfcActive(true);
-      toastFn(lang === "ar" ? "مستشعر NFC نشط الآن، قرّب البطاقة 📱" : "Lecteur NFC actif, approchez la carte 📱");
-
-      ndef.onreading = (event) => {
-        const serialNumber = event.serialNumber || "";
-        if (serialNumber) {
-          handleCardScanned(serialNumber);
-        }
-      };
-
-      ndef.onreadingerror = () => {
-        if (soundEnabled) playTone(false);
-        setNfcError(lang === "ar" ? "تعذر قراءة بطاقة NFC، حاول ثانية" : "Erreur de lecture NFC");
-      };
-    } catch (err) {
-      setNfcActive(false);
-      setNfcError(err?.message || (lang === "ar" ? "فشل تفعيل NFC" : "Échec d'activation NFC"));
-    }
-  };
-
-  // ── Process Scanned NFC / Tag Code ──
-  const handleCardScanned = (rawCode) => {
-    const code = (rawCode || "").trim().toLowerCase();
+  // ── Manual Input or Barcode Submit ──
+  const handleManualSubmit = async (e) => {
+    if (e) e.preventDefault();
+    const code = manualCode.trim();
     if (!code) return;
 
-    // 1. Find matching student by nfcCardId, student.id, student.phone, or name
-    const students = data.students || [];
-    const matched = students.find(s =>
-      (s.nfcCardId && s.nfcCardId.toLowerCase() === code) ||
-      (s.id && s.id.toLowerCase() === code) ||
-      (s.phone && s.phone.toLowerCase() === code) ||
-      (`${s.prenom} ${s.nom}`.toLowerCase() === code)
-    );
-
-    if (!matched) {
-      if (soundEnabled) playTone(false);
-      setLastScanned({
-        success: false,
-        code,
-        message: lang === "ar" ? "بطاقة NFC غير مسجلة لأي تلميذ!" : "Carte NFC non reconnue !",
-        timestamp: new Date().toLocaleTimeString("fr-FR"),
+    try {
+      const res = await fetch(`${API_BASE_URL}/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardUid: code }),
       });
-      return;
+      const resJson = await res.json();
+      handleBackendScanEvent(resJson);
+    } catch (err) {
+      console.warn("Manual scan fallback:", err);
     }
-
-    // 2. Identify target session
-    let targetSessionId = selectedSessionId !== "auto" ? selectedSessionId : null;
-    let targetSg = subgroups.find(sg => sg.id === matched.subgroupId);
-
-    if (!targetSessionId) {
-      // Find today's session for this student's subgroup
-      const stTodaySession = (data.sessions || []).find(s => s.subgroupId === matched.subgroupId && s.date === todayStr);
-      if (stTodaySession) {
-        targetSessionId = stTodaySession.id;
-      } else {
-        // Fallback: pick closest planned session or create one on the fly
-        const stNextSession = (data.sessions || []).find(s => s.subgroupId === matched.subgroupId && s.status === "planned");
-        if (stNextSession) {
-          targetSessionId = stNextSession.id;
-        } else {
-          // Create attendance session if none exists
-          targetSessionId = `sess_nfc_${todayStr}_${matched.subgroupId}`;
-        }
-      }
-    }
-
-    const nowTime = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    const nowTimeShort = nowTime.slice(0, 5);
-
-    // 3. Mark Attendance in data
-    setData(d => {
-      const existingAttIndex = (d.attendances || []).findIndex(
-        a => a.studentId === matched.id && (a.sessionId === targetSessionId || a.date === todayStr)
-      );
-
-      let updatedAttendances = [...(d.attendances || [])];
-      const newAttendanceRecord = {
-        id: existingAttIndex >= 0 ? updatedAttendances[existingAttIndex].id : uid(),
-        sessionId: targetSessionId,
-        studentId: matched.id,
-        present: true,
-        date: todayStr,
-        time: nowTimeShort,
-        nfcVerified: true,
-      };
-
-      if (existingAttIndex >= 0) {
-        updatedAttendances[existingAttIndex] = newAttendanceRecord;
-      } else {
-        updatedAttendances.push(newAttendanceRecord);
-      }
-
-      // Send Instant Student Notification
-      const sgName = targetSg ? targetSg.nom : "";
-      const notif = {
-        id: uid(),
-        userId: matched.id,
-        type: "presence",
-        title: lang === "ar" ? "تسجيل حضورك بالبطاقة NFC ⏱️" : "Pointage NFC validé ⏱️",
-        message: lang === "ar"
-          ? `تم تأكيد تسجيل حضورك في حصة ${sgName ? `(${sgName}) ` : ""}بتاريخ ${todayStr} الساعة ${nowTimeShort}.`
-          : `Votre présence à la séance ${sgName ? `(${sgName}) ` : ""}a été validée par NFC le ${todayStr} à ${nowTimeShort}.`,
-        date: todayStr,
-        time: nowTimeShort,
-        read: false,
-      };
-
-      return {
-        ...d,
-        attendances: updatedAttendances,
-        userNotifications: [...(d.userNotifications || []), notif],
-      };
-    });
-
-    if (soundEnabled) playTone(true);
-
-    const fin = getStudentFinancialSummary(data, matched.id);
-
-    const scanResult = {
-      success: true,
-      student: matched,
-      subgroup: targetSg,
-      timestamp: nowTime,
-      financial: fin,
-    };
-
-    setLastScanned(scanResult);
-    setRecentScans(prev => [scanResult, ...prev.filter(r => r.student?.id !== matched.id)].slice(0, 15));
     setManualCode("");
-
-    toastFn(
-      lang === "ar"
-        ? `تم تسجيل حضور: ${matched.prenom} ${matched.nom} ✓`
-        : `Présence validée : ${matched.prenom} ${matched.nom} ✓`
-    );
   };
 
-  const handleManualSubmit = (e) => {
-    if (e) e.preventDefault();
-    if (manualCode.trim()) {
-      handleCardScanned(manualCode.trim());
+  // ── Save Card Assignment via Backend API ──
+  const handleSaveAssignedCard = async (studentId, cardUid) => {
+    const trimmed = cardUid.trim();
+    if (!trimmed) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, cardUid: trimmed }),
+      });
+      const resJson = await res.json();
+      if (!resJson.success) {
+        toastFn(resJson.message || "Erreur d'attribution");
+        return;
+      }
+    } catch (err) {
+      console.warn("Backend assign error:", err);
     }
-  };
 
-  // ── Associate Card to Student ──
-  const handleSaveAssignedCard = (studentId, cardUid) => {
-    if (!cardUid.trim()) return;
+    // Update frontend state
     setData(d => ({
       ...d,
-      students: (d.students || []).map(s => s.id === studentId ? { ...s, nfcCardId: cardUid.trim() } : s)
+      students: (d.students || []).map(s => s.id === studentId ? { ...s, nfcCardId: trimmed.toUpperCase() } : s)
     }));
     toastFn(lang === "ar" ? "تم ربط بطاقة NFC بالتلميذ بنجاح ✓" : "Carte NFC associée à l'élève ✓");
     setAssignModalStudent(null);
@@ -310,6 +376,28 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {/* Hardware Reader Connection Badge */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "8px 14px", borderRadius: 10,
+            background: hardwareConnected ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
+            border: `1px solid ${hardwareConnected ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.3)"}`,
+            color: hardwareConnected ? "#4ade80" : "#f87171",
+            fontSize: 12.5, fontWeight: 700
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: hardwareConnected ? "#4ade80" : "#f87171",
+              boxShadow: hardwareConnected ? "0 0 8px #4ade80" : "none"
+            }} />
+            <Usb size={14} />
+            <span>
+              {hardwareConnected
+                ? (lang === "ar" ? "قارئ 5YOA متصل (USB HID)" : "Lecteur 5YOA connecté (USB HID)")
+                : (lang === "ar" ? "قارئ 5YOA غير متصل" : "Lecteur 5YOA déconnecté")}
+            </span>
+          </div>
+
           {/* Sound toggle */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
@@ -325,23 +413,6 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
             {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
             {soundEnabled ? (lang === "ar" ? "الصوت مفعّل" : "Bip activé") : (lang === "ar" ? "صامت" : "Muet")}
           </button>
-
-          {/* Web NFC Mobile button */}
-          {nfcSupported && (
-            <button
-              onClick={startMobileNfc}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 14px", borderRadius: 10,
-                background: nfcActive ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.08)",
-                border: `1px solid ${nfcActive ? "#818cf8" : C.border}`,
-                color: nfcActive ? "#818cf8" : C.ink, fontSize: 12.5, fontWeight: 700, cursor: "pointer"
-              }}
-            >
-              <Smartphone size={15} />
-              {nfcActive ? (lang === "ar" ? "مستشعر الهاتف نشط ✓" : "NFC Téléphone actif ✓") : (lang === "ar" ? "تفعيل NFC الهاتف" : "Scanner NFC Mobile")}
-            </button>
-          )}
 
           {onBack && <IconBtn icon={ArrowLeft} onClick={onBack} title={lang === "ar" ? "رجوع" : "Retour"} />}
         </div>
@@ -410,35 +481,44 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
           {/* Glowing Animated NFC Radar Circle */}
           <div style={{
             position: "relative", width: 120, height: 120, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(74,222,128,0.2) 0%, rgba(99,102,241,0.05) 70%)",
-            border: "2px solid rgba(74,222,128,0.5)", display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 18, boxShadow: "0 0 30px rgba(74,222,128,0.2)"
+            background: hardwareConnected
+              ? "radial-gradient(circle, rgba(74,222,128,0.2) 0%, rgba(99,102,241,0.05) 70%)"
+              : "radial-gradient(circle, rgba(248,113,113,0.15) 0%, rgba(99,102,241,0.05) 70%)",
+            border: `2px solid ${hardwareConnected ? "rgba(74,222,128,0.5)" : "rgba(248,113,113,0.4)"}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 18, boxShadow: hardwareConnected ? "0 0 30px rgba(74,222,128,0.2)" : "none"
           }}>
             <div style={{
               position: "absolute", inset: -10, borderRadius: "50%",
-              border: "1.5px dashed rgba(74,222,128,0.35)", animation: "spin 12s linear infinite"
+              border: `1.5px dashed ${hardwareConnected ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.25)"}`,
+              animation: "spin 12s linear infinite"
             }} />
-            <Radio size={52} color="#4ade80" />
+            <Radio size={52} color={hardwareConnected ? "#4ade80" : "#f87171"} />
           </div>
 
           <h3 className="f-display" style={{ fontSize: 20, fontWeight: 800, color: C.ink, margin: "0 0 6px" }}>
-            {lang === "ar" ? "جاهز لقراءة بطاقات NFC" : "Prêt à scanner les cartes NFC"}
+            {hardwareConnected
+              ? (lang === "ar" ? "جاهز لقراءة بطاقات NFC" : "Prêt à scanner les cartes NFC")
+              : (lang === "ar" ? "في انتظار قارئ NFC..." : "Lecteur NFC en attente...")}
           </h3>
-          <p style={{ color: C.inkSoft, fontSize: 13, maxWidth: 300, margin: "0 0 20px" }}>
-            {lang === "ar"
-              ? "مرر بطاقة التلميذ أمام القارئ أو استخدم مربع الإدخال للبحث السريع"
-              : "Passez le badge de l'élève sur le lecteur USB ou approchez le téléphone"}
+          <p style={{ color: C.inkSoft, fontSize: 13, maxWidth: 320, margin: "0 0 20px" }}>
+            {hardwareConnected
+              ? (lang === "ar"
+                  ? "مرر بطاقة NTAG215 للتلميذ فوق القارئ لتسجيل حضوره تلقائياً وفورياً"
+                  : "Approchez la carte NTAG215 de l'élève sur le lecteur 5YOA pour valider sa présence")
+              : (lang === "ar"
+                  ? "تأكد من توصيل قارئ 5YOA بمنفذ USB على جهازك"
+                  : "Vérifiez que le lecteur 5YOA est branché sur votre port USB")}
           </p>
 
-          {/* Scanner Input / Manual Trigger */}
+          {/* Scanner Input / Manual Search & Trigger */}
           <form onSubmit={handleManualSubmit} style={{ width: "100%", maxWidth: 360, position: "relative" }}>
             <input
               ref={inputRef}
               type="text"
               value={manualCode}
               onChange={e => setManualCode(e.target.value)}
-              placeholder={lang === "ar" ? "امسح بطاقة NFC أو اكتب رقم الهاتف / الاسم..." : "Code badge NFC, téléphone ou nom..."}
-              autoFocus
+              placeholder={lang === "ar" ? "بحث برمز البطاقة أو الاسم..." : "Code badge, UID ou recherche..."}
               style={{
                 width: "100%", padding: "12px 42px 12px 14px",
                 borderRadius: 14, border: "1.5px solid rgba(74,222,128,0.45)",
@@ -459,12 +539,6 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
               <Check size={16} />
             </button>
           </form>
-
-          {nfcError && (
-            <div style={{ marginTop: 12, color: "#f87171", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <AlertCircle size={14} /> {nfcError}
-            </div>
-          )}
         </div>
 
         {/* Right: Last Scanned Result & Student Live Profile */}
@@ -476,13 +550,23 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
             lastScanned.success ? (
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <span style={{
-                    fontSize: 12, fontWeight: 800, color: "#4ade80", background: "rgba(74,222,128,0.15)",
-                    border: "1px solid rgba(74,222,128,0.3)", padding: "4px 10px", borderRadius: 999,
-                    display: "inline-flex", alignItems: "center", gap: 5
-                  }}>
-                    <CheckCircle2 size={13} /> {lang === "ar" ? "تم تسجيل الحضور بنجاح" : "Présence confirmée"}
-                  </span>
+                  {lastScanned.isDuplicate ? (
+                    <span style={{
+                      fontSize: 12, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.15)",
+                      border: "1px solid rgba(251,191,36,0.3)", padding: "4px 10px", borderRadius: 999,
+                      display: "inline-flex", alignItems: "center", gap: 5
+                    }}>
+                      <AlertTriangle size={13} /> {lang === "ar" ? "تنبيه: تم تسجيل الحضور مسبقاً" : "Pointage déjà enregistré"}
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: 12, fontWeight: 800, color: "#4ade80", background: "rgba(74,222,128,0.15)",
+                      border: "1px solid rgba(74,222,128,0.3)", padding: "4px 10px", borderRadius: 999,
+                      display: "inline-flex", alignItems: "center", gap: 5
+                    }}>
+                      <CheckCircle2 size={13} /> {lang === "ar" ? "تم تسجيل الحضور بنجاح" : "Présence confirmée"}
+                    </span>
+                  )}
                   <span style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700 }}>
                     {lastScanned.timestamp}
                   </span>
@@ -496,42 +580,60 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 18, fontWeight: 800, color: C.accent
                   }}>
-                    {lastScanned.student.prenom?.[0]}{lastScanned.student.nom?.[0]}
+                    {lastScanned.student?.prenom?.[0]}{lastScanned.student?.nom?.[0]}
                   </div>
                   <div>
                     <h4 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: C.ink }}>
-                      {lastScanned.student.prenom} {lastScanned.student.nom}
+                      {lastScanned.student?.prenom} {lastScanned.student?.nom}
                     </h4>
                     <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 2 }}>
-                      {lastScanned.subgroup?.nom || (lang === "ar" ? "فوج غير محدد" : "Groupe")} · {lastScanned.student.phone || "—"}
+                      {lastScanned.subgroup?.nom || (lang === "ar" ? "فوج غير محدد" : "Groupe")} · {lastScanned.student?.phone || "—"}
                     </div>
                   </div>
                 </div>
 
-                {/* Financial Status Box */}
-                <div style={{
-                  background: lastScanned.financial.totalUnpaid > 0 ? "rgba(248,113,113,0.08)" : "rgba(74,222,128,0.08)",
-                  border: `1px solid ${lastScanned.financial.totalUnpaid > 0 ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)"}`,
-                  borderRadius: 14, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between"
-                }}>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: lastScanned.financial.totalUnpaid > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>
-                      {lang === "ar" ? "الوضعية المالية للمستحقات" : "Statut des paiements"}
-                    </div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, marginTop: 2 }}>
-                      {lastScanned.financial.totalUnpaid > 0
-                        ? `${lang === "ar" ? "تنبيه: متبقي عليه" : "Reste à payer :"} ${lastScanned.financial.totalUnpaid.toLocaleString()} DA`
-                        : (lang === "ar" ? "جميع المستحقات مسددة ومستوفاة ✓" : "Tous les paiements sont à jour ✓")}
-                    </div>
+                {/* Duplicate Warning Notice */}
+                {lastScanned.isDuplicate && (
+                  <div style={{
+                    background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)",
+                    borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 12.5,
+                    color: "#fbbf24", display: "flex", alignItems: "center", gap: 8
+                  }}>
+                    <Clock size={16} />
+                    <span>
+                      {lang === "ar"
+                        ? `تم تسجيل الحضور بالفعل. انتظر ${lastScanned.remainingSeconds || 10} ثوانٍ لتفادي التكرار.`
+                        : `Présence déjà validée. Patientez ${lastScanned.remainingSeconds || 10}s pour un nouveau scan.`}
+                    </span>
                   </div>
-                  {lastScanned.financial.totalUnpaid > 0 && (
-                    <AlertTriangle size={20} color="#f87171" />
-                  )}
-                </div>
+                )}
+
+                {/* Financial Status Box */}
+                {lastScanned.financial && (
+                  <div style={{
+                    background: lastScanned.financial.totalUnpaid > 0 ? "rgba(248,113,113,0.08)" : "rgba(74,222,128,0.08)",
+                    border: `1px solid ${lastScanned.financial.totalUnpaid > 0 ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)"}`,
+                    borderRadius: 14, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between"
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: lastScanned.financial.totalUnpaid > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>
+                        {lang === "ar" ? "الوضعية المالية للمستحقات" : "Statut des paiements"}
+                      </div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, marginTop: 2 }}>
+                        {lastScanned.financial.totalUnpaid > 0
+                          ? `${lang === "ar" ? "تنبيه: متبقي عليه" : "Reste à payer :"} ${lastScanned.financial.totalUnpaid.toLocaleString()} DA`
+                          : (lang === "ar" ? "جميع المستحقات مسددة ومستوفاة ✓" : "Tous les paiements sont à jour ✓")}
+                      </div>
+                    </div>
+                    {lastScanned.financial.totalUnpaid > 0 && (
+                      <AlertTriangle size={20} color="#f87171" />
+                    )}
+                  </div>
+                )}
 
                 {/* Quick Profile Link */}
                 <button
-                  onClick={() => onNav({ screen: "student", studentId: lastScanned.student.id })}
+                  onClick={() => onNav && onNav({ screen: "student", studentId: lastScanned.student?.id })}
                   style={{
                     width: "100%", padding: "10px", borderRadius: 12,
                     background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
@@ -551,9 +653,30 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
                 <h4 style={{ margin: "0 0 6px", fontSize: 16, color: "#f87171", fontWeight: 700 }}>
                   {lastScanned.message}
                 </h4>
-                <div className="f-mono" style={{ fontSize: 12, color: C.inkSoft }}>
-                  UID: {lastScanned.code}
+                <div style={{ fontSize: 12, color: C.inkSoft, marginBottom: 16 }}>
+                  {lang === "ar" ? "هذه البطاقة غير مربوطة بأي تلميذ في النظام." : "Cette carte NFC n'est associée à aucun élève."}
                 </div>
+
+                {lastScanned.isUnknown && (
+                  <button
+                    onClick={() => {
+                      const firstStudent = (data.students || [])[0];
+                      if (firstStudent) {
+                        setAssignModalStudent(firstStudent);
+                        setAssignCardInput(lastScanned.code || "");
+                      }
+                    }}
+                    style={{
+                      padding: "8px 16px", borderRadius: 10,
+                      background: C.accent, border: "none", color: "#120e2e",
+                      fontSize: 13, fontWeight: 700, cursor: "pointer",
+                      display: "inline-flex", alignItems: "center", gap: 6
+                    }}
+                  >
+                    <CreditCard size={15} />
+                    {lang === "ar" ? "ربط هذه البطاقة بتلميذ الآن" : "Attribuer cette carte à un élève"}
+                  </button>
+                )}
               </div>
             )
           ) : (
@@ -689,7 +812,7 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
                       {st.prenom} {st.nom}
                     </div>
                     <div style={{ fontSize: 11.5, color: C.inkSoft }}>
-                      {sg?.nom || "—"} {hasCard ? `· UID: ${st.nfcCardId}` : ""}
+                      {sg?.nom || "—"} {hasCard ? "· Carte configurée ✓" : "· Sans carte"}
                     </div>
                   </div>
 
@@ -718,31 +841,64 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
           onClose={() => setAssignModalStudent(null)}
         >
           <div style={{ display: "grid", gap: 16 }}>
-            <Field label={lang === "ar" ? "معرّف / رقم بطاقة NFC (UID)" : "Identifiant carte NFC (UID)"}>
-              <input
-                type="text"
-                autoFocus
-                value={assignCardInput}
-                onChange={e => setAssignCardInput(e.target.value)}
-                placeholder={lang === "ar" ? "امسح البطاقة الآن أو اكتب الرمز..." : "Passez la carte sur le lecteur ou écrivez le code..."}
-                style={{
-                  width: "100%", padding: "12px", borderRadius: 10,
-                  border: `1.5px solid ${C.accent}`, background: "rgba(255,255,255,0.08)",
-                  color: C.ink, fontSize: 14, fontWeight: 700, outline: "none", boxSizing: "border-box"
+            {/* Student selection if needed */}
+            <Field label={lang === "ar" ? "التلميذ المحدد" : "Élève sélectionné"}>
+              <select
+                value={assignModalStudent.id}
+                onChange={e => {
+                  const found = (data.students || []).find(s => s.id === e.target.value);
+                  if (found) {
+                    setAssignModalStudent(found);
+                    setAssignCardInput(found.nfcCardId || "");
+                  }
                 }}
-              />
+                style={{
+                  width: "100%", padding: "10px", borderRadius: 10,
+                  border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.08)",
+                  color: C.ink, fontSize: 13.5, fontWeight: 700, outline: "none"
+                }}
+              >
+                {(data.students || []).map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.prenom} {s.nom} ({s.phone || "—"})
+                  </option>
+                ))}
+              </select>
             </Field>
 
-            <p style={{ margin: 0, fontSize: 12.5, color: C.inkSoft }}>
-              {lang === "ar"
-                ? "💡 نصيحة: عندما يكون هذا الحقل مفتوحاً، قم بتمرير البطاقة فوق قارئ NFC وسيكتب الرمز تلقائياً."
-                : "💡 Astuce : Passez le badge sur le lecteur NFC pour insérer le code automatiquement."}
-            </p>
+            <Field label={lang === "ar" ? "رمز بطاقة NFC" : "Code du badge NFC"}>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  autoFocus
+                  value={assignCardInput}
+                  onChange={e => setAssignCardInput(e.target.value)}
+                  placeholder={lang === "ar" ? "مرر البطاقة على القارئ الآن..." : "Approchez la carte sur le lecteur 5YOA..."}
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: 10,
+                    border: `1.5px solid ${C.accent}`, background: "rgba(255,255,255,0.08)",
+                    color: C.ink, fontSize: 14, fontWeight: 700, outline: "none", boxSizing: "border-box"
+                  }}
+                />
+              </div>
+            </Field>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <div style={{
+              background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)",
+              borderRadius: 10, padding: "10px 14px", fontSize: 12.5, color: "#4ade80", display: "flex", alignItems: "center", gap: 8
+            }}>
+              <Sparkles size={16} />
+              <span>
+                {lang === "ar"
+                  ? "💡 المسح التلقائي مفعّل: ضع البطاقة على قارئ 5YOA وسيكتب الرمز فورياً."
+                  : "💡 Détection en direct : Posez la carte sur le lecteur 5YOA pour capturer son identifiant automatiquement."}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
               <PrimaryBtn full onClick={() => handleSaveAssignedCard(assignModalStudent.id, assignCardInput)}>
                 <Check size={16} />
-                {lang === "ar" ? "حفظ وربط البطاقة" : "Enregistrer la carte"}
+                {lang === "ar" ? "حفظ وربط البطاقة" : "Enregistrer et associer"}
               </PrimaryBtn>
             </div>
           </div>
