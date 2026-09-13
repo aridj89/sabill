@@ -419,9 +419,9 @@ const LanguageContext = createContext(null);
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(() => {
     try {
-      return localStorage.getItem("ecole-lang") || "ar";
+      return localStorage.getItem("ecole-lang") || "fr";
     } catch {
-      return "ar";
+      return "fr";
     }
   });
 
