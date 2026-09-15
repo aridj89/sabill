@@ -1,9 +1,6 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
 import { hashPasswordSync, comparePassword } from "./utils/password.js";
@@ -11,15 +8,13 @@ import { generateToken } from "./utils/jwt.js";
 import { authenticateToken, requireRole } from "./middleware/auth.js";
 import { loginRateLimiter, apiRateLimiter } from "./middleware/rateLimiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { loadDatabase, saveDatabase } from "./dbHelpers.js";
+import { db } from "./db.js";
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 const PORT = process.env.PORT || 5000;
-const DB_FILE = path.join(__dirname, "database.json");
 
 // ─── HTTP Security Headers & CORS ────────────────────────────
 app.use(helmet());
@@ -27,7 +22,6 @@ app.use(helmet());
 const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177").split(",");
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or same-origin)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -39,90 +33,6 @@ app.use(cors({
 
 app.use(express.json({ limit: "10mb" }));
 app.use(apiRateLimiter);
-
-// ─── Initial Clean Data Template ─────────────────────────────
-const INITIAL_DATA = {
-  admin: {
-    nom: "Bensalem",
-    prenom: "Karim",
-    username: "admin",
-    password: "admin1234",
-    avatar: "🧑‍🏫",
-  },
-  settings: {
-    enrollmentFee: 500,
-  },
-  langLevels: [
-    { id: "ll1", nom: "A1" },
-    { id: "ll2", nom: "A2" },
-    { id: "ll3", nom: "B1" },
-  ],
-  subgroups: [],
-  students: [],
-  sessions: [],
-  attendances: [],
-  payments: [],
-  subgroupMessages: [],
-  privateMessages: [],
-  userNotifications: [],
-  parents: [],
-  messages: [],
-  notifications: [],
-  extraSessions: [],
-  commCategories: [{ id: "cat1comm", nom: "Langue Française" }],
-  commGroups: [],
-  commMessages: [],
-  groups: [],
-};
-
-// Auto-hash plain text passwords safely on boot
-function sanitizeAndHashDatabase(data) {
-  if (data.admin && data.admin.password) {
-    data.admin.password = hashPasswordSync(data.admin.password);
-  }
-  if (Array.isArray(data.students)) {
-    data.students.forEach(st => {
-      if (st.password) {
-        st.password = hashPasswordSync(st.password);
-      }
-    });
-  }
-  if (Array.isArray(data.parents)) {
-    data.parents.forEach(p => {
-      if (p.password) {
-        p.password = hashPasswordSync(p.password);
-      }
-    });
-  }
-  return data;
-}
-
-function loadDatabase() {
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, "utf-8");
-      const parsed = JSON.parse(raw);
-      const sanitized = sanitizeAndHashDatabase(parsed);
-      saveDatabase(sanitized);
-      return sanitized;
-    }
-  } catch (err) {
-    console.error("Erreur de lecture du fichier database.json:", err);
-  }
-  const clean = sanitizeAndHashDatabase(INITIAL_DATA);
-  saveDatabase(clean);
-  return clean;
-}
-
-function saveDatabase(data) {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-    return true;
-  } catch (err) {
-    console.error("Erreur d'écriture dans database.json:", err);
-    return false;
-  }
-}
 
 // ─── API Routes ───────────────────────────────────────────────
 
@@ -233,8 +143,16 @@ app.post("/api/data", authenticateToken, (req, res, next) => {
         const existingSt = (existingDb.students || []).find(x => x.id === st.id);
         if (!st.password && existingSt) {
           st.password = existingSt.password;
-        } else if (st.password) {
+        } else if (st.password && !st.password.startsWith("$2")) {
           st.password = hashPasswordSync(st.password);
+        }
+      });
+    }
+    if (Array.isArray(newData.parents)) {
+      newData.parents.forEach(p => {
+        const existingP = (existingDb.parents || []).find(x => x.id === p.id);
+        if (!p.password && existingP) {
+          p.password = existingP.password;
         }
       });
     }
@@ -254,11 +172,23 @@ app.post("/api/data", authenticateToken, (req, res, next) => {
  * POST /api/reset — Reset database (Admin only)
  */
 app.post("/api/reset", authenticateToken, requireRole("admin"), (req, res) => {
-  const clean = sanitizeAndHashDatabase(INITIAL_DATA);
-  const success = saveDatabase(clean);
-  if (success) {
+  try {
+    const tables = [
+      "subgroups","students","sessions","attendances","payments","parents",
+      "extra_sessions","user_notifications","subgroup_messages","private_messages",
+      "messages","notifications","comm_groups","comm_messages","groups_table",
+    ];
+    db.transaction(() => {
+      for (const t of tables) db.prepare(`DELETE FROM ${t}`).run();
+      db.prepare("DELETE FROM settings").run();
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('enrollmentFee', '500')").run();
+      db.prepare("DELETE FROM lang_levels").run();
+      db.prepare("INSERT INTO lang_levels (id, nom) VALUES ('ll1','A1'),('ll2','A2'),('ll3','B1')").run();
+      db.prepare("DELETE FROM comm_categories").run();
+      db.prepare("INSERT INTO comm_categories (id, nom) VALUES ('cat1comm','Langue Française')").run();
+    })();
     res.json({ success: true, message: "Base de données réinitialisée." });
-  } else {
+  } catch (err) {
     res.status(500).json({ success: false, message: "Échec de la réinitialisation." });
   }
 });
@@ -267,5 +197,5 @@ app.post("/api/reset", authenticateToken, requireRole("admin"), (req, res) => {
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`🔒 Serveur Express sécurisé démarré sur http://localhost:${PORT}`);
+  console.log(`🔒 Serveur Express + SQLite3 démarré sur http://localhost:${PORT}`);
 });

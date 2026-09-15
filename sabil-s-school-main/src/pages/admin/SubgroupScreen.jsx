@@ -693,9 +693,9 @@ export default function SubgroupScreen({ subgroupId, openSessionId, data, setDat
 
                 {/* Actions */}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={() => onNav({ screen: "student", studentId: st.id })} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, cursor: "pointer" }}><ChevronRight size={14} /></button>
-                  <button onClick={() => setEditingStudent(st)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, cursor: "pointer" }}><Edit2 size={13} /></button>
-                  <button onClick={() => deleteStudent(st.id)} style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#f87171", cursor: "pointer" }}><Trash2 size={13} /></button>
+                  <button onClick={() => onNav({ screen: "student", studentId: st.id })} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, cursor: "pointer" }}><ChevronRight size={14} /></button>
+                  <button onClick={() => setEditingStudent(st)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, cursor: "pointer" }}><Edit2 size={13} /></button>
+                  <button onClick={() => deleteStudent(st.id)} style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#f87171", cursor: "pointer" }}><Trash2 size={13} /></button>
                 </div>
               </div>
             ))}

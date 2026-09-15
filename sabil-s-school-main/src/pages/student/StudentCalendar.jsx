@@ -39,14 +39,48 @@ export default function StudentCalendar({ student, subgroup, data }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={prevMonth} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: C.ink, cursor: "pointer" }}>
-            <ChevronLeft size={16} />
+          <button
+            type="button"
+            onClick={prevMonth}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              width: 38,
+              height: 38,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              cursor: "pointer",
+              flexShrink: 0
+            }}
+          >
+            <ChevronLeft size={20} strokeWidth={2.5} color="#ffffff" />
           </button>
           <span style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>
             {current.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { month: "long", year: "numeric" })}
           </span>
-          <button onClick={nextMonth} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: C.ink, cursor: "pointer" }}>
-            <ChevronRight size={16} />
+          <button
+            type="button"
+            onClick={nextMonth}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              width: 38,
+              height: 38,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              cursor: "pointer",
+              flexShrink: 0
+            }}
+          >
+            <ChevronRight size={20} strokeWidth={2.5} color="#ffffff" />
           </button>
         </div>
       </div>
