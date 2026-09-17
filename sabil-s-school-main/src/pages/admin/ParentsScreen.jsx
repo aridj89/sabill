@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Users, User, KeyRound, Eye, EyeOff, Copy, Check, MessageCircle,
   Bell, Pencil, Trash2, Search, Plus, Filter, ShieldCheck, AlertCircle,
-  CheckCircle2, X, RefreshCw, Send, Share2, GraduationCap, ChevronDown, ArrowLeft, ArrowRight
+  CheckCircle2, X, RefreshCw, Send, Share2, GraduationCap, ChevronDown, ArrowLeft, ArrowRight,
+  Radio, Usb, AlertTriangle
 } from "lucide-react";
 import { C, uid, inputStyle, CAT_BY_ID, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -12,6 +13,26 @@ import Pill from "../../components/ui/Pill";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
 import { notifyPaymentReceived, notifyAccountUpdated } from "../../utils/notificationEngine";
+import { API_BASE_URL } from "../../config/api";
+
+const NFC_API_URL = `${API_BASE_URL}/api/nfc`;
+
+function playScanTone() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.28);
+  } catch {}
+}
 
 /* ── Modal: Modifier le mot de passe ── */
 function PasswordModal({ student, onClose, onSave }) {
@@ -181,6 +202,9 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
   const { lang } = useLanguage();
   const isEdit = !!initial;
 
+  const currentGroup = (groups || []).find(g => g.id === initial?.groupId);
+  const [groupInput, setGroupInput] = useState(currentGroup ? currentGroup.nom : (initial?.groupName || initial?.groupId || ""));
+
   const [form, setForm] = useState(initial ? {
     id: initial.id,
     nom: initial.nom || "",
@@ -188,6 +212,7 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
     phone: initial.phone || "",
     password: initial.password || "",
     groupId: initial.groupId || "",
+    groupName: currentGroup ? currentGroup.nom : (initial.groupName || initial.groupId || ""),
     level: initial.level || "2ème CEM",
     studyClass: initial.studyClass || "",
     school: initial.school || "",
@@ -203,6 +228,7 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
     phone: "",
     password: uid().slice(0, 6),
     groupId: groups?.[0]?.id || "",
+    groupName: groups?.[0]?.nom || "",
     level: "2ème CEM",
     studyClass: "",
     school: "",
@@ -214,6 +240,77 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
   });
 
   const [showPwd, setShowPwd] = useState(false);
+  const [nfcConnected, setNfcConnected] = useState(false);
+  const [justScanned, setJustScanned] = useState(false);
+  const justScannedTimer = useRef(null);
+
+  // ── Live 5YOA NFC Reader Stream Connection ──
+  useEffect(() => {
+    let eventSource = null;
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`${NFC_API_URL}/status`);
+        const json = await res.json();
+        if (json.success && json.reader) {
+          setNfcConnected(!!json.reader.connected);
+        }
+      } catch (err) {
+        setNfcConnected(false);
+      }
+    };
+    checkStatus();
+
+    try {
+      eventSource = new EventSource(`${NFC_API_URL}/stream`);
+
+      eventSource.addEventListener("connected", (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload.readerStatus) {
+            setNfcConnected(!!payload.readerStatus.connected);
+          }
+        } catch (_) {}
+      });
+
+      eventSource.addEventListener("status_change", (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          setNfcConnected(!!payload.connected);
+        } catch (_) {}
+      });
+
+      eventSource.addEventListener("card_scanned", (e) => {
+        try {
+          const result = JSON.parse(e.data);
+          if (result && result.cardUid) {
+            const uidClean = result.cardUid.toUpperCase().trim();
+            setForm(f => ({ ...f, nfcCardId: uidClean }));
+            setJustScanned(true);
+            playScanTone();
+
+            clearTimeout(justScannedTimer.current);
+            justScannedTimer.current = setTimeout(() => {
+              setJustScanned(false);
+            }, 3500);
+          }
+        } catch (err) {
+          console.error("Error reading NFC card in StudentAccountModal:", err);
+        }
+      });
+
+      eventSource.onerror = () => {
+        setNfcConnected(false);
+      };
+    } catch (err) {
+      console.warn("SSE error in StudentAccountModal:", err);
+    }
+
+    return () => {
+      if (eventSource) eventSource.close();
+      clearTimeout(justScannedTimer.current);
+    };
+  }, []);
 
   const generatePass = () => {
     const chars = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -227,7 +324,21 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.nom.trim() || !form.prenom.trim()) return;
-    onSave(form);
+
+    // Resolve groupId & groupName from input
+    let resolvedGroupId = form.groupId;
+    const match = (groups || []).find(g => g.nom.toLowerCase() === groupInput.trim().toLowerCase() || g.id === groupInput.trim());
+    if (match) {
+      resolvedGroupId = match.id;
+    } else if (groupInput.trim()) {
+      resolvedGroupId = groupInput.trim();
+    }
+
+    onSave({
+      ...form,
+      groupId: resolvedGroupId,
+      groupName: groupInput.trim() || (match ? match.nom : "")
+    });
     onClose();
   };
 
@@ -331,7 +442,7 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Niveau & Groupe */}
+        {/* Niveau & Groupe (Écriture libre & Suggestions) */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
             <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
@@ -343,9 +454,9 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
               value={form.level}
               onChange={e => setForm({ ...form, level: e.target.value })}
               placeholder="ex: 2ème CEM"
-              list="student-levels-list"
+              list="student-account-levels-list"
             />
-            <datalist id="student-levels-list">
+            <datalist id="student-account-levels-list">
               <option value="2ème CEM" />
               <option value="1ère CEM" />
               <option value="3ème CEM" />
@@ -362,26 +473,61 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
 
           <div>
             <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
-              {lang === "ar" ? "الفوج / المجموعة" : "Groupe"}
+              {lang === "ar" ? "الفوج / المجموعة (اكتب أو اختر)" : "Groupe (Saisir ou choisir)"}
             </label>
-            <select
-              style={{ ...inputStyle, cursor: "pointer" }}
-              value={form.groupId}
-              onChange={e => setForm({ ...form, groupId: e.target.value })}
-            >
-              <option value="" style={{ background: "#1c1836", color: "#fff" }}>
-                {lang === "ar" ? "-- بدون فوج --" : "-- Sans groupe --"}
-              </option>
+            <input
+              type="text"
+              style={inputStyle}
+              value={groupInput}
+              onChange={e => {
+                const val = e.target.value;
+                setGroupInput(val);
+                const match = (groups || []).find(g => g.nom.toLowerCase() === val.toLowerCase() || g.id === val);
+                if (match) {
+                  setForm(f => ({ ...f, groupId: match.id, groupName: match.nom }));
+                } else {
+                  setForm(f => ({ ...f, groupId: val, groupName: val }));
+                }
+              }}
+              placeholder={lang === "ar" ? "اكتب اسم الفوج أو اختر..." : "Tapez le nom du groupe..."}
+              list="student-account-groups-list"
+            />
+            <datalist id="student-account-groups-list">
               {(groups || []).map(g => (
-                <option key={g.id} value={g.id} style={{ background: "#1c1836", color: "#fff" }}>
-                  {g.nom}
+                <option key={g.id} value={g.nom}>
+                  {g.nom} {g.groupType ? `(${g.groupType})` : ""}
                 </option>
               ))}
-            </select>
+            </datalist>
+
+            {/* Quick group chips */}
+            {(groups || []).length > 0 && (
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                {(groups || []).slice(0, 5).map(g => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => {
+                      setGroupInput(g.nom);
+                      setForm(f => ({ ...f, groupId: g.id, groupName: g.nom }));
+                    }}
+                    style={{
+                      padding: "2px 7px", borderRadius: 5, fontSize: 10.5,
+                      background: (form.groupId === g.id || groupInput === g.nom) ? "rgba(226,150,58,0.25)" : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${(form.groupId === g.id || groupInput === g.nom) ? "#e2963a" : "rgba(255,255,255,0.12)"}`,
+                      color: (form.groupId === g.id || groupInput === g.nom) ? "#e2963a" : C.inkSoft,
+                      cursor: "pointer", fontWeight: 600
+                    }}
+                  >
+                    {g.nom}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Statut du compte & Carte NFC */}
+        {/* Statut du compte & Carte NFC (Live 5YOA reader scanning) */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
             <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
@@ -402,16 +548,57 @@ function StudentAccountModal({ initial, groups, onClose, onSave }) {
           </div>
 
           <div>
-            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
-              {lang === "ar" ? "معرّف بطاقة NFC (اختياري)" : "Carte NFC (Optionnel)"}
-            </label>
-            <input
-              type="text"
-              style={inputStyle}
-              value={form.nfcCardId}
-              onChange={e => setForm({ ...form, nfcCardId: e.target.value })}
-              placeholder="Ex: 04A1B2C3"
-            />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <label style={{ color: C.inkSoft, fontSize: 12.5, fontWeight: 600 }}>
+                {lang === "ar" ? "بطاقة NFC (تلقائي)" : "Puce / Carte NFC (Auto)"}
+              </label>
+              {nfcConnected && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: "#4ade80",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  background: "rgba(74,222,128,0.12)", padding: "1px 6px", borderRadius: 999
+                }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#4ade80" }} />
+                  {lang === "ar" ? "قارئ 5YOA متصل" : "5YOA Connecté"}
+                </span>
+              )}
+            </div>
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                style={{
+                  ...inputStyle,
+                  borderColor: justScanned ? "#4ade80" : form.nfcCardId ? C.accent : inputStyle.borderColor,
+                  boxShadow: justScanned ? "0 0 12px rgba(74,222,128,0.4)" : "none",
+                  fontFamily: "monospace",
+                  letterSpacing: 1,
+                  fontWeight: 700,
+                  paddingRight: form.nfcCardId ? 36 : 12
+                }}
+                value={form.nfcCardId}
+                onChange={e => setForm({ ...form, nfcCardId: e.target.value.toUpperCase() })}
+                placeholder={lang === "ar" ? "مرر البطاقة فوق القارئ..." : "Approchez la carte du lecteur..."}
+              />
+              {form.nfcCardId && (
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, nfcCardId: "" })}
+                  style={{
+                    position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                    background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6,
+                    color: C.inkSoft, cursor: "pointer", padding: "2px 7px", fontSize: 11, fontWeight: 700
+                  }}
+                  title={lang === "ar" ? "مسح" : "Effacer"}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: justScanned ? "#4ade80" : C.inkSoft, marginTop: 4 }}>
+              {justScanned 
+                ? (lang === "ar" ? "✓ تم مسح البطاقة بنجاح!" : "✓ Carte scannée avec succès !")
+                : (lang === "ar" ? "ضع البطاقة فوق قارئ 5YOA وسيكتب الرمز تلقائياً" : "Passez la carte sur le lecteur USB 5YOA")}
+            </div>
           </div>
         </div>
 
