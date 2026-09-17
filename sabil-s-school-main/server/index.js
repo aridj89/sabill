@@ -24,19 +24,17 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ─── HTTP Security Headers & CORS ────────────────────────────
-app.use(helmet());
+// ─── Trust Proxy (Required for Railway / Render / Reverse Proxies) ──
+app.set("trust proxy", 1);
 
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:5174").split(",");
+// ─── HTTP Security Headers & CORS ────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or same-origin)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Accès CORS bloqué par la politique de sécurité."));
-    }
-  },
+  origin: true,
   credentials: true,
 }));
 
