@@ -190,6 +190,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   const [passwordTarget, setPasswordTarget] = useState(null);
   const [notifTarget, setNotifTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Visible passwords tracker: { [studentId]: boolean }
   const [revealedPasswords, setRevealedPasswords] = useState({});
