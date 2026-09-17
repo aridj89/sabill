@@ -39,7 +39,7 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: "10mb" }));
-app.use(apiRateLimiter);
+app.use("/api", apiRateLimiter);
 
 // ─── NFC Hardware Attendance API ─────────────────────────────
 app.use("/api/nfc", nfcRoutes);
