@@ -11,7 +11,15 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
   const [filterUnpaid, setFilterUnpaid] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
-  const [addForm, setAddForm] = useState({ studentId: "", studentName: "", amount: "", paymentAmount: "", yearId: activeYearId });
+  const [addForm, setAddForm] = useState({
+    studentId: "",
+    studentName: "",
+    academicYear: activeYearId || "",
+    level: "2ème CEM",
+    teacher: "",
+    amount: "",
+    paymentAmount: "",
+  });
   const [payModal, setPayModal] = useState(null); // { studentId, studentName, maxAmount }
   const [payAmount, setPayAmount] = useState("");
 
@@ -53,7 +61,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
 
     if (!targetStudentId) {
       // Find if exact match exists just in case
-      const existing = data.students.find(st => `${st.prenom} ${st.nom}`.toLowerCase() === addForm.studentName.toLowerCase().trim());
+      const existing = (data.students || []).find(st => `${st.prenom} ${st.nom}`.toLowerCase() === addForm.studentName.toLowerCase().trim());
       if (existing) {
         targetStudentId = existing.id;
       } else {
@@ -68,18 +76,23 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
           id: targetStudentId,
           nom,
           prenom,
+          level: addForm.level || "2ème CEM",
+          teacher: addForm.teacher || "",
           createdAt: new Date().toISOString()
         };
       }
     }
 
-    const resolvedYearId = addForm.yearId || activeYearId || (data.academicYears?.[0]?.id || null);
+    const resolvedYearId = addForm.academicYear || activeYearId || (data.academicYears?.[0]?.id || "2026-2027");
     
     const newDebt = {
       id: uid(),
       studentId: targetStudentId,
       fromYearId: "manual",
       toYearId: resolvedYearId,
+      level: addForm.level || "2ème CEM",
+      teacher: addForm.teacher || "",
+      note: [addForm.level, addForm.teacher].filter(Boolean).join(" - "),
       amount: Number(addForm.amount),
       createdAt: new Date().toISOString()
     };
@@ -97,7 +110,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
         type: "debt",
         paidDate: new Date().toISOString().slice(0, 10),
         month: new Date().toISOString().slice(0, 7),
-        academicYearId: activeYearId
+        academicYearId: resolvedYearId
       };
     }
     
@@ -109,7 +122,15 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
     }));
     
     setShowAddModal(false);
-    setAddForm({ studentId: "", studentName: "", amount: "", paymentAmount: "", yearId: activeYearId });
+    setAddForm({
+      studentId: "",
+      studentName: "",
+      academicYear: activeYearId || "",
+      level: "2ème CEM",
+      teacher: "",
+      amount: "",
+      paymentAmount: "",
+    });
     if (toastFn) toastFn(lang === "ar" ? "تم إضافة الدين بنجاح" : "Dette ajoutée avec succès");
   };
 
@@ -117,9 +138,13 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
     const fin = getStudentFinancialSummary(data, st.id, activeYearId);
     
     // Support both groupId (new) and groupId (old)
-    const groupId = st.groupId || st.groupId;
-    const sg = [...(data.groups || []), ...(data.groups || [])].find(s => s.id === groupId);
-    const groupName = sg ? sg.nom : (lang === "ar" ? "بدون مجموعة" : "Sans groupe");
+    const groupId = st.groupId;
+    const sg = (data.groups || []).find(s => s.id === groupId);
+    const groupName = sg 
+      ? sg.nom 
+      : (st.level 
+          ? `${st.level}${st.teacher ? ` (${st.teacher})` : ""}` 
+          : (lang === "ar" ? "بدون مجموعة" : "Sans groupe"));
     
     return {
       student: st,
@@ -259,13 +284,16 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
       </div>
 
       {showAddModal && (
-        <Modal title={lang === "ar" ? "إضافة دين لطالب موجود" : "Ajouter dette à un élève"} onClose={() => setShowAddModal(false)}>
+        <Modal title={lang === "ar" ? "إضافة دين لطالب (أو طالب جديد)" : "Ajouter dette à un élève"} onClose={() => setShowAddModal(false)}>
           <form onSubmit={handleAddSubmit} style={{ display: "grid", gap: 14 }}>
+            {/* Student Name with Auto-Suggest */}
             <div style={{ position: "relative" }}>
-              <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>{lang === "ar" ? "الطالب" : "Élève"}</label>
+              <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>
+                {lang === "ar" ? "الطالب (اكتب الاسم أو اختر من القائمة)" : "Élève (Saisir ou sélectionner)"}
+              </label>
               <input 
                 type="text"
-                style={{...inputStyle, background: "rgba(255,255,255,0.06)"}} 
+                style={{ ...inputStyle, background: "rgba(255,255,255,0.06)" }} 
                 value={addForm.studentName}
                 onChange={e => {
                   setAddForm({ ...addForm, studentName: e.target.value, studentId: "" });
@@ -273,33 +301,161 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                 }}
                 onFocus={() => setShowStudentDropdown(true)}
                 onBlur={() => setTimeout(() => setShowStudentDropdown(false), 200)}
-                placeholder={lang === "ar" ? "اكتب اسم الطالب..." : "Saisir le nom de l'élève..."}
+                placeholder={lang === "ar" ? "اكتب اسم ولقب الطالب..." : "Nom et prénom de l'élève..."}
                 required
               />
               {showStudentDropdown && addForm.studentName && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, maxHeight: 150, overflowY: "auto", zIndex: 10 }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#1c1836", border: `1px solid ${C.border}`, borderRadius: 8, maxHeight: 160, overflowY: "auto", zIndex: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
                   {(data.students || []).filter(st => `${st.prenom} ${st.nom}`.toLowerCase().includes(addForm.studentName.toLowerCase())).map(st => (
                     <div 
                       key={st.id} 
-                      style={{ padding: "8px 12px", cursor: "pointer", borderBottom: `1px solid ${C.border}`, color: C.ink }}
+                      style={{ padding: "9px 12px", cursor: "pointer", borderBottom: `1px solid rgba(255,255,255,0.06)`, color: C.ink, display: "flex", justifyContent: "space-between", alignItems: "center" }}
                       onClick={() => {
-                        setAddForm({ ...addForm, studentName: `${st.prenom} ${st.nom}`, studentId: st.id });
+                        setAddForm({ 
+                          ...addForm, 
+                          studentName: `${st.prenom} ${st.nom}`, 
+                          studentId: st.id,
+                          level: st.level || addForm.level || "2ème CEM",
+                          teacher: st.teacher || addForm.teacher || "",
+                        });
                         setShowStudentDropdown(false);
                       }}
                     >
-                      {st.prenom} {st.nom}
+                      <span style={{ fontWeight: 600 }}>{st.prenom} {st.nom}</span>
+                      <span style={{ fontSize: 11.5, color: C.inkSoft }}>{st.level || (lang === "ar" ? "طالب مسجل" : "Élève inscrit")}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            <div>
-              <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>{lang === "ar" ? "مبلغ الدين (DA)" : "Montant de la dette (DA)"}</label>
-              <input type="number" style={inputStyle} value={addForm.amount} onChange={e => setAddForm({ ...addForm, amount: e.target.value })} required min="1" />
+
+            {/* Année Scolaire & Niveau (2ème CEM, etc.) */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>
+                  {lang === "ar" ? "السنة الدراسية" : "Année scolaire"}
+                </label>
+                <select
+                  style={{ ...inputStyle, background: "rgba(255,255,255,0.06)", cursor: "pointer" }}
+                  value={addForm.academicYear}
+                  onChange={e => setAddForm({ ...addForm, academicYear: e.target.value })}
+                >
+                  <option value="" style={{ background: "#1e1a38", color: "#fff" }}>
+                    {lang === "ar" ? "-- السنة الحالية --" : "-- Année en cours --"}
+                  </option>
+                  {(data.academicYears || []).map(y => (
+                    <option key={y.id} value={y.id} style={{ background: "#1e1a38", color: "#fff" }}>
+                      {y.name || y.id}
+                    </option>
+                  ))}
+                  <option value="2026-2027" style={{ background: "#1e1a38", color: "#fff" }}>2026 / 2027</option>
+                  <option value="2025-2026" style={{ background: "#1e1a38", color: "#fff" }}>2025 / 2026</option>
+                  <option value="2024-2025" style={{ background: "#1e1a38", color: "#fff" }}>2024 / 2025</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>
+                  {lang === "ar" ? "المستوى الدراسي (2ème CEM...)" : "Niveau (ex: 2ème CEM)"}
+                </label>
+                <input 
+                  type="text"
+                  style={{ ...inputStyle, background: "rgba(255,255,255,0.06)" }}
+                  value={addForm.level}
+                  onChange={e => setAddForm({ ...addForm, level: e.target.value })}
+                  placeholder="ex: 2ème CEM"
+                  list="levels-suggestions"
+                />
+                <datalist id="levels-suggestions">
+                  <option value="2ème CEM" />
+                  <option value="1ère CEM" />
+                  <option value="3ème CEM" />
+                  <option value="4ème CEM" />
+                  <option value="4ème Primaire" />
+                  <option value="5ème Primaire" />
+                  <option value="1ère Lycée" />
+                  <option value="2ème Lycée" />
+                  <option value="3ème Lycée (BAC)" />
+                  <option value="Langues" />
+                  <option value="Zoom" />
+                </datalist>
+              </div>
             </div>
+
+            {/* Quick Level Presets Buttons */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["2ème CEM", "1ère CEM", "3ème CEM", "4ème CEM", "Primaire", "Lycée", "Zoom"].map(lvl => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setAddForm({ ...addForm, level: lvl })}
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    border: addForm.level === lvl ? "1px solid #e2963a" : "1px solid rgba(255,255,255,0.15)",
+                    background: addForm.level === lvl ? "rgba(226,150,58,0.25)" : "rgba(255,255,255,0.04)",
+                    color: addForm.level === lvl ? "#e2963a" : C.inkSoft,
+                    cursor: "pointer",
+                    fontWeight: 600
+                  }}
+                >
+                  {lvl}
+                </button>
+              ))}
+            </div>
+
+            {/* Professeur / Groupe */}
             <div>
-              <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>{lang === "ar" ? "دفع دفعة الآن (Versement) (اختياري)" : "Versement immédiat (DA) (Optionnel)"}</label>
-              <input type="number" style={inputStyle} value={addForm.paymentAmount} onChange={e => setAddForm({ ...addForm, paymentAmount: e.target.value })} min="0" max={addForm.amount || 0} placeholder="0" />
+              <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>
+                {lang === "ar" ? "الأستاذ / الفوج (Professeur / Groupe)" : "Professeur / Groupe"}
+              </label>
+              <input 
+                type="text" 
+                style={{ ...inputStyle, background: "rgba(255,255,255,0.06)" }} 
+                value={addForm.teacher} 
+                onChange={e => setAddForm({ ...addForm, teacher: e.target.value })} 
+                placeholder={lang === "ar" ? "اسم الأستاذ أو الفوج..." : "Nom de l'enseignant ou du groupe..."} 
+                list="teachers-groups-suggestions"
+              />
+              <datalist id="teachers-groups-suggestions">
+                {(data.groups || []).map(g => (
+                  <option key={g.id} value={g.nom} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* Montant & Versement */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>
+                  {lang === "ar" ? "مبلغ الدين (DA)" : "Montant de la dette (DA)"}
+                </label>
+                <input 
+                  type="number" 
+                  style={inputStyle} 
+                  value={addForm.amount} 
+                  onChange={e => setAddForm({ ...addForm, amount: e.target.value })} 
+                  required 
+                  min="1" 
+                  placeholder="DA"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 4, fontWeight: 600 }}>
+                  {lang === "ar" ? "دفع دفعة الآن (Versement)" : "Versement immédiat (DA)"}
+                </label>
+                <input 
+                  type="number" 
+                  style={inputStyle} 
+                  value={addForm.paymentAmount} 
+                  onChange={e => setAddForm({ ...addForm, paymentAmount: e.target.value })} 
+                  min="0" 
+                  max={addForm.amount || 0} 
+                  placeholder="0" 
+                />
+              </div>
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
