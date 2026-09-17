@@ -171,9 +171,6 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
           >
             {lang === "ar" ? "رسالة خاصة" : "Message privé"}
           </button>
-          <button onClick={() => setShowEdit(true)} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600 }}>
-            <Edit2 size={14} /> {lang === "ar" ? "تعديل" : "Modifier"}
-          </button>
         </div>
       </div>
 
