@@ -93,7 +93,10 @@ class NfcReaderService extends EventEmitter {
       if (matches.length === 0) return null;
       return matches.find(d => d.interface === 1) || matches[0];
     } catch (err) {
-      console.warn("Erreur lors de l'énumération HID:", err.message);
+      if (!this._hidWarned) {
+        console.info("ℹ [NFC Service] Mode Cloud/Web (Lecteur USB physique non connecté sur ce serveur).");
+        this._hidWarned = true;
+      }
       return null;
     }
   }
