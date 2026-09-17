@@ -7,7 +7,38 @@ import { hashPasswordSync } from "./utils/password.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_PATH = path.join(__dirname, "school.db");
+const bundledDbPath = path.join(__dirname, "school.db");
+let resolvedDbPath = process.env.DB_PATH;
+
+if (!resolvedDbPath) {
+  if (fs.existsSync("/data")) {
+    resolvedDbPath = "/data/school.db";
+  } else {
+    resolvedDbPath = bundledDbPath;
+  }
+}
+
+// Ensure target directory exists
+const targetDir = path.dirname(resolvedDbPath);
+if (!fs.existsSync(targetDir)) {
+  try {
+    fs.mkdirSync(targetDir, { recursive: true });
+  } catch (e) {
+    console.warn("Could not create DB directory:", e.message);
+  }
+}
+
+// If persistent volume doesn't have school.db yet, seed it from bundled repo DB
+if (resolvedDbPath !== bundledDbPath && !fs.existsSync(resolvedDbPath) && fs.existsSync(bundledDbPath)) {
+  try {
+    fs.copyFileSync(bundledDbPath, resolvedDbPath);
+    console.log(`📦 Base de données SQLite initialisée dans le Volume : ${resolvedDbPath}`);
+  } catch (err) {
+    console.warn("Could not seed DB to volume:", err.message);
+  }
+}
+
+const DB_PATH = resolvedDbPath;
 const JSON_PATH = path.join(__dirname, "database.json");
 
 // ─── Open / Create the SQLite database ───────────────────────
