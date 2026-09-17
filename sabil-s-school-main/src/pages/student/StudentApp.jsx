@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Menu, LogOut, CalendarClock, MessageCircle, Home, User as UserIcon, Bell, ChevronDown } from "lucide-react";
+import { Menu, LogOut, CalendarClock, MessageCircle, Home, User as UserIcon, Bell, ChevronDown, ArrowLeft, ArrowRight } from "lucide-react";
 import { C, CAT_BY_ID } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import IconBtn from "../../components/ui/IconBtn";
@@ -75,7 +75,43 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
   const cat = sg ? CAT_BY_ID[sg.categoryId] : null;
 
   if (!student) {
-    return <div style={{ color: "#fff", textAlign: "center", padding: 40 }}>{lang === "ar" ? "حساب غير موجود" : "Compte introuvable"}</div>;
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{
+          maxWidth: 440, width: "100%", textAlign: "center", padding: "40px 24px",
+          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 24,
+          boxShadow: "0 20px 40px rgba(0,0,0,0.3)"
+        }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: "50%",
+            background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)",
+            display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px"
+          }}>
+            <UserIcon size={32} color="#f87171" />
+          </div>
+          <h3 style={{ fontSize: 18, fontWeight: 800, color: C.ink, margin: "0 0 8px" }}>
+            {lang === "ar" ? "مكان حتى حساب تلميذ" : "Aucun compte élève trouvé"}
+          </h3>
+          <p style={{ fontSize: 13, color: C.inkSoft, margin: "0 0 24px", lineHeight: 1.5 }}>
+            {lang === "ar" ? "لم يتم العثور على بيانات هذا التلميذ في النظام. يرجى التواصل مع الإدارة." : "Aucune donnée n'a été trouvée pour cet élève. Veuillez contacter l'administration."}
+          </p>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "10px 20px", borderRadius: 12,
+                background: C.accent, border: "none", color: "#fff",
+                fontSize: 14, fontWeight: 700, cursor: "pointer"
+              }}
+            >
+              {isRTL ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
+              {lang === "ar" ? "رجوع وتسجيل الخروج" : "Retour / Déconnexion"}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   const notifications = (data.userNotifications || []).filter(n => n.userId === studentId).reverse();

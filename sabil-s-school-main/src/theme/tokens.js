@@ -1,4 +1,4 @@
-import { BookOpen, School, Landmark, Languages } from "lucide-react";
+import { BookOpen, School, Landmark, Languages, Video } from "lucide-react";
 
 /* ---------------------------------------------------------------
    DESIGN TOKENS (Glassmorphism & Brown Theme)
@@ -75,6 +75,17 @@ export const SCHOOL_CATS = [
     border: "rgba(226,150,58,0.45)",
     levels: null,  // dynamique — stocké dans data.langLevels
     groups: null,  // pas de groupe intermédiaire, directement sous-groupes
+  },
+  {
+    id: "zoom",
+    label: "Zoom",
+    labelAr: "عن بعد",
+    icon: Video,
+    color: "#3b82f6",
+    bg: "rgba(59,130,246,0.18)",
+    border: "rgba(59,130,246,0.42)",
+    levels: ["En ligne"],
+    groups: ["Unique"],
   },
 ];
 

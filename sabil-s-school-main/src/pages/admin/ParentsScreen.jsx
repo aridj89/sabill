@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   Users, User, KeyRound, Eye, EyeOff, Copy, Check, MessageCircle,
   Bell, Pencil, Trash2, Search, Plus, Filter, ShieldCheck, AlertCircle,
-  CheckCircle2, X, RefreshCw, Send, Share2, GraduationCap, ChevronDown
+  CheckCircle2, X, RefreshCw, Send, Share2, GraduationCap, ChevronDown, ArrowLeft, ArrowRight
 } from "lucide-react";
 import { C, uid, inputStyle, CAT_BY_ID, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -412,8 +412,25 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   return (
     <div>
       {/* ── Header ──────────────────────────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 14 }}>
-        <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {onBack && (
+            <button
+              onClick={onBack}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 14px", borderRadius: 12,
+                background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`,
+                color: C.ink, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                transition: "all 0.15s ease"
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+            >
+              {isRTL ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
+              {lang === "ar" ? "رجوع" : "Retour"}
+            </button>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(226,150,58,0.18)", border: "1px solid rgba(226,150,58,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <GraduationCap size={22} color={C.accent} />
@@ -785,18 +802,43 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
         {filteredStudents.length === 0 && (
           <div style={{
             textAlign: "center", padding: "48px 24px",
-            background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18
+            background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
           }}>
-            <Users size={36} color={C.inkSoft} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
-            <div style={{ fontSize: 16, fontWeight: 700, color: C.ink }}>
-              {lang === "ar" ? "لم يتم العثور على أي حساب تلميذ" : "Aucun compte étudiant trouvé"}
+            <div style={{
+              width: 64, height: 64, borderRadius: "50%",
+              background: "rgba(226,150,58,0.12)", border: "1px solid rgba(226,150,58,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 16px"
+            }}>
+              <Users size={32} color={C.accent} />
             </div>
-            <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 4 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.ink }}>
+              {lang === "ar" ? "مكان حتى حساب تلميذ (لا يوجد حساب)" : "Aucun compte étudiant (Makan hata compte)"}
+            </div>
+            <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 6, maxWidth: 440, margin: "6px auto 0" }}>
               {search
-                ? (lang === "ar" ? "جرب البحث بكلمات أخرى" : "Essayez avec d'autres termes de recherche")
-                : (lang === "ar" ? "ابدأ بإضافة أول حساب تلميذ بالضغط على الزر أعلاه" : "Commencez par ajouter un premier compte")}
+                ? (lang === "ar" ? "جرب البحث بكلمات أخرى أو تغيير الفلتر" : "Essayez avec d'autres termes de recherche")
+                : (lang === "ar" ? "القائمة فارغة حالياً. يمكنك إضافة حساب تلميذ جديد أو الرجوع للخلف." : "La liste est actuellement vide. Vous pouvez ajouter un nouveau compte ou revenir en arrière.")}
             </div>
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "9px 18px", borderRadius: 12,
+                    background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`,
+                    color: C.ink, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+                    transition: "all 0.15s ease"
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.16)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                >
+                  {isRTL ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
+                  {lang === "ar" ? "رجوع" : "Retour"}
+                </button>
+              )}
               <PrimaryBtn onClick={() => setShowAddModal(true)}>
                 <Plus size={15} />
                 {lang === "ar" ? "إضافة حساب جديد" : "Créer un compte"}
