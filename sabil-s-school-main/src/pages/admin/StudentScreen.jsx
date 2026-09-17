@@ -131,7 +131,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ width: 64, height: 64, borderRadius: 18, background: st.enrollmentPaid ? C.accentSoft : "rgba(251,191,36,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 24, color: st.enrollmentPaid ? C.accent : "#fbbf24", flexShrink: 0 }}>
-            {st.prenom[0]}{st.nom[0]}
+            {(st.prenom?.[0] || st.nom?.[0] || "S").toUpperCase()}{(st.nom?.[0] || st.prenom?.[1] || "").toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 250 }}>
             <h2 className="f-display" style={{ fontSize: 28, fontWeight: 700, color: C.ink, margin: 0 }}>

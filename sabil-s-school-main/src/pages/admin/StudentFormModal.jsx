@@ -39,19 +39,19 @@ const GROUP_TYPES = [
   { value: "Individuel", labelFr: "Individuel", labelAr: "فردي", color: "#f472b6" },
 ];
 
-export default function StudentFormModal({ groupId, initial, enrollmentFee, onClose, onSave, allStudents, allGroups }) {
+export default function StudentFormModal({ groupId, initial, enrollmentFee, onClose, onSave, allStudents, allGroups, allSubgroups }) {
   const { t, lang } = useLanguage();
   const isEdit = !!initial;
 
   const [form, setForm] = useState(initial ? {
-    nom: initial.nom,
-    prenom: initial.prenom,
+    nom: initial.nom || "",
+    prenom: initial.prenom || "",
     phone: initial.phone || "",
     password: initial.password || "",
     school: initial.school || "",
     studyClass: initial.studyClass || "",
     nfcCardId: initial.nfcCardId || "",
-    enrollmentPaid: initial.enrollmentPaid,
+    enrollmentPaid: !!initial.enrollmentPaid,
     enrollmentDate: initial.enrollmentDate || new Date().toISOString().slice(0, 10),
     monthlyPrice: initial.monthlyPrice || initial.montant || 0,
     groupId: initial.groupId || groupId || "",
@@ -154,34 +154,35 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
   );
 
   const handleSave = () => {
-    if (!form.nom.trim() || !form.prenom.trim() || !form.phone.trim()) return;
+    if (!form.nom.trim() && !form.prenom.trim()) return;
     if (nfcDuplicate) return;
     const student = {
+      ...(initial || {}),
       id: initial?.id || uid(),
       nom: form.nom.trim(),
       prenom: form.prenom.trim(),
-      phone: form.phone.trim(),
+      phone: (form.phone || "").trim(),
       password: form.password,
-      school: form.school?.trim() || "",
-      studyClass: form.studyClass?.trim() || "",
+      school: (form.school || "").trim(),
+      studyClass: (form.studyClass || "").trim(),
       nfcCardId: (form.nfcCardId || "").trim().toUpperCase(),
-      groupId: form.groupId || groupId,
+      groupId: form.groupId || groupId || "",
       monthlyPrice: Number(form.monthlyPrice) || 0,
       montant: Number(form.monthlyPrice) || 0,
-      enrollmentPaid: form.enrollmentPaid,
+      enrollmentPaid: !!form.enrollmentPaid,
       enrollmentDate: form.enrollmentDate,
       studentCode: form.studentCode,
-      accountStatus: form.accountStatus,
+      accountStatus: form.accountStatus || "active",
       createdAt: initial?.createdAt || new Date().toISOString(),
       lastModified: new Date().toISOString(),
     };
     onSave(student);
   };
 
-  const isValid = form.nom.trim() && form.prenom.trim() && form.phone.trim() && !nfcDuplicate;
+  const isValid = (form.nom.trim() || form.prenom.trim()) && !nfcDuplicate;
 
   // Build group options
-  const groups = allGroups || [];
+  const groups = allGroups || allSubgroups || [];
   const getGroupTypeLabel = (gt) => {
     const found = GROUP_TYPES.find(g => g.value === gt);
     return found ? (lang === "ar" ? found.labelAr : found.labelFr) : gt;
