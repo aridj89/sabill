@@ -8,6 +8,6 @@
   ],
   "scripts": {
     "build": "npm --workspace=sabil-s-school-main run build",
-    "start": "npm --workspace=sabil-s-school-main start"
+    "start": "node sabil-s-school-main/server/index.js"
   }
 }

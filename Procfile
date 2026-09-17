@@ -1,1 +1,1 @@
-web: npm start
+web: node sabil-s-school-main/server/index.js
