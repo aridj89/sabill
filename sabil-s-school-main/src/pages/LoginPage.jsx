@@ -16,11 +16,12 @@ export default function LoginPage({ data, setData, toastFn }) {
 
   // Generalized login handler using Express REST API
   const handleLogin = async () => {
+    const cleanId = identifier.trim();
     try {
       const res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({ identifier: cleanId, password }),
       });
 
       const resData = await res.json();

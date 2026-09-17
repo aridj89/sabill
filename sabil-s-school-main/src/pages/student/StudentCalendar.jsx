@@ -3,7 +3,7 @@ import { Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-
 import { C, CAT_BY_ID } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 
-export default function StudentCalendar({ student, subgroup, data }) {
+export default function StudentCalendar({ student, group, data }) {
   const { lang } = useLanguage();
   const today = new Date();
   const [current, setCurrent] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -14,16 +14,16 @@ export default function StudentCalendar({ student, subgroup, data }) {
   const prevMonth = () => setCurrent(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrent(new Date(year, month + 1, 1));
 
-  if (!subgroup) {
+  if (!group) {
     return <div style={{ color: C.inkSoft }}>{lang === "ar" ? "أنت غير مسجل في أي فوج" : "Vous n'êtes dans aucun sous-groupe."}</div>;
   }
 
-  const cat = CAT_BY_ID[subgroup.categoryId];
+  const cat = CAT_BY_ID[group.categoryId];
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
 
   // Sessions du sous-groupe ce mois-ci
   const sessions = data.sessions
-    .filter(s => s.subgroupId === subgroup.id && s.date.startsWith(monthStr))
+    .filter(s => s.groupId === group.id && s.date.startsWith(monthStr))
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   return (
@@ -34,19 +34,53 @@ export default function StudentCalendar({ student, subgroup, data }) {
             {lang === "ar" ? "رزنامة الدروس" : "Mon Calendrier"}
           </h2>
           <div style={{ fontSize: 13, color: cat?.color || C.accent, fontWeight: 600, marginTop: 4 }}>
-            {subgroup.nom} {cat ? `· ${cat.label}` : ""} {subgroup.levelId ? `· ${subgroup.levelId}` : ""}
+            {group.nom} {cat ? `· ${cat.label}` : ""} {group.levelId ? `· ${group.levelId}` : ""}
           </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={prevMonth} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: C.ink, cursor: "pointer" }}>
-            <ChevronLeft size={16} />
+          <button
+            type="button"
+            onClick={prevMonth}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              width: 38,
+              height: 38,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              cursor: "pointer",
+              flexShrink: 0
+            }}
+          >
+            <ChevronLeft size={20} strokeWidth={2.5} color="#ffffff" />
           </button>
           <span style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>
             {current.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { month: "long", year: "numeric" })}
           </span>
-          <button onClick={nextMonth} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: C.ink, cursor: "pointer" }}>
-            <ChevronRight size={16} />
+          <button
+            type="button"
+            onClick={nextMonth}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              width: 38,
+              height: 38,
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              cursor: "pointer",
+              flexShrink: 0
+            }}
+          >
+            <ChevronRight size={20} strokeWidth={2.5} color="#ffffff" />
           </button>
         </div>
       </div>

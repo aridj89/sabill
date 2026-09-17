@@ -2,20 +2,20 @@ import React, { useState } from "react";
 import { Send, Users, User, MessageSquare } from "lucide-react";
 import { C, uid, inputStyle } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
-import { notifyAdminPrivateMessage, notifyAdminSubgroupMessage } from "../../utils/notificationEngine";
+import { notifyAdminPrivateMessage, notifyAdminGroupMessage } from "../../utils/notificationEngine";
 
-export default function StudentChat({ student, subgroup, data, setData }) {
+export default function StudentChat({ student, group, data, setData }) {
   const { lang } = useLanguage();
   const [tab, setTab] = useState("group"); // 'group' | 'private'
   const [text, setText] = useState("");
 
-  if (!subgroup) {
+  if (!group) {
     return <div style={{ color: C.inkSoft }}>{lang === "ar" ? "أنت غير مسجل في أي فوج" : "Vous n'êtes inscrit dans aucun groupe."}</div>;
   }
 
   // Messages de groupe
-  const groupMessages = (data.subgroupMessages || [])
-    .filter(m => m.subgroupId === subgroup.id)
+  const groupMessages = (data.groupMessages || [])
+    .filter(m => m.groupId === group.id)
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
   // Messages privés avec l'admin
@@ -39,12 +39,12 @@ export default function StudentChat({ student, subgroup, data, setData }) {
     };
 
     if (tab === "group") {
-      msgObj.subgroupId = subgroup.id;
+      msgObj.groupId = group.id;
       setData(d => {
-        const notifs = notifyAdminSubgroupMessage(d, subgroup.id, subgroup.nom, studentFullName, messageContent);
+        const notifs = notifyAdminGroupMessage(d, group.id, group.nom, studentFullName, messageContent);
         return {
           ...d,
-          subgroupMessages: [...(d.subgroupMessages || []), msgObj],
+          groupMessages: [...(d.groupMessages || []), msgObj],
           userNotifications: notifs,
         };
       });
@@ -79,7 +79,7 @@ export default function StudentChat({ student, subgroup, data, setData }) {
           }}
         >
           <Users size={18} />
-          {lang === "ar" ? "مجموعة الفوج (" + subgroup.nom + ")" : "Groupe (" + subgroup.nom + ")"}
+          {lang === "ar" ? "مجموعة الفوج (" + group.nom + ")" : "Groupe (" + group.nom + ")"}
         </button>
 
         <button

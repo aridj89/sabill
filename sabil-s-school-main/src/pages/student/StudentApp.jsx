@@ -68,8 +68,10 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
     return () => document.removeEventListener("mousedown", handleClick);
   }, [profileOpen]);
 
-  const student = data.students.find(s => s.id === studentId);
-  const sg = data.subgroups.find(s => s.id === student?.subgroupId);
+  const student = (data.students || []).find(s => s.id === studentId);
+  const enrollment = (data.enrollments || []).find(e => e.studentId === studentId);
+  const activeGroupId = student?.groupId || enrollment?.groupId;
+  const sg = (data.groups || []).find(s => s.id === activeGroupId);
   const cat = sg ? CAT_BY_ID[sg.categoryId] : null;
 
   if (!student) {
@@ -192,9 +194,9 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
       <StudentSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} nav={nav} onNav={setNav} />
 
       <div className="main-content-layout" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 80px" }}>
-        {nav.screen === "dashboard" && <StudentDashboard student={student} subgroup={sg} data={data} />}
-        {nav.screen === "calendar" && <StudentCalendar student={student} subgroup={sg} data={data} />}
-        {nav.screen === "chat" && <StudentChat student={student} subgroup={sg} data={data} setData={setData} />}
+        {nav.screen === "dashboard" && <StudentDashboard student={student} group={sg} data={data} />}
+        {nav.screen === "calendar" && <StudentCalendar student={student} group={sg} data={data} />}
+        {nav.screen === "chat" && <StudentChat student={student} group={sg} data={data} setData={setData} />}
       </div>
     </div>
   );

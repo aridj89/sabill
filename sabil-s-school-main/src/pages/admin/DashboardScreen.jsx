@@ -7,8 +7,8 @@ import {
 import { C, CAT_BY_ID, computeCycles } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
-
-/* ─── Stat card ──────────────────────────────────────────────── */
+import { notifyPaymentRequired } from "../../utils/notificationEngine";
+import { uid, getStudentFinancialSummary } from "../../theme/tokens";
 function StatCard({ icon: Icon, label, value, color, bg, border, onClick }) {
   return (
     <div
@@ -36,8 +36,8 @@ function StatCard({ icon: Icon, label, value, color, bg, border, onClick }) {
 }
 
 /* ─── Session item ───────────────────────────────────────────── */
-function SessionItem({ session, subgroup, onOpen }) {
-  const cat = CAT_BY_ID[subgroup?.categoryId];
+function SessionItem({ session, group, onOpen }) {
+  const cat = CAT_BY_ID[group?.categoryId];
   const catColor = cat?.color || C.accent;
 
   return (
@@ -61,10 +61,10 @@ function SessionItem({ session, subgroup, onOpen }) {
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14.5, fontWeight: 700, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {subgroup?.nom}
+          {group?.nom}
         </div>
         <div style={{ fontSize: 12, color: catColor, fontWeight: 600, marginTop: 2 }}>
-          {cat?.label} {subgroup?.levelId && `· ${subgroup.levelId}`} {subgroup?.groupType && `· ${subgroup.groupType}`}
+          {cat?.label} {group?.levelId && `· ${group.levelId}`} {group?.groupType && `· ${group.groupType}`}
         </div>
       </div>
       {/* Status */}
@@ -83,25 +83,20 @@ function SessionItem({ session, subgroup, onOpen }) {
   );
 }
 
-import { notifyPaymentRequired } from "../../utils/notificationEngine";
-import { uid } from "../../theme/tokens";
-
 /* ─── Main component ─────────────────────────────────────────── */
-export default function DashboardScreen({ data, setData, toastFn, onNav }) {
+export default function DashboardScreen({ data, setData, toastFn, onNav, activeYearId }) {
   const { lang } = useLanguage();
   const today = new Date().toISOString().slice(0, 10);
-  const [unpaidModal, setUnpaidModal] = useState(null); // 'enrollment' | 'courses' | null
+  const [unpaidModal, setUnpaidModal] = useState(null); // 'debts' | null
 
   const handleSendReminder = (studentId, amount, typeLabel) => {
     const student = data.students.find(s => s.id === studentId);
     if (!student) return;
 
-    // Envoyer uniquement dans les NOTIFICATIONS (pas dans les messages)
     setData(d => {
       const notifs = notifyPaymentRequired(d, student.id, amount, typeLabel);
       return {
         ...d,
-        // Nettoyer les éventuels anciens messages de rappel du chat
         privateMessages: (d.privateMessages || []).filter(m => !m.content?.includes("nous vous rappelons que vos frais")),
         userNotifications: notifs,
       };
@@ -117,57 +112,58 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
 
   // ── Stats ────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const { students, sessions, payments, subgroups } = data;
+    const { students, sessions } = data;
 
     const totalStudents = students.length;
-    const enrollmentUnpaidStudents = students.filter(s => !s.enrollmentPaid);
-
-    const todaySessions = sessions.filter(s => s.date === today).sort((a, b) => a.time.localeCompare(b.time));
+    const todaySessions = sessions.filter(s => s.date === today && (!activeYearId || s.academicYearId === activeYearId || !s.academicYearId)).sort((a, b) => a.time.localeCompare(b.time));
 
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
     const weekStr = (d) => d.toISOString().slice(0, 10);
-    const weekSessions = sessions.filter(s => s.date >= weekStr(weekStart) && s.date <= weekStr(weekEnd));
+    const weekSessions = sessions.filter(s => s.date >= weekStr(weekStart) && s.date <= weekStr(weekEnd) && (!activeYearId || s.academicYearId === activeYearId || !s.academicYearId));
 
-    // Déterminer la liste exacte des élèves en retard de paiement de cours
-    const courseUnpaidList = [];
-    subgroups.forEach(sg => {
-      const cycles = computeCycles(sessions, sg);
-      const studentsInSg = students.filter(s => s.subgroupId === sg.id);
-      studentsInSg.forEach(st => {
-        for (let c = 1; c <= cycles; c++) {
-          const pmt = payments.find(p => p.studentId === st.id && p.subgroupId === sg.id && p.cycleNum === c);
-          if (!pmt || !pmt.paid) {
-            courseUnpaidList.push({
-              student: st,
-              subgroup: sg,
-              cycleNum: c,
-              amount: sg.price,
-              paymentId: pmt?.id,
-            });
-          }
-        }
-      });
+    let totalDebtValue = 0;
+    let totalPreviousDebt = 0;
+    let totalCurrentFees = 0;
+    let totalPaid = 0;
+    const unpaidStudentsList = [];
+    
+    students.forEach(st => {
+      const fin = getStudentFinancialSummary(data, st.id, activeYearId);
+      totalPreviousDebt += fin.previousDebtRemaining;
+      totalCurrentFees += fin.currentFeesRemaining;
+      totalPaid += fin.totalPaid;
+      if (fin.totalUnpaid > 0) {
+        totalDebtValue += fin.totalUnpaid;
+        unpaidStudentsList.push({
+          student: st,
+          amount: fin.totalUnpaid,
+          previousDebt: fin.previousDebtRemaining,
+          currentFees: fin.currentFeesRemaining,
+        });
+      }
     });
 
-    // Sessions done today
     const todayDone = todaySessions.filter(s => s.status === "done").length;
 
     return {
       totalStudents,
-      enrollmentUnpaidList: enrollmentUnpaidStudents,
       todaySessions,
       weekSessions,
-      courseUnpaidList,
+      unpaidStudentsList,
+      totalDebtValue,
+      totalPreviousDebt,
+      totalCurrentFees,
+      totalPaid,
       todayDone
     };
-  }, [data, today]);
+  }, [data, today, activeYearId]);
 
   const openSession = (sess) => {
-    const sg = data.subgroups.find(s => s.id === sess.subgroupId);
-    if (sg) onNav({ screen: "subgroup", subgroupId: sg.id, openSession: sess.id });
+    const g = (data.groups || []).find(s => s.id === (sess.groupId || sess.subgroupId));
+    if (g) onNav({ screen: "group", groupId: g.id, openSession: sess.id });
   };
 
   return (
@@ -183,10 +179,10 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
       </div>
 
       {/* ── Stats grid ─────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginBottom: 30 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginBottom: 14 }}>
         <StatCard
           icon={Users}
-          label={lang === "ar" ? "إجمالي التلاميذ (انقر لفتح الحسابات)" : "Total élèves (cliquer pour gérer)"}
+          label={lang === "ar" ? "إجمالي التلاميذ" : "Total élèves"}
           value={stats.totalStudents}
           color="#818cf8" bg="rgba(99,102,241,0.2)" border="rgba(99,102,241,0.35)"
           onClick={() => onNav && onNav({ screen: "parents" })}
@@ -199,17 +195,38 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
         />
         <StatCard
           icon={CreditCard}
-          label={lang === "ar" ? "مدفوعات معلقة (انقر للتفاصيل)" : "Paiements en attente (cliquer)"}
-          value={stats.courseUnpaidList.length}
+          label={lang === "ar" ? "إجمالي الديون (DA)" : "Dette Totale (DA)"}
+          value={stats.totalDebtValue.toLocaleString()}
           color="#f87171" bg="rgba(248,113,113,0.18)" border="rgba(248,113,113,0.35)"
-          onClick={() => setUnpaidModal("courses")}
+          onClick={() => setUnpaidModal("debts")}
         />
         <StatCard
           icon={AlertCircle}
-          label={lang === "ar" ? "تسجيل غير مدفوع (انقر للتفاصيل)" : "Inscriptions impayées (cliquer)"}
-          value={stats.enrollmentUnpaidList.length}
+          label={lang === "ar" ? "طلاب لديهم ديون (انقر)" : "Élèves endettés (cliquer)"}
+          value={stats.unpaidStudentsList.length}
           color="#fbbf24" bg="rgba(251,191,36,0.18)" border="rgba(251,191,36,0.35)"
-          onClick={() => setUnpaidModal("enrollment")}
+          onClick={() => setUnpaidModal("debts")}
+        />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, marginBottom: 30 }}>
+        <StatCard
+          icon={TrendingUp}
+          label={lang === "ar" ? "ديون سابقة متبقية" : "Ancienne dette"}
+          value={stats.totalPreviousDebt.toLocaleString()}
+          color="#f87171" bg="rgba(248,113,113,0.18)" border="rgba(248,113,113,0.35)"
+        />
+        <StatCard
+          icon={CreditCard}
+          label={lang === "ar" ? "رسوم السنة الحالية" : "Frais actuels restants"}
+          value={stats.totalCurrentFees.toLocaleString()}
+          color="#fbbf24" bg="rgba(251,191,36,0.18)" border="rgba(251,191,36,0.35)"
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label={lang === "ar" ? "إجمالي المسدد" : "Total payé"}
+          value={stats.totalPaid.toLocaleString()}
+          color="#4ade80" bg="rgba(74,222,128,0.18)" border="rgba(74,222,128,0.35)"
         />
       </div>
 
@@ -231,8 +248,8 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
             {stats.todaySessions.map(sess => {
-              const sg = data.subgroups.find(s => s.id === sess.subgroupId);
-              return <SessionItem key={sess.id} session={sess} subgroup={sg} onOpen={() => openSession(sess)} />;
+              const g = (data.groups || []).find(s => s.id === (sess.groupId || sess.subgroupId));
+              return <SessionItem key={sess.id} session={sess} group={g} onOpen={() => openSession(sess)} />;
             })}
           </div>
         )}
@@ -270,8 +287,8 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 {daySessions.slice(0, 4).map(sess => {
-                  const sg = data.subgroups.find(s => s.id === sess.subgroupId);
-                  return <SessionItem key={sess.id} session={sess} subgroup={sg} onOpen={() => openSession(sess)} />;
+                  const g = (data.groups || []).find(s => s.id === (sess.groupId || sess.subgroupId));
+                  return <SessionItem key={sess.id} session={sess} group={g} onOpen={() => openSession(sess)} />;
                 })}
                 {daySessions.length > 4 && (
                   <div style={{ fontSize: 12, color: C.inkSoft, padding: "4px 0" }}>
@@ -284,89 +301,47 @@ export default function DashboardScreen({ data, setData, toastFn, onNav }) {
         })}
       </div>
 
-      {/* ── MODAL UNPAID DETAILS ("CHKUN MSLKCH") ── */}
+      {/* ── MODAL UNPAID DETAILS ── */}
       {unpaidModal && (
         <Modal
-          title={unpaidModal === "courses" 
-            ? (lang === "ar" ? "قائمة غير المسددين للدروس" : "Liste des impayés de cours")
-            : (lang === "ar" ? "قائمة غير المسددين للتسجيل" : "Liste des inscriptions non payées")
-          }
+          title={lang === "ar" ? "قائمة غير المسددين للديون" : "Liste des impayés"}
           onClose={() => setUnpaidModal(null)}
           wide
         >
-          {unpaidModal === "courses" ? (
-            stats.courseUnpaidList.length === 0 ? (
-              <div style={{ textAlign: "center", color: C.good, padding: "20px 0", fontWeight: 700 }}>
-                {lang === "ar" ? "الجميع مسدد لجميع المستحقات! ✓" : "Tous les étudiants sont à jour de paiement ! ✓"}
-              </div>
-            ) : (
-              <div style={{ display: "grid", gap: 10, maxHeight: 400, overflowY: "auto" }}>
-                {stats.courseUnpaidList.map((item, idx) => (
-                  <div key={idx} style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{item.student.prenom} {item.student.nom}</div>
-                      <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
-                        {item.subgroup.nom} · <span style={{ color: "#f87171", fontWeight: 700 }}>{item.amount} DA</span>
-                      </div>
-                      <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }} className="f-mono">{item.student.phone}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        onClick={() => { setUnpaidModal(null); onNav({ screen: "student", studentId: item.student.id }); }}
-                        style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.1)", border: `1px solid ${C.border}`, color: C.ink, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                      >
-                        {lang === "ar" ? "الملف" : "Fiche"}
-                      </button>
-                      <button
-                        onClick={() => handleSendReminder(item.student.id, item.amount, "de cours")}
-                        style={{ padding: "6px 12px", borderRadius: 8, background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
-                      >
-                        <MessageCircle size={13} />
-                        {lang === "ar" ? "تذكير" : "Rappel"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
+          {stats.unpaidStudentsList.length === 0 ? (
+            <div style={{ textAlign: "center", color: C.good, padding: "20px 0", fontWeight: 700 }}>
+              {lang === "ar" ? "الجميع مسدد لجميع المستحقات! ✓" : "Tous les étudiants sont à jour de paiement ! ✓"}
+            </div>
           ) : (
-            stats.enrollmentUnpaidList.length === 0 ? (
-              <div style={{ textAlign: "center", color: C.good, padding: "20px 0", fontWeight: 700 }}>
-                {lang === "ar" ? "الجميع مسدد لحقوق التسجيل! ✓" : "Tous les étudiants ont réglé l'inscription ! ✓"}
-              </div>
-            ) : (
-              <div style={{ display: "grid", gap: 10, maxHeight: 400, overflowY: "auto" }}>
-                {stats.enrollmentUnpaidList.map(st => {
-                  const sg = data.subgroups.find(s => s.id === st.subgroupId);
-                  return (
-                    <div key={st.id} style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{st.prenom} {st.nom}</div>
-                        <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
-                          {sg?.nom || "—"} · <span style={{ color: "#fbbf24", fontWeight: 700 }}>{data.settings?.enrollmentFee || 500} DA ({lang === "ar" ? "تسجيل" : "Inscription"})</span>
-                        </div>
-                        <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }} className="f-mono">{st.phone}</div>
-                      </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button
-                          onClick={() => { setUnpaidModal(null); onNav({ screen: "student", studentId: st.id }); }}
-                          style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.1)", border: `1px solid ${C.border}`, color: C.ink, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                        >
-                          {lang === "ar" ? "الملف" : "Fiche"}
-                        </button>
-                        <button
-                          onClick={() => handleSendReminder(st.id, data.settings?.enrollmentFee || 500, "d'inscription")}
-                          style={{ padding: "6px 12px", borderRadius: 8, background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
-                        >
-                          <MessageCircle size={13} />
-                          {lang === "ar" ? "تذكير" : "Rappel"}
-                        </button>
-                      </div>
+            <div style={{ display: "grid", gap: 10, maxHeight: 400, overflowY: "auto" }}>
+              {stats.unpaidStudentsList.map((item, idx) => (
+                <div key={idx} style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{item.student.prenom} {item.student.nom}</div>
+                    <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
+                      <span style={{ color: "#f87171", fontWeight: 700 }}>{item.amount.toLocaleString()} DA</span>
+                      {item.previousDebt > 0 && <span style={{ marginLeft: 6, opacity: 0.8 }}>(Préc: {item.previousDebt.toLocaleString()} DA)</span>}
                     </div>
-                  );
-                })}
-              </div>
-            )
+                    <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }} className="f-mono">{item.student.phone}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => { setUnpaidModal(null); onNav({ screen: "student", studentId: item.student.id }); }}
+                      style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.1)", border: `1px solid ${C.border}`, color: C.ink, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      {lang === "ar" ? "الملف" : "Fiche"}
+                    </button>
+                    <button
+                      onClick={() => handleSendReminder(item.student.id, item.amount, "des dettes")}
+                      style={{ padding: "6px 12px", borderRadius: 8, background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      <MessageCircle size={13} />
+                      {lang === "ar" ? "تذكير" : "Rappel"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </Modal>
       )}

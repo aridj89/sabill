@@ -6,7 +6,8 @@ import rateLimit from "express-rate-limit";
  */
 export const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15,
+  max: process.env.NODE_ENV === "production" ? 20 : 1000, // Relaxed limit in development
+  skipSuccessfulRequests: true, // Don't count successful logins
   standardHeaders: true,
   legacyHeaders: false,
   message: {

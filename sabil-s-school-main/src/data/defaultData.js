@@ -28,13 +28,14 @@ export function defaultData() {
       { id: "ll1", nom: "A1" },
       { id: "ll2", nom: "A2" },
       { id: "ll3", nom: "B1" },
+      { id: "ll4", nom: "B2" },
+      { id: "ll5", nom: "C1" },
+      { id: "ll6", nom: "C2" },
     ],
-    subgroups: [],
     students: [],
     sessions: [],
     attendances: [],
     payments: [],
-    subgroupMessages: [],
     privateMessages: [],
     userNotifications: [],
     parents: [],
@@ -52,7 +53,15 @@ export function defaultData() {
 /* ---------------------------------------------------------------
    STORAGE & API SYNC (WITH JWT HEADER)
 --------------------------------------------------------------- */
-const STORAGE_KEY = "ecole-data-v3";
+const STORAGE_KEY = "ecole-data-v4";
+
+// Evict legacy cached test data immediately
+try {
+  localStorage.removeItem("ecole-data-v3");
+  localStorage.removeItem("ecole-data-v2");
+  localStorage.removeItem("ecole-data-v1");
+  localStorage.removeItem("ecole-data");
+} catch {}
 
 export async function fetchCleanData() {
   try {

@@ -53,12 +53,12 @@ function playTone(type = "success") {
   }
 }
 
-export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, onNav }) {
+export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, onNav, embeddedSubgroupId }) {
   const { lang, isRTL } = useLanguage();
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // States
-  const [selectedSubgroupId, setSelectedSubgroupId] = useState("auto");
+  const [selectedSubgroupId, setSelectedSubgroupId] = useState(embeddedSubgroupId || "auto");
   const [selectedSessionId, setSelectedSessionId] = useState("auto");
   const [manualCode, setManualCode] = useState("");
   const [lastScanned, setLastScanned] = useState(null);
@@ -348,75 +348,74 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
 
   return (
     <div>
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 14 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 14,
-              background: "linear-gradient(135deg, rgba(74,222,128,0.25) 0%, rgba(99,102,241,0.25) 100%)",
-              border: "1px solid rgba(74,222,128,0.4)", display: "flex", alignItems: "center", justifyContent: "center"
-            }}>
-              <Radio size={24} color="#4ade80" />
-            </div>
-            <div>
-              <h2 className="f-display" style={{ fontSize: 26, fontWeight: 800, color: C.ink, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-                {lang === "ar" ? "تسجيل الحضور بالبطاقة الذكية (Pointage NFC)" : "Pointage par Carte NFC / Puce"}
-                <span style={{ fontSize: 11, fontWeight: 800, color: "#4ade80", background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.3)", padding: "2px 8px", borderRadius: 999 }}>
-                  LIVE
-                </span>
-              </h2>
-              <div style={{ fontSize: 13.5, color: C.inkSoft, marginTop: 3 }}>
-                {lang === "ar"
-                  ? "مرر بطاقة أو شريحة NFC للتلميذ لتسجيل حضوره فورياً مع التحقق المالي وتنبيهه"
-                  : "Scannez les cartes NFC / badges pour valider instantanément les présences"}
+      {/* ── Header (Hidden if embedded) ───────────────────────── */}
+      {!embeddedSubgroupId && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 14 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 14,
+                background: "linear-gradient(135deg, rgba(74,222,128,0.25) 0%, rgba(99,102,241,0.25) 100%)",
+                border: "1px solid rgba(74,222,128,0.4)", display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+                <Radio size={24} color="#4ade80" />
+              </div>
+              <div>
+                <h2 className="f-display" style={{ fontSize: 26, fontWeight: 800, color: C.ink, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                  {lang === "ar" ? "تسجيل الحضور بالبطاقة الذكية (Pointage NFC)" : "Pointage par Carte NFC / Puce"}
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#4ade80", background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.3)", padding: "2px 8px", borderRadius: 999 }}>
+                    LIVE
+                  </span>
+                </h2>
+                <div style={{ fontSize: 13.5, color: C.inkSoft, marginTop: 3 }}>
+                  {lang === "ar"
+                    ? "مرر بطاقة أو شريحة NFC للتلميذ لتسجيل حضوره فورياً مع التحقق المالي وتنبيهه"
+                    : "Scannez les cartes NFC / badges pour valider instantanément les présences"}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {/* Hardware Reader Connection Badge */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 7,
-            padding: "8px 14px", borderRadius: 10,
-            background: hardwareConnected ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
-            border: `1px solid ${hardwareConnected ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.3)"}`,
-            color: hardwareConnected ? "#4ade80" : "#f87171",
-            fontSize: 12.5, fontWeight: 700
-          }}>
-            <span style={{
-              width: 8, height: 8, borderRadius: "50%",
-              background: hardwareConnected ? "#4ade80" : "#f87171",
-              boxShadow: hardwareConnected ? "0 0 8px #4ade80" : "none"
-            }} />
-            <Usb size={14} />
-            <span>
-              {hardwareConnected
-                ? (lang === "ar" ? "قارئ 5YOA متصل (USB HID)" : "Lecteur 5YOA connecté (USB HID)")
-                : (lang === "ar" ? "قارئ 5YOA غير متصل" : "Lecteur 5YOA déconnecté")}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "8px 14px", borderRadius: 10,
+              background: hardwareConnected ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
+              border: `1px solid ${hardwareConnected ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.3)"}`,
+              color: hardwareConnected ? "#4ade80" : "#f87171",
+              fontSize: 12.5, fontWeight: 700
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: "50%",
+                background: hardwareConnected ? "#4ade80" : "#f87171",
+                boxShadow: hardwareConnected ? "0 0 8px #4ade80" : "none"
+              }} />
+              <Usb size={14} />
+              <span>
+                {hardwareConnected
+                  ? (lang === "ar" ? "قارئ 5YOA متصل (USB HID)" : "Lecteur 5YOA connecté (USB HID)")
+                  : (lang === "ar" ? "قارئ 5YOA غير متصل" : "Lecteur 5YOA déconnecté")}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "8px 12px", borderRadius: 10,
+                background: soundEnabled ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.06)",
+                border: `1px solid ${soundEnabled ? "rgba(74,222,128,0.35)" : C.border}`,
+                color: soundEnabled ? "#4ade80" : C.inkSoft, fontSize: 12.5, fontWeight: 700, cursor: "pointer"
+              }}
+              title={soundEnabled ? "كتم الصوت" : "تشغيل الصوت"}
+            >
+              {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              {soundEnabled ? (lang === "ar" ? "الصوت مفعّل" : "Bip activé") : (lang === "ar" ? "صامت" : "Muet")}
+            </button>
+            {onBack && <IconBtn icon={ArrowLeft} onClick={onBack} title={lang === "ar" ? "رجوع" : "Retour"} />}
           </div>
-
-          {/* Sound toggle */}
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 12px", borderRadius: 10,
-              background: soundEnabled ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.06)",
-              border: `1px solid ${soundEnabled ? "rgba(74,222,128,0.35)" : C.border}`,
-              color: soundEnabled ? "#4ade80" : C.inkSoft, fontSize: 12.5, fontWeight: 700, cursor: "pointer"
-            }}
-            title={soundEnabled ? "كتم الصوت" : "تشغيل الصوت"}
-          >
-            {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
-            {soundEnabled ? (lang === "ar" ? "الصوت مفعّل" : "Bip activé") : (lang === "ar" ? "صامت" : "Muet")}
-          </button>
-
-          {onBack && <IconBtn icon={ArrowLeft} onClick={onBack} title={lang === "ar" ? "رجوع" : "Retour"} />}
         </div>
-      </div>
+      )}
 
       {/* ── Group selector & Date indicator ─────────────────── */}
       <div style={{
@@ -431,26 +430,47 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
             <span style={{ color: C.ink, background: "rgba(255,255,255,0.08)", padding: "3px 8px", borderRadius: 6 }}>{todayStr}</span>
           </div>
 
-          <div style={{ width: 1, height: 20, background: C.border }} />
-
-          {/* Subgroup selector */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, color: C.inkSoft, fontWeight: 700 }}>{lang === "ar" ? "الفوج المستهدف:" : "Groupe cible :"}</span>
-            <select
-              value={selectedSubgroupId}
-              onChange={e => { setSelectedSubgroupId(e.target.value); setSelectedSessionId("auto"); }}
-              style={{
-                background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`,
-                color: C.ink, padding: "6px 12px", borderRadius: 10, fontSize: 13, fontWeight: 700, outline: "none"
-              }}
-            >
-              <option value="auto">{lang === "ar" ? "⚡ الكشف التلقائي (جميع الأفواج)" : "⚡ Détection automatique (tous les groupes)"}</option>
-              {subgroups.map(sg => (
-                <option key={sg.id} value={sg.id}>{sg.nom} ({sg.days?.join(", ")})</option>
-              ))}
-            </select>
-          </div>
+          {!embeddedSubgroupId && (
+            <>
+              <div style={{ width: 1, height: 20, background: C.border }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, color: C.inkSoft, fontWeight: 700 }}>{lang === "ar" ? "الفوج المستهدف:" : "Groupe cible :"}</span>
+                <select
+                  value={selectedSubgroupId}
+                  onChange={e => { setSelectedSubgroupId(e.target.value); setSelectedSessionId("auto"); }}
+                  style={{
+                    background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`,
+                    color: C.ink, padding: "6px 12px", borderRadius: 10, fontSize: 13, fontWeight: 700, outline: "none"
+                  }}
+                >
+                  <option value="auto">{lang === "ar" ? "⚡ الكشف التلقائي (جميع الأفواج)" : "⚡ Détection automatique (tous les groupes)"}</option>
+                  {subgroups.map(sg => (
+                    <option key={sg.id} value={sg.id}>{sg.nom} ({sg.days?.join(", ")})</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Embedded connection info & sound toggle */}
+        {embeddedSubgroupId && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 7, color: hardwareConnected ? "#4ade80" : "#f87171",
+              fontSize: 12, fontWeight: 700
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: hardwareConnected ? "#4ade80" : "#f87171" }} />
+              {hardwareConnected ? "NFC Connected" : "NFC Disconnected"}
+            </div>
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              style={{ background: "none", border: "none", color: soundEnabled ? "#4ade80" : C.inkSoft, cursor: "pointer", display: "flex" }}
+            >
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+          </div>
+        )}
 
         {/* Live Counter */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

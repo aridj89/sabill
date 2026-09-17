@@ -13,7 +13,7 @@ function createNotification(userId, type, title, message, meta = {}) {
     type, // 'info', 'payment', 'presence', 'session', 'message'
     title,
     message,
-    meta, // { screen, studentId, subgroupId, parentId }
+    meta, // { screen, studentId, groupId, parentId }
     date: new Date().toISOString().slice(0, 10),
     time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
     read: false,
@@ -23,8 +23,8 @@ function createNotification(userId, type, title, message, meta = {}) {
 /**
  * Notifie tous les élèves d'un sous-groupe qu'une séance supplémentaire a été ajoutée.
  */
-export function notifyExtraSessionAdded(data, subgroupId, extraSession, lang = "ar") {
-  const students = (data.students || []).filter(s => s.subgroupId === subgroupId);
+export function notifyExtraSessionAdded(data, groupId, extraSession, lang = "ar") {
+  const students = (data.students || []).filter(s => s.groupId === groupId);
   if (students.length === 0) return data.userNotifications || [];
 
   const dateFormatted = extraSession.date;
@@ -41,7 +41,7 @@ export function notifyExtraSessionAdded(data, subgroupId, extraSession, lang = "
     "session",
     title,
     message,
-    { screen: "calendar", subgroupId, date: extraSession.date, time: extraSession.time }
+    { screen: "calendar", groupId, date: extraSession.date, time: extraSession.time }
   ));
 
   return [...(data.userNotifications || []), ...newNotifs];
@@ -50,8 +50,8 @@ export function notifyExtraSessionAdded(data, subgroupId, extraSession, lang = "
 /**
  * Notifie tous les élèves d'un sous-groupe qu'une séance a été ajoutée/modifiée/annulée.
  */
-export function notifySessionChange(data, subgroupId, actionType, sessionDetails, lang = "ar") {
-  const students = (data.students || []).filter(s => s.subgroupId === subgroupId);
+export function notifySessionChange(data, groupId, actionType, sessionDetails, lang = "ar") {
+  const students = (data.students || []).filter(s => s.groupId === groupId);
   if (students.length === 0) return data.userNotifications || [];
 
   let title = "";
@@ -81,7 +81,7 @@ export function notifySessionChange(data, subgroupId, actionType, sessionDetails
     "session",
     title,
     message,
-    { screen: "calendar", subgroupId, date: sessionDetails.date, time: sessionDetails.time }
+    { screen: "calendar", groupId, date: sessionDetails.date, time: sessionDetails.time }
   ));
   return [...(data.userNotifications || []), ...newNotifs];
 }
@@ -103,8 +103,8 @@ export function notifyPresenceChange(data, studentId, sessionDate, isPresent) {
  * Notifie un élève d'un paiement effectué avec succès (inscription ou mensualité/cycle).
  */
 export function notifyPaymentReceived(data, studentId, amount, details = {}, lang = "ar") {
-  const { type = "course", subgroupId = null, month = "", cycleNum = null } = details;
-  const sg = subgroupId ? (data.subgroups || []).find(s => s.id === subgroupId) : null;
+  const { type = "course", groupId = null, month = "", cycleNum = null } = details;
+  const sg = groupId ? (data.groups || []).find(s => s.id === groupId) : null;
   const sgName = sg ? sg.nom : "";
 
   let title = "";
@@ -127,7 +127,7 @@ export function notifyPaymentReceived(data, studentId, amount, details = {}, lan
     screen: "payments",
     amount,
     type,
-    subgroupId,
+    groupId,
   });
 
   return [...(data.userNotifications || []), notif];
@@ -171,8 +171,9 @@ export function notifyPaymentRequired(data, studentId, amount, reason, customMes
 /**
  * Notifie les élèves d'un nouveau message de l'admin dans un groupe.
  */
-export function notifyGroupMessage(data, subgroupId) {
-  const students = data.students.filter(s => s.subgroupId === subgroupId);
+export function notifyGroupMessage(data, groupId) {
+  const enrolledIds = new Set((data.enrollments || []).filter(e => e.groupId === groupId).map(e => e.studentId));
+  const students = (data.students || []).filter(s => s.groupId === groupId || enrolledIds.has(s.id));
   const newNotifs = students.map(st => createNotification(st.id, "info", "Nouveau message", "Le professeur a envoyé un nouveau message dans le groupe.", { screen: "chat", tab: "group" }));
   return [...(data.userNotifications || []), ...newNotifs];
 }
@@ -195,14 +196,14 @@ export function notifyAdminPrivateMessage(data, studentId, studentName, messageT
 /**
  * Notifie l'admin d'un message envoyé par un élève dans un groupe.
  */
-export function notifyAdminSubgroupMessage(data, subgroupId, subgroupName, studentName, messageText = "") {
+export function notifyAdminGroupMessage(data, groupId, groupName, studentName, messageText = "") {
   const preview = messageText ? ` : "${messageText.length > 55 ? messageText.slice(0, 55) + '…' : messageText}"` : "";
   const notif = createNotification(
     "admin",
     "message",
-    `Message dans ${subgroupName}`,
+    `Message dans ${groupName}`,
     `${studentName}${preview}`,
-    { screen: "chat", section: "groups", subgroupId }
+    { screen: "chat", section: "groups", groupId }
   );
   return [...(data.userNotifications || []), notif];
 }

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Menu, Search, CalendarClock, Users, MessageCircle, LogOut, Settings, ChevronDown, Bell, Radio } from "lucide-react";
-import { C, CAT_BY_ID } from "../../theme/tokens";
+import { C, CAT_BY_ID, uid, generateSessions } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import IconBtn from "../../components/ui/IconBtn";
 import AvatarDisplay from "../../components/ui/AvatarDisplay";
@@ -8,15 +8,15 @@ import LanguageToggle from "../../components/ui/LanguageToggle";
 import AppSidebar from "../../components/AppSidebar";
 import GlobalSearch from "../../components/GlobalSearch";
 
-// Nouvelles pages
 import DashboardScreen from "./DashboardScreen";
 import SchoolStructureScreen from "./SchoolStructureScreen";
-import SubgroupScreen from "./SubgroupScreen";
+import GroupScreen from "./GroupScreen";
 import StudentScreen from "./StudentScreen";
 import CalendarScreen from "./CalendarScreen";
 import CommunicationScreen from "./CommunicationScreen";
 import FinancialScreen from "./FinancialScreen";
 import NfcAttendanceScreen from "./NfcAttendanceScreen";
+import DebtsScreen from "./DebtsScreen";
 
 // Anciennes pages (conservées)
 import ParentsScreen from "./ParentsScreen";
@@ -27,6 +27,10 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
   
   const [nav, setNav] = useState({ screen: "dashboard" });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Find current year or default to first
+  const currentYear = (data.academicYears || []).find(y => y.isCurrent) || (data.academicYears || [])[0];
+  const [activeYearId, setActiveYearId] = useState(currentYear ? currentYear.id : null);
   
   // Profile & Notif dropdowns
   const [profileOpen, setProfileOpen] = useState(false);
@@ -43,17 +47,88 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [profileOpen]);
 
-  const handleNav = (navState) => setNav(navState);
+  const handleNav = (navState) => {
+    if (navState.screen === "group" && (navState.levelId || navState.catId || navState.groupId)) {
+      const gType = navState.groupType || "Normal";
+      const cat = CAT_BY_ID[navState.catId] || SCHOOL_CATS.find(c => c.levels?.includes(navState.levelId)) || SCHOOL_CATS[0];
+      const resolvedCatId = navState.catId || cat?.id || "cem";
+      const resolvedLevel = navState.levelId || "";
+      const langLevelObj = resolvedCatId === "langues" ? (data.langLevels || []).find(l => l.id === resolvedLevel) : null;
+      const levelDisplayName = langLevelObj ? langLevelObj.nom : resolvedLevel;
+      
+      let existing = null;
+      if (navState.groupId) {
+        existing = (data.groups || []).find(s => s.id === navState.groupId);
+      }
+      if (!existing && resolvedLevel && resolvedCatId) {
+        existing = (data.groups || []).find(s => 
+          s.categoryId === resolvedCatId && 
+          s.levelId === resolvedLevel && 
+          (navState.groupType ? s.groupType === navState.groupType : true) &&
+          (!activeYearId || !s.academicYearId || s.academicYearId === activeYearId)
+        );
+      }
+      if (!existing && resolvedLevel) {
+        existing = (data.groups || []).find(s => s.levelId === resolvedLevel && (!navState.groupType || s.groupType === navState.groupType));
+      }
+
+      if (existing) {
+        setNav({
+          screen: "group",
+          groupId: existing.id,
+          catId: existing.categoryId,
+          levelId: existing.levelId,
+          groupType: existing.groupType,
+          openAddStudent: navState.openAddStudent || false
+        });
+      } else {
+        const newG = {
+          id: navState.groupId || uid(),
+          nom: levelDisplayName ? `${levelDisplayName} - ${gType}` : `${cat?.label || "Groupe"} - ${gType}`,
+          categoryId: resolvedCatId,
+          levelId: resolvedLevel,
+          groupType: gType,
+          days: [],
+          time: "10:00",
+          startDate: new Date().toISOString().slice(0, 10),
+          endDate: new Date(Date.now() + 9 * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          sessionsPerCycle: 4,
+          academicYearId: activeYearId || null
+        };
+        const newSessions = generateSessions(newG).map(s => ({ ...s, groupId: newG.id, academicYearId: activeYearId }));
+        setData(d => ({ 
+          ...d, 
+          groups: [...(d.groups || []).filter(g => g.id !== newG.id), newG],
+          sessions: [...(d.sessions || []), ...newSessions]
+        }));
+        setNav({
+          screen: "group",
+          groupId: newG.id,
+          catId: resolvedCatId,
+          levelId: resolvedLevel,
+          groupType: gType,
+          openAddStudent: Boolean(navState.openAddStudent)
+        });
+      }
+    } else {
+      setNav(navState);
+    }
+  };
   
   const goBack = () => {
     if (nav.screen === "student") {
-      const st = data.students.find(s => s.id === nav.studentId);
-      if (st) setNav({ screen: "subgroup", subgroupId: st.subgroupId });
+      const en = (data.enrollments || []).find(e => e.studentId === nav.studentId && e.academicYearId === activeYearId);
+      if (en) setNav({ screen: "group", groupId: en.groupId });
       else setNav({ screen: "dashboard" });
-    } else if (nav.screen === "subgroup") {
-      const sg = data.subgroups.find(s => s.id === nav.subgroupId);
-      if (sg) setNav({ screen: "structure", catId: sg.categoryId, levelId: sg.levelId, groupType: sg.groupType });
-      else setNav({ screen: "dashboard" });
+    } else if (nav.screen === "group") {
+      const g = (data.groups || []).find(s => s.id === nav.groupId);
+      if (g && g.categoryId && g.levelId) {
+        setNav({ screen: "structure", catId: g.categoryId, levelId: g.levelId });
+      } else if (nav.catId && nav.levelId) {
+        setNav({ screen: "structure", catId: nav.catId, levelId: nav.levelId });
+      } else {
+        setNav({ screen: "groups_dashboard" });
+      }
     } else {
       setNav({ screen: "dashboard" });
     }
@@ -81,7 +156,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
       setNav({
         screen: "chat",
         studentId: notif.meta.studentId,
-        subgroupId: notif.meta.subgroupId
+        groupId: notif.meta.groupId
       });
     } else if (notif.meta?.screen === "parents") {
       setNav({ screen: "parents" });
@@ -98,7 +173,21 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
           <GlobalSearch data={data} onNav={handleNav} />
           
           <div style={{ display: "flex", gap: 8, marginLeft: isRTL ? 0 : "auto", marginRight: isRTL ? "auto" : 0, alignItems: "center" }}>
-            <IconBtn icon={Radio} onClick={() => handleNav({ screen: "nfc" })} title={lang === "ar" ? "تسجيل الحضور بالبطاقة (NFC)" : "Pointage NFC"} />
+            {data.academicYears && data.academicYears.length > 0 && (
+              <select
+                value={activeYearId || ""}
+                onChange={e => setActiveYearId(e.target.value)}
+                style={{
+                  background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.ink,
+                  borderRadius: 10, padding: "6px 10px", fontSize: 13, outline: "none", cursor: "pointer",
+                  fontWeight: 600
+                }}
+              >
+                {data.academicYears.map(y => (
+                  <option key={y.id} value={y.id} style={{ color: "#000" }}>{y.name}</option>
+                ))}
+              </select>
+            )}
             <LanguageToggle />
             
             {/* Notifications Dropdown */}
@@ -251,17 +340,34 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
 
       {/* ── Main content area ── */}
       <div className="main-content-layout" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 80px" }}>
-        {nav.screen === "dashboard" && <DashboardScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
-        {nav.screen === "structure" && <SchoolStructureScreen catId={nav.catId} levelId={nav.levelId} groupType={nav.groupType} data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
-        {nav.screen === "subgroup" && <SubgroupScreen subgroupId={nav.subgroupId} openSessionId={nav.openSessionId} data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
-        {nav.screen === "student" && <StudentScreen studentId={nav.studentId} data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
-        {nav.screen === "calendar" && <CalendarScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
-        {nav.screen === "chat" && <CommunicationScreen data={data} setData={setData} initialTarget={nav} onBack={goBack} />}
-        {nav.screen === "finance" && <FinancialScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} />}
+        {nav.screen === "dashboard" && <DashboardScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "groups_dashboard" && <SchoolStructureScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "structure" && <SchoolStructureScreen catId={nav.catId} levelId={nav.levelId} groupType={nav.groupType} data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "group" && (
+          <GroupScreen
+            groupId={nav.groupId}
+            catId={nav.catId}
+            levelId={nav.levelId}
+            groupType={nav.groupType}
+            openAddStudent={nav.openAddStudent}
+            openSessionId={nav.openSessionId}
+            data={data}
+            setData={setData}
+            toastFn={toastFn}
+            onBack={goBack}
+            onNav={handleNav}
+            activeYearId={activeYearId}
+          />
+        )}
+        {nav.screen === "student" && <StudentScreen studentId={nav.studentId} data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "calendar" && <CalendarScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "chat" && <CommunicationScreen data={data} setData={setData} toastFn={toastFn} initialTarget={nav} onBack={goBack} activeYearId={activeYearId} />}
+        {nav.screen === "finance" && <FinancialScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "debts" && <DebtsScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
         {nav.screen === "nfc" && <NfcAttendanceScreen data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
 
         {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} />}
-        {nav.screen === "settings" && <SettingsScreen admin={data.admin} toastFn={toastFn} onSave={(a) => setData(d => ({ ...d, admin: a }))} onBack={goBack} />}
+        {nav.screen === "settings" && <SettingsScreen admin={data.admin} data={data} setData={setData} toastFn={toastFn} onSave={(a) => setData(d => ({ ...d, admin: a }))} onBack={goBack} />}
       </div>
     </div>
   );

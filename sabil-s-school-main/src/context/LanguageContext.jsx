@@ -139,6 +139,13 @@ const translations = {
     saveSettingsBtn: "Enregistrer les modifications",
     settingsSavedToast: "Profil mis à jour ✓",
     languagePreference: "Langue de l'application",
+    
+    // Student Form specific
+    studentCode: "Code Élève",
+    accountStatus: "Statut du compte",
+    activateAccount: "Activer",
+    deactivateAccount: "Désactiver",
+    resetPassword: "Réinitialiser mot de passe",
 
     // Parent App
     parentPortalTitle: "Carnet de Classe",
@@ -346,6 +353,13 @@ const translations = {
     settingsSavedToast: "تم تحديث الملف الشخصي بنجاح ✓",
     languagePreference: "لغة التطبيق",
 
+    // Student Form specific
+    studentCode: "رمز التلميذ",
+    accountStatus: "حالة الحساب",
+    activateAccount: "تفعيل الحساب",
+    deactivateAccount: "تعطيل الحساب",
+    resetPassword: "إعادة تعيين كلمة المرور",
+
     // Parent App
     parentPortalTitle: "دفتر المتابعة المدرسية",
     parentWelcome: "مرحباً بك",
@@ -419,9 +433,9 @@ const LanguageContext = createContext(null);
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(() => {
     try {
-      return localStorage.getItem("ecole-lang") || "ar";
+      return localStorage.getItem("ecole-lang") || "fr";
     } catch {
-      return "ar";
+      return "fr";
     }
   });
 

@@ -5,9 +5,9 @@ import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
 
-export default function SessionDetailModal({ session, subgroup, students, attendances, onClose, onSave }) {
+export default function SessionDetailModal({ session, group, students, attendances, onClose, onSave }) {
   const { lang } = useLanguage();
-  const cat = CAT_BY_ID[subgroup?.categoryId];
+  const cat = CAT_BY_ID[group?.categoryId];
 
   // Local attendance state
   const initAtt = () => {
@@ -71,7 +71,7 @@ export default function SessionDetailModal({ session, subgroup, students, attend
         {/* Subgroup breadcrumb */}
         <div style={{ fontSize: 12, color: catColor, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
           {cat && <cat.icon size={12} />}
-          {cat?.label} {subgroup?.levelId && `· ${subgroup.levelId}`} {subgroup?.groupType && `· ${subgroup.groupType}`} · {subgroup?.nom}
+          {cat?.label} {group?.levelId && `· ${group.levelId}`} {group?.groupType && `· ${group.groupType}`} · {group?.nom}
         </div>
 
         {/* Date & time */}
@@ -154,10 +154,7 @@ export default function SessionDetailModal({ session, subgroup, students, attend
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.ink }}>
                     {s.prenom} {s.nom}
                   </span>
-                  {present
-                    ? <CheckCircle2 size={20} color="#4ade80" />
-                    : <XCircle     size={20} color="#f87171" />
-                  }
+                  <input type="checkbox" className="theme-checkbox" checked={present} onChange={() => toggle(s.id)} onClick={(e) => e.stopPropagation()} />
                 </div>
               );
             })}

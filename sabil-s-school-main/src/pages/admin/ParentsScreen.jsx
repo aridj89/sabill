@@ -175,173 +175,6 @@ function SendNotificationModal({ student, onClose, onSend }) {
   );
 }
 
-/* ── Modal: Créer ou modifier un compte étudiant ── */
-function StudentAccountModal({ initial, subgroups, onClose, onSave }) {
-  const { lang } = useLanguage();
-  const isEdit = !!initial;
-
-  const [form, setForm] = useState(initial ? {
-    nom: initial.nom || "",
-    prenom: initial.prenom || "",
-    phone: initial.phone || "",
-    password: initial.password || "",
-    subgroupId: initial.subgroupId || (subgroups[0]?.id || ""),
-    enrollmentPaid: !!initial.enrollmentPaid,
-    enrollmentDate: initial.enrollmentDate || new Date().toISOString().slice(0, 10),
-  } : {
-    nom: "",
-    prenom: "",
-    phone: "",
-    password: Math.random().toString(36).slice(2, 8),
-    subgroupId: subgroups[0]?.id || "",
-    enrollmentPaid: false,
-    enrollmentDate: new Date().toISOString().slice(0, 10),
-  });
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const generatePass = () => {
-    const chars = "abcdefghjkmnpqrstuvwxyz23456789";
-    let p = "";
-    for (let i = 0; i < 6; i++) {
-      p += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    set("password", p);
-  };
-
-  const handleSave = () => {
-    if (!form.nom.trim() || !form.prenom.trim() || !form.phone.trim()) return;
-    onSave({
-      id: initial?.id || uid(),
-      nom: form.nom.trim(),
-      prenom: form.prenom.trim(),
-      phone: form.phone.trim(),
-      password: form.password.trim(),
-      subgroupId: form.subgroupId,
-      enrollmentPaid: form.enrollmentPaid,
-      enrollmentDate: form.enrollmentDate,
-    });
-  };
-
-  const isValid = form.nom.trim() && form.prenom.trim() && form.phone.trim();
-
-  return (
-    <Modal
-      title={isEdit
-        ? (lang === "ar" ? "تعديل حساب التلميذ" : "Modifier le compte élève")
-        : (lang === "ar" ? "إنشاء حساب تلميذ جديد" : "Nouveau compte élève")
-      }
-      onClose={onClose}
-    >
-      <div style={{ display: "grid", gap: 14 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label={lang === "ar" ? "اللقب" : "Nom"}>
-            <input
-              autoFocus
-              style={inputStyle}
-              placeholder="Benali"
-              value={form.nom}
-              onChange={e => set("nom", e.target.value)}
-            />
-          </Field>
-          <Field label={lang === "ar" ? "الاسم" : "Prénom"}>
-            <input
-              style={inputStyle}
-              placeholder="Amine"
-              value={form.prenom}
-              onChange={e => set("prenom", e.target.value)}
-            />
-          </Field>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label={lang === "ar" ? "الهاتف (معرف تسجيل الدخول)" : "Téléphone (Identifiant)"}>
-            <input
-              style={inputStyle}
-              placeholder="0550123456"
-              value={form.phone}
-              onChange={e => set("phone", e.target.value)}
-            />
-          </Field>
-          <Field label={lang === "ar" ? "الفوج والمستوى" : "Sous-groupe"}>
-            <select
-              style={inputStyle}
-              value={form.subgroupId}
-              onChange={e => set("subgroupId", e.target.value)}
-            >
-              {subgroups.map(sg => {
-                const cat = CAT_BY_ID[sg.categoryId];
-                return (
-                  <option key={sg.id} value={sg.id}>
-                    {sg.nom} ({cat ? cat.label : ""})
-                  </option>
-                );
-              })}
-            </select>
-          </Field>
-        </div>
-
-        <Field label={lang === "ar" ? "كلمة المرور" : "Mot de passe"}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              className="f-mono"
-              style={{ ...inputStyle, flex: 1, letterSpacing: 2 }}
-              value={form.password}
-              onChange={e => set("password", e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={generatePass}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "0 12px", borderRadius: 10,
-                background: "rgba(226,150,58,0.2)", border: "1px solid rgba(226,150,58,0.4)",
-                color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                whiteSpace: "nowrap"
-              }}
-            >
-              <RefreshCw size={13} />
-              {lang === "ar" ? "توليد" : "Générer"}
-            </button>
-          </div>
-        </Field>
-
-        {/* Enrollment switch */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 12, background: form.enrollmentPaid ? "rgba(74,222,128,0.1)" : "rgba(251,191,36,0.1)", border: `1px solid ${form.enrollmentPaid ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}` }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
-              {lang === "ar" ? "حقوق التسجيل السنوية" : "Frais d'inscription"}
-            </div>
-            <div style={{ fontSize: 11.5, color: C.inkSoft }}>
-              {form.enrollmentPaid
-                ? (lang === "ar" ? "مدفوعة ✓" : "Réglés ✓")
-                : (lang === "ar" ? "غير مدفوعة" : "En attente")}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => set("enrollmentPaid", !form.enrollmentPaid)}
-            style={{
-              padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, border: "none",
-              background: form.enrollmentPaid ? "rgba(74,222,128,0.25)" : "rgba(251,191,36,0.25)",
-              color: form.enrollmentPaid ? "#4ade80" : "#fbbf24", cursor: "pointer"
-            }}
-          >
-            {form.enrollmentPaid ? (lang === "ar" ? "تحديد كمعلق" : "Marquer en attente") : (lang === "ar" ? "تحديد كمدفوع" : "Marquer payé")}
-          </button>
-        </div>
-
-        <div style={{ marginTop: 8 }}>
-          <PrimaryBtn full onClick={handleSave} disabled={!isValid}>
-            {isEdit
-              ? (lang === "ar" ? "حفظ التعديلات" : "Enregistrer")
-              : (lang === "ar" ? "إنشاء حساب التلميذ" : "Créer le compte")}
-          </PrimaryBtn>
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 /* ═════════════════════════════════════════════════════════════════
    MAIN COMPONENT: Student Accounts Dashboard
@@ -350,14 +183,13 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   const { lang, isRTL } = useLanguage();
 
   const [search, setSearch] = useState("");
-  const [selectedSubgroupFilter, setSelectedSubgroupFilter] = useState("all");
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'has_pass' | 'no_pass' | 'paid' | 'unpaid'
 
   // Modals state
   const [passwordTarget, setPasswordTarget] = useState(null);
   const [notifTarget, setNotifTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
 
   // Visible passwords tracker: { [studentId]: boolean }
   const [revealedPasswords, setRevealedPasswords] = useState({});
@@ -367,20 +199,20 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   };
 
   const students = data.students || [];
-  const subgroups = data.subgroups || [];
+  const groups = data.groups || [];
 
-  const subgroupMap = useMemo(() => {
+  const groupMap = useMemo(() => {
     const map = {};
-    subgroups.forEach(sg => { map[sg.id] = sg; });
+    groups.forEach(sg => { map[sg.id] = sg; });
     return map;
-  }, [subgroups]);
+  }, [groups]);
 
   // ── Dashboard Metrics ──
   const stats = useMemo(() => {
     const total = students.length;
     const withPassword = students.filter(s => s.password && s.password.trim().length > 0).length;
     const enrollmentPaid = students.filter(s => s.enrollmentPaid).length;
-    const activeGroups = new Set(students.map(s => s.subgroupId).filter(Boolean)).size;
+    const activeGroups = new Set(students.map(s => s.groupId).filter(Boolean)).size;
 
     return { total, withPassword, enrollmentPaid, activeGroups };
   }, [students]);
@@ -388,8 +220,8 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   // ── Filtered Students ──
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
-      // Subgroup filter
-      if (selectedSubgroupFilter !== "all" && s.subgroupId !== selectedSubgroupFilter) {
+      // Group filter
+      if (selectedGroupFilter !== "all" && s.groupId !== selectedGroupFilter) {
         return false;
       }
 
@@ -412,7 +244,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
         const q = search.toLowerCase().trim();
         const fullName = `${s.prenom || ""} ${s.nom || ""}`.toLowerCase();
         const phone = (s.phone || "").toLowerCase();
-        const sg = subgroupMap[s.subgroupId];
+        const sg = groupMap[s.groupId];
         const sgName = sg ? sg.nom.toLowerCase() : "";
 
         return fullName.includes(q) || phone.includes(q) || sgName.includes(q);
@@ -420,7 +252,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
 
       return true;
     });
-  }, [students, selectedSubgroupFilter, statusFilter, search, subgroupMap]);
+  }, [students, selectedGroupFilter, statusFilter, search, groupMap]);
 
   // ── Handlers ──
   const handleSavePassword = (studentId, newPassword, sendNotif) => {
@@ -521,7 +353,6 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       return { ...d, students: updatedStudents, userNotifications: updatedNotifs };
     });
 
-    setShowAddModal(false);
     setEditTarget(null);
     toastFn(
       isEdit
@@ -601,10 +432,6 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <PrimaryBtn onClick={() => setShowAddModal(true)}>
-            <Plus size={16} />
-            {lang === "ar" ? "إضافة حساب تلميذ" : "Nouveau compte"}
-          </PrimaryBtn>
           {onBack && <IconBtn icon={X} onClick={onBack} title={lang === "ar" ? "إغلاق" : "Fermer"} />}
         </div>
       </div>
@@ -613,7 +440,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 22 }}>
         {/* Total students */}
         <div
-          onClick={() => { setSearch(""); setSelectedSubgroupFilter("all"); setStatusFilter("all"); }}
+          onClick={() => { setSearch(""); setSelectedGroupFilter("all"); setStatusFilter("all"); }}
           style={{
             background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16,
             padding: "16px 18px", display: "flex", alignItems: "center", gap: 14,
@@ -710,20 +537,20 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
           )}
         </div>
 
-        {/* Subgroup select filter */}
+        {/* Group select filter */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, color: C.inkSoft, fontWeight: 600 }}>{lang === "ar" ? "الفوج:" : "Groupe :"}</span>
             <select
-              value={selectedSubgroupFilter}
-              onChange={e => setSelectedSubgroupFilter(e.target.value)}
+              value={selectedGroupFilter}
+              onChange={e => setSelectedGroupFilter(e.target.value)}
               style={{
                 height: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${C.border}`,
                 background: "rgba(255,255,255,0.06)", color: C.ink, fontSize: 12.5, fontWeight: 600, outline: "none"
               }}
             >
               <option value="all">{lang === "ar" ? "جميع الأفواج" : "Tous les groupes"}</option>
-              {subgroups.map(sg => (
+              {groups.map(sg => (
                 <option key={sg.id} value={sg.id}>{sg.nom}</option>
               ))}
             </select>
@@ -759,7 +586,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       {/* ── Student Accounts Cards Grid ─────────────────────── */}
       <div style={{ display: "grid", gap: 12 }}>
         {filteredStudents.map(st => {
-          const sg = subgroupMap[st.subgroupId];
+          const sg = groupMap[st.groupId];
           const cat = sg ? CAT_BY_ID[sg.categoryId] : null;
           const isRevealed = !!revealedPasswords[st.id];
           const initials = `${(st.prenom || "")[0] || ""}${(st.nom || "")[0] || ""}`.toUpperCase() || "ST";
@@ -999,7 +826,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       {(showAddModal || editTarget) && (
         <StudentAccountModal
           initial={editTarget}
-          subgroups={subgroups}
+          groups={groups}
           onClose={() => { setShowAddModal(false); setEditTarget(null); }}
           onSave={handleSaveStudentAccount}
         />

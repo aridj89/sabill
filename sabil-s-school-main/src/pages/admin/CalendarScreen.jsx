@@ -162,14 +162,52 @@ export default function CalendarScreen({ data, setData, toastFn, onNav }) {
 
       {/* ── Navigation ──────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
-        <button onClick={prevMonth} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", color: C.ink, cursor: "pointer" }}>
-          <ChevronLeft size={16} />
+        <button
+          type="button"
+          onClick={prevMonth}
+          title={lang === "ar" ? "الشهر السابق" : "Mois précédent"}
+          aria-label={lang === "ar" ? "الشهر السابق" : "Mois précédent"}
+          style={{
+            background: "rgba(255,255,255,0.12)",
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+            width: 40,
+            height: 40,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#ffffff",
+            cursor: "pointer",
+            flexShrink: 0
+          }}
+        >
+          <ChevronLeft size={22} strokeWidth={2.5} color="#ffffff" />
         </button>
-        <h3 className="f-display" style={{ margin: 0, fontSize: 20, color: C.ink, flex: 1, textAlign: "center" }}>
+        <h3 className="f-display" style={{ margin: 0, fontSize: 21, fontWeight: 700, color: C.ink, flex: 1, textAlign: "center", letterSpacing: "0.02em" }}>
           {lang === "ar" ? MONTHS_AR[month] : MONTHS_FR[month]} {year}
         </h3>
-        <button onClick={nextMonth} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", color: C.ink, cursor: "pointer" }}>
-          <ChevronRight size={16} />
+        <button
+          type="button"
+          onClick={nextMonth}
+          title={lang === "ar" ? "الشهر القادم" : "Mois suivant"}
+          aria-label={lang === "ar" ? "الشهر القادم" : "Mois suivant"}
+          style={{
+            background: "rgba(255,255,255,0.12)",
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+            width: 40,
+            height: 40,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#ffffff",
+            cursor: "pointer",
+            flexShrink: 0
+          }}
+        >
+          <ChevronRight size={22} strokeWidth={2.5} color="#ffffff" />
         </button>
       </div>
 

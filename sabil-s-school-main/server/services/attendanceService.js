@@ -1,4 +1,4 @@
-import { loadDatabase, saveDatabase } from "../utils/db.js";
+import { loadDatabase, saveDatabase } from "../dbHelpers.js";
 
 // In-memory debounce / cooldown tracking: cardUid -> timestamp (ms)
 const scanHistoryMap = new Map();
@@ -76,7 +76,7 @@ export function assignCardToStudent(studentId, rawUid) {
       nom: targetStudent.nom,
       prenom: targetStudent.prenom,
       phone: targetStudent.phone,
-      subgroupId: targetStudent.subgroupId,
+      groupId: targetStudent.groupId,
       nfcCardId: targetStudent.nfcCardId,
     },
   };
@@ -130,7 +130,7 @@ export function processCardScan(rawUid) {
         nom: student.nom,
         prenom: student.prenom,
         phone: student.phone,
-        subgroupId: student.subgroupId,
+        groupId: student.groupId,
         nfcCardId: student.nfcCardId,
       },
       message: `Double scan ignoré pour ${student.prenom} ${student.nom}. Patientez ${remainingSeconds}s.`,
@@ -141,14 +141,14 @@ export function processCardScan(rawUid) {
   scanHistoryMap.set(cardUid, now);
 
   // 3. Find or define Target Session
-  const subgroupId = student.subgroupId || "default_group";
-  const subgroups = db.subgroups || [];
-  const subgroup = subgroups.find(sg => sg.id === subgroupId);
-  const subgroupName = subgroup ? subgroup.nom : "";
+  const groupId = student.groupId || "default_group";
+  const groups = db.groups || [];
+  const group = groups.find(g => g.id === groupId);
+  const groupName = group ? group.nom : "";
 
-  // Check existing session for subgroup today
-  const existingSession = (db.sessions || []).find(s => s.subgroupId === subgroupId && s.date === todayStr);
-  const targetSessionId = existingSession ? existingSession.id : `sess_nfc_${todayStr}_${subgroupId}`;
+  // Check existing session for group today
+  const existingSession = (db.sessions || []).find(s => s.groupId === groupId && s.date === todayStr);
+  const targetSessionId = existingSession ? existingSession.id : `sess_nfc_${todayStr}_${groupId}`;
 
   // 4. Record Attendance
   const attendances = db.attendances || [];
@@ -181,7 +181,7 @@ export function processCardScan(rawUid) {
     userId: student.id,
     type: "presence",
     title: "Pointage NFC validé ⏱️",
-    message: `Votre présence${subgroupName ? ` (${subgroupName})` : ""} a été validée par NFC le ${todayStr} à ${timeShort}.`,
+    message: `Votre présence${groupName ? ` (${groupName})` : ""} a été validée par NFC le ${todayStr} à ${timeShort}.`,
     date: todayStr,
     time: timeShort,
     read: false,
@@ -203,8 +203,8 @@ export function processCardScan(rawUid) {
       nom: student.nom,
       prenom: student.prenom,
       phone: student.phone,
-      subgroupId: student.subgroupId,
-      subgroupName,
+      groupId: student.groupId,
+      groupName,
       nfcCardId: student.nfcCardId,
     },
     attendance: attendanceRecord,

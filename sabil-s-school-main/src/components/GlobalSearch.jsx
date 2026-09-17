@@ -35,14 +35,15 @@ export default function GlobalSearch({ data, onNav }) {
     (data.students || []).forEach(st => {
       const name = `${st.prenom} ${st.nom}`.toLowerCase();
       const phone = (st.phone || "").toLowerCase();
-      if (name.includes(q) || phone.includes(q)) {
+      const code = (st.studentCode || "").toLowerCase();
+      if (name.includes(q) || phone.includes(q) || code.includes(q)) {
         const sg = data.subgroups?.find(s => s.id === st.subgroupId);
         const cat = sg ? CAT_BY_ID[sg.categoryId] : null;
         items.push({
           type: "student",
           id: st.id,
           label: `${st.prenom} ${st.nom}`,
-          sub: sg ? sg.nom : (lang === "ar" ? "بدون فوج" : "Sans groupe"),
+          sub: (st.studentCode ? `${st.studentCode} · ` : '') + (sg ? sg.nom : (lang === "ar" ? "بدون فوج" : "Sans groupe")),
           color: cat?.color || C.accent,
           navState: { screen: "student", studentId: st.id },
         });

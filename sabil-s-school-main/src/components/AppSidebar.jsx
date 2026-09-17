@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import {
   X, ChevronRight, ChevronDown,
   MessageCircle, LayoutDashboard, Calendar, Landmark,
-  Users, Settings, BookOpen, Languages, GraduationCap, Radio,
+  Users, Settings, BookOpen, Languages, GraduationCap, Radio, AlertCircle,
+  Wallet, CalendarDays
 } from "lucide-react";
 import { C, SCHOOL_CATS, CAT_BY_ID } from "../theme/tokens";
 import { useLanguage } from "../context/LanguageContext";
@@ -20,6 +21,17 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
   const { t, lang } = useLanguage();
   const [openCats, setOpenCats] = useState({ primaire: true });
   const [openLevels, setOpenLevels] = useState({});
+
+  const navItems = [
+    { id: "dashboard", icon: LayoutDashboard, label: t("dashboardNav"), labelAr: "الرئيسية" },
+    { id: "debts", icon: AlertCircle, label: "Dettes", labelAr: "الديون" },
+    { id: "finance", icon: Wallet, label: t("financialNav"), labelAr: "المالية" },
+    { id: "calendar", icon: CalendarDays, label: t("calendarNav"), labelAr: "الجدول" },
+    { id: "chat", icon: MessageCircle, label: t("messagesNav"), labelAr: "الرسائل" },
+    { id: "parents", icon: Users, label: t("parentsNav"), labelAr: "الأولياء" },
+    { id: "nfc", icon: Radio, label: "NFC / Scan", labelAr: "بطاقات NFC" },
+    { id: "settings", icon: Settings, label: t("settingsNav"), labelAr: "الإعدادات" },
+  ];
 
   const langLevels = data?.langLevels || [];
 
@@ -105,6 +117,8 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
           </button>
         </div>
 
+
+
         {/* ── Quick links ─────────────────────────────────────────── */}
         {sectionLabel(lang === "ar" ? "الرئيسية" : "Accès rapide")}
 
@@ -113,14 +127,19 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
           {lang === "ar" ? "لوحة القيادة" : "Tableau de bord"}
         </button>
 
+        <button style={itemStyle(isActive("groups_dashboard"))} onClick={() => go({ screen: "groups_dashboard" })}>
+          <Users size={16} color={C.accent} />
+          {lang === "ar" ? "إدارة المجموعات" : "Groupes"}
+        </button>
+
+        <button style={itemStyle(isActive("debts"))} onClick={() => go({ screen: "debts" })}>
+          <AlertCircle size={16} color={C.accent} />
+          {lang === "ar" ? "الديون" : "Dettes"}
+        </button>
+
         <button style={itemStyle(isActive("finance"))} onClick={() => go({ screen: "finance" })}>
           <Landmark size={16} color={C.accent} />
           {t("financeNav")}
-        </button>
-
-        <button style={itemStyle(isActive("nfc"))} onClick={() => go({ screen: "nfc" })}>
-          <Radio size={16} color="#4ade80" />
-          {lang === "ar" ? "تسجيل الحضور (NFC)" : "Pointage NFC"}
         </button>
 
         <button style={itemStyle(isActive("calendar"))} onClick={() => go({ screen: "calendar" })}>
@@ -172,56 +191,37 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
                         langLevels.map(ll => (
                           <button
                             key={ll.id}
-                            onClick={() => go({ screen: "structure", catId: "langues", levelId: ll.id, groupType: null })}
+                            onClick={() => go({ screen: "structure", catId: "langues", levelId: ll.id })}
                             style={{
                               ...itemStyle(isActive("structure", { catId: "langues", levelId: ll.id })),
-                              paddingLeft: 10,
+                              paddingLeft: 10, fontSize: 13, marginBottom: 2
                             }}
                           >
                             <span style={{ width: 6, height: 6, borderRadius: 999, background: cat.color, flexShrink: 0 }} />
-                            {ll.nom}
+                            <span style={{ flex: 1 }}>{ll.nom}</span>
+                            <ChevronRight size={11} color="rgba(255,255,255,0.45)" />
                           </button>
                         ))
                       )}
                     </>
                   ) : (
-                    /* Primaire / CEM / Lycée : niveaux + types */
-                    cat.levels.map(level => {
-                      const levelKey = `${cat.id}-${level}`;
-                      const isLevelOpen = !!openLevels[levelKey];
-                      return (
-                        <div key={level} style={{ marginBottom: 2 }}>
-                          <button
-                            onClick={() => toggleLevel(levelKey)}
-                            style={{ ...itemStyle(false), paddingLeft: 10, fontSize: 13 }}
-                          >
-                            <span style={{ width: 5, height: 5, borderRadius: 999, background: cat.color, flexShrink: 0 }} />
-                            <span style={{ flex: 1 }}>{level} {cat.label === "Primaire" ? "année" : cat.label === "CEM" ? "CEM" : "lycée"}</span>
-                            {isLevelOpen
-                              ? <ChevronDown size={11} color="rgba(255,255,255,0.45)" />
-                              : <ChevronRight size={11} color="rgba(255,255,255,0.45)" />
-                            }
-                          </button>
-                          {isLevelOpen && (
-                            <div style={{ paddingLeft: 14 }}>
-                              {cat.groups.map(gType => (
-                                <button
-                                  key={gType}
-                                  onClick={() => go({ screen: "structure", catId: cat.id, levelId: level, groupType: gType })}
-                                  style={{
-                                    ...itemStyle(isActive("structure", { catId: cat.id, levelId: level, groupType: gType })),
-                                    fontSize: 12.5, paddingLeft: 8,
-                                  }}
-                                >
-                                  <span style={{ width: 4, height: 4, borderRadius: 999, background: cat.color, opacity: 0.7, flexShrink: 0 }} />
-                                  {gType}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
+                    /* Primaire / CEM / Lycée : niveaux directs */
+                    cat.levels.map(level => (
+                      <button
+                        key={level}
+                        onClick={() => go({ screen: "structure", catId: cat.id, levelId: level })}
+                        style={{
+                          ...itemStyle(isActive("structure", { catId: cat.id, levelId: level })),
+                          paddingLeft: 10, fontSize: 13, marginBottom: 2
+                        }}
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: 999, background: cat.color, flexShrink: 0 }} />
+                        <span style={{ flex: 1 }}>
+                          {level} {cat.label === "Primaire" ? "année" : cat.label === "CEM" ? "CEM" : "lycée"}
+                        </span>
+                        <ChevronRight size={11} color="rgba(255,255,255,0.45)" />
+                      </button>
+                    ))
                   )}
                 </div>
               )}

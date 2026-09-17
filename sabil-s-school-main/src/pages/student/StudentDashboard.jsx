@@ -3,12 +3,12 @@ import { CheckCircle2, XCircle, AlertTriangle, CalendarClock, Clock, CreditCard,
 import { C, CAT_BY_ID, computeCycles, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 
-export default function StudentDashboard({ student, subgroup, data }) {
+export default function StudentDashboard({ student, group, data }) {
   const { lang } = useLanguage();
-  const cat = subgroup ? CAT_BY_ID[subgroup.categoryId] : null;
+  const cat = group ? CAT_BY_ID[group.categoryId] : null;
 
   const stats = useMemo(() => {
-    if (!subgroup) return { total: 0, done: 0, presenceRate: 0, payments: [] };
+    if (!group) return { total: 0, done: 0, presenceRate: 0, payments: [] };
 
     const attendances = data.attendances.filter(a => a.studentId === student.id);
     const totalDoneSessions = attendances.length;
@@ -17,7 +17,7 @@ export default function StudentDashboard({ student, subgroup, data }) {
     
     // Prochaines séances du sous-groupe (non effectuées)
     const today = new Date().toISOString().slice(0, 10);
-    const allSgSessions = data.sessions.filter(s => s.subgroupId === subgroup.id);
+    const allSgSessions = data.sessions.filter(s => s.groupId === group.id);
     const upcoming = allSgSessions
       .filter(s => s.date >= today && s.status === "planned")
       .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
@@ -33,13 +33,13 @@ export default function StudentDashboard({ student, subgroup, data }) {
     const payments = data.payments.filter(p => p.studentId === student.id).sort((a, b) => b.cycleNum - a.cycleNum);
     
     // Cycle en cours
-    const currentCycle = computeCycles(allSgSessions, subgroup) + 1;
-    const sessionsInCurrentCycle = allSgSessions.filter(s => s.status === "done").length % (subgroup.sessionsPerCycle || 4);
+    const currentCycle = computeCycles(allSgSessions, group) + 1;
+    const sessionsInCurrentCycle = allSgSessions.filter(s => s.status === "done").length % (group.sessionsPerCycle || 4);
 
     return { totalDoneSessions, presentCount, presenceRate, upcoming, recent, payments, currentCycle, sessionsInCurrentCycle };
-  }, [data, student, subgroup]);
+  }, [data, student, group]);
 
-  if (!subgroup) return <div style={{ color: C.inkSoft }}>{lang === "ar" ? "أنت غير مسجل في أي فوج" : "Vous n'êtes inscrit dans aucun groupe."}</div>;
+  if (!group) return <div style={{ color: C.inkSoft }}>{lang === "ar" ? "أنت غير مسجل في أي فوج" : "Vous n'êtes inscrit dans aucun groupe."}</div>;
 
   return (
     <div>
@@ -90,10 +90,10 @@ export default function StudentDashboard({ student, subgroup, data }) {
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ fontSize: 13, color: C.inkSoft, marginBottom: 8 }}>{lang === "ar" ? "تقدم الحصص المنجزة" : "Progression des séances"}</div>
               <div style={{ height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 999, overflow: "hidden" }}>
-                <div style={{ height: "100%", background: C.accent, width: `${(stats.sessionsInCurrentCycle / (subgroup.sessionsPerCycle || 4)) * 100}%` }} />
+                <div style={{ height: "100%", background: C.accent, width: `${(stats.sessionsInCurrentCycle / (group.sessionsPerCycle || 4)) * 100}%` }} />
               </div>
               <div style={{ fontSize: 12, color: C.inkSoft, textAlign: "right", marginTop: 4 }}>
-                {stats.sessionsInCurrentCycle} / {subgroup.sessionsPerCycle || 4} {lang === "ar" ? "حصص" : "séances"}
+                {stats.sessionsInCurrentCycle} / {group.sessionsPerCycle || 4} {lang === "ar" ? "حصص" : "séances"}
               </div>
             </div>
           </div>
@@ -124,7 +124,7 @@ export default function StudentDashboard({ student, subgroup, data }) {
                         )}
                       </div>
                       <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
-                        {subgroup.nom} {cat ? `· ${cat.label}` : ""} {sess.note ? `· ${sess.note}` : ""}
+                        {group.nom} {cat ? `· ${cat.label}` : ""} {sess.note ? `· ${sess.note}` : ""}
                       </div>
                     </div>
                   </div>
