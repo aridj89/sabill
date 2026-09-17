@@ -10,35 +10,36 @@ function AlertTriangle(props) {
   return <svg xmlns="http://www.w3.org/2000/svg" width={props.size||24} height={props.size||24} viewBox="0 0 24 24" fill="none" stroke={props.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>;
 }
 
-export default function StudentScreen({ studentId, data, setData, toastFn, onBack, onNav }) {
+export default function StudentScreen({ studentId, data, setData, toastFn, onBack, onNav, activeYearId }) {
   const { lang } = useLanguage();
   const [showEdit, setShowEdit] = useState(false);
 
-  const st = data.students.find(s => s.id === studentId);
+  const st = (data.students || []).find(s => s.id === studentId);
   if (!st) return <div style={{ color: C.inkSoft }}>{lang === "ar" ? "التلميذ غير موجود" : "Élève introuvable"}</div>;
 
   const sg = [...(data.groups || [])].find(s => s.id === st.groupId);
   const cat = sg ? CAT_BY_ID[sg.categoryId] : null;
 
   // Stats & data
-  const attendances = data.attendances.filter(a => a.studentId === st.id);
+  const attendances = (data.attendances || []).filter(a => a.studentId === st.id);
   const totalSessions = attendances.length;
   const presentCount = attendances.filter(a => a.present).length;
   const absentCount = totalSessions - presentCount;
   const presenceRate = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0;
 
-  const payments = data.payments.filter(p => p.studentId === st.id).sort((a, b) => (a.cycleNum || 0) - (b.cycleNum || 0));
+  const payments = (data.payments || []).filter(p => p.studentId === st.id).sort((a, b) => (a.cycleNum || 0) - (b.cycleNum || 0));
   const unpaidPmtCount = payments.filter(p => !p.paid).length;
   const studentPrice = st.monthlyPrice || st.montant || 0;
 
   const saveStudent = (student) => {
     setData(d => {
+      const activeYear = activeYearId || d.activeYearId || (d.academicYears?.[0]?.id);
       const notifs = notifyAccountUpdated(d, student.id, lang === "ar" ? "تم تعديل وتحديث بيانات حسابك من قبل الإدارة." : "Votre profil a été mis à jour par l'administration.", lang);
-      const existingEnrollment = (d.enrollments || []).find(e => e.studentId === student.id && e.academicYearId === d.activeYearId);
+      const existingEnrollment = (d.enrollments || []).find(e => e.studentId === student.id && (!activeYear || e.academicYearId === activeYear));
       const enrollmentObj = {
         id: existingEnrollment ? existingEnrollment.id : uid(),
         studentId: student.id,
-        academicYearId: d.activeYearId,
+        academicYearId: activeYear || null,
         groupId: student.groupId || null,
         monthlyPrice: Number(student.monthlyPrice) || 0
       };
@@ -48,7 +49,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
 
       return {
         ...d,
-        students: d.students.map(s => s.id === student.id ? student : s),
+        students: (d.students || []).map(s => s.id === student.id ? student : s),
         enrollments: newEnrollments,
         userNotifications: notifs,
       };
@@ -178,7 +179,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
 
       {/* ── Status badges ──────────────────────────────────────── */}
       {(() => {
-        const fin = getStudentFinancialSummary(data, st.id, data.activeYearId); // Note: AdminApp passes activeYearId
+        const fin = getStudentFinancialSummary(data, st.id, activeYearId || data.activeYearId);
         return (
           <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
             {/* Monthly Price */}

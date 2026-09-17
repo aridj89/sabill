@@ -611,16 +611,17 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
 
   const saveStudent = (student) => {
     setData(d => {
-      const exists = d.students.some(s => s.id === student.id);
+      const activeYear = activeYearId || d.activeYearId || (d.academicYears?.[0]?.id);
+      const exists = (d.students || []).some(s => s.id === student.id);
       let notifs = d.userNotifications || [];
       if (exists) {
         notifs = notifyAccountUpdated(d, student.id, lang === "ar" ? "تم تعديل وتحديث بيانات حسابك من قبل الإدارة." : "Votre profil a été mis à jour par l'administration.", lang);
       }
-      const existingEnrollment = (d.enrollments || []).find(e => e.studentId === student.id && e.academicYearId === activeYearId);
+      const existingEnrollment = (d.enrollments || []).find(e => e.studentId === student.id && (!activeYear || e.academicYearId === activeYear));
       const enrollmentObj = {
         id: existingEnrollment ? existingEnrollment.id : uid(),
         studentId: student.id,
-        academicYearId: activeYearId,
+        academicYearId: activeYear || null,
         groupId: student.groupId || null,
         monthlyPrice: Number(student.monthlyPrice) || 0
       };
@@ -630,7 +631,7 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
 
       return {
         ...d,
-        students: exists ? d.students.map(s => s.id === student.id ? student : s) : [...d.students, student],
+        students: exists ? (d.students || []).map(s => s.id === student.id ? student : s) : [...(d.students || []), student],
         enrollments: newEnrollments,
         userNotifications: notifs
       };
@@ -982,7 +983,8 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
           groupId={sg.id}
           initial={editingStudent}
           enrollmentFee={data.settings?.enrollmentFee || 500}
-          allStudents={data.students}
+          allStudents={data.students || []}
+          allGroups={data.groups || []}
           allSubgroups={[...(data.subgroups || []), ...(data.groups || [])]}
           onClose={() => { setShowAddStudent(false); setEditingStudent(null); }}
           onSave={saveStudent}

@@ -312,9 +312,9 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                   <td style={{ padding: "14px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{ width: 32, height: 32, borderRadius: 8, background: d.totalUnpaid > 0 ? "rgba(248,113,113,0.15)" : "rgba(74,222,128,0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: d.totalUnpaid > 0 ? "#f87171" : "#4ade80", fontWeight: 700, fontSize: 13 }}>
-                        {d.student.prenom[0]}{d.student.nom[0]}
+                        {(d.student.prenom?.[0] || d.student.nom?.[0] || "S").toUpperCase()}{(d.student.nom?.[0] || d.student.prenom?.[1] || "").toUpperCase()}
                       </div>
-                      <div style={{ fontWeight: 700, color: C.ink, fontSize: 14 }}>{d.student.prenom} {d.student.nom}</div>
+                      <div style={{ fontWeight: 700, color: C.ink, fontSize: 14 }}>{d.student.prenom || ""} {d.student.nom || ""}</div>
                     </div>
                   </td>
                   <td style={{ padding: "14px 16px", color: C.inkSoft, fontSize: 13.5 }}>{d.groupName}</td>

@@ -167,36 +167,43 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
   if (!data) return { totalPaid: 0, totalUnpaid: 0, isSettled: true, enrollmentPaid: false, previousDebt: 0, currentFees: 0 };
   
   // If activeYearId is not provided, try to find the current year
-  let yearId = activeYearId;
-  if (!yearId && data.academicYears) {
-    const currentYear = data.academicYears.find(y => y.isCurrent);
+  let yearId = activeYearId || data.activeYearId;
+  if (!yearId && data.academicYears && data.academicYears.length > 0) {
+    const currentYear = data.academicYears.find(y => y.isCurrent) || data.academicYears[0];
     if (currentYear) yearId = currentYear.id;
   }
 
   const st = (data.students || []).find(s => s.id === studentId);
   if (!st) return { totalPaid: 0, totalUnpaid: 0, isSettled: true, enrollmentPaid: false, previousDebt: 0, currentFees: 0 };
 
-  // Get active enrollment for the year
-  const enrollment = (data.enrollments || []).find(e => e.studentId === studentId && e.academicYearId === yearId);
-  const groupId = enrollment ? enrollment.groupId : null;
-  const price = enrollment ? (enrollment.monthlyPrice || 0) : 0;
+  // Get active enrollment for the year or student's assigned group
+  const enrollment = (data.enrollments || []).find(e => e.studentId === studentId && (!yearId || e.academicYearId === yearId || !e.academicYearId));
+  const groupId = enrollment ? enrollment.groupId : st.groupId;
+  const price = Number(enrollment?.monthlyPrice !== undefined ? enrollment.monthlyPrice : (st.monthlyPrice || st.montant || 0));
 
-  // 1. Calculate Previous Debt (carried over to this year)
+  // 1. Calculate Previous Debt (carried over or manual debts entered for this student)
   let previousDebt = 0;
-  const carryOvers = (data.debtCarryOvers || []).filter(c => c.studentId === studentId && c.toYearId === yearId);
-  carryOvers.forEach(c => previousDebt += c.amount);
+  const carryOvers = (data.debtCarryOvers || []).filter(c => 
+    c.studentId === studentId && 
+    (!yearId || !c.toYearId || c.toYearId === yearId || c.toYearId === "manual" || c.toYearId === "2026-2027" || (data.academicYears || []).some(y => y.id === c.toYearId))
+  );
+  carryOvers.forEach(c => {
+    previousDebt += Number(c.amount || 0);
+  });
 
   // 2. Calculate Current Year Expected Fees
   let currentFees = 0;
   const sg = (data.groups || []).find(s => s.id === groupId);
-  const enrollmentFee = data.settings?.enrollmentFee || 500;
+  const enrollmentFee = data.settings?.enrollmentFee !== undefined ? Number(data.settings.enrollmentFee) : 500;
 
-  if (!st.enrollmentPaid) {
+  // Only charge enrollment fee if student is enrolled in a group / active school structure, or explicitly has enrollment
+  const isEnrolledInSchool = Boolean(groupId || sg || enrollment);
+
+  if (isEnrolledInSchool && !st.enrollmentPaid) {
     currentFees += enrollmentFee;
   }
 
   // Calculate fees from sessions in this year
-  // For safety, only consider sessions that belong to the active year if sg is active in this year
   if (sg) {
     const doneSessions = (data.sessions || []).filter(s => 
       (s.groupId === sg.id || s.groupId === sg.id) && 
@@ -207,7 +214,7 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
     currentFees += (cycles * price);
   }
 
-  // 3. Calculate Total Paid in this Year
+  // 3. Calculate Total Paid in this Year / for this student
   let totalPaid = 0;
   const stPayments = (data.payments || []).filter(p => 
     p.studentId === studentId && 
@@ -215,15 +222,12 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
   );
   
   stPayments.forEach(p => {
-    const expected = p.expectedAmount || p.amount || price;
-    const paid = (p.paid === true || p.status === "paid") ? expected : (p.paidAmount || 0);
+    const expected = Number(p.expectedAmount || p.amount || price);
+    const paid = (p.paid === true || p.status === "paid") ? expected : Number(p.paidAmount || 0);
     totalPaid += paid;
   });
 
-  if (st.enrollmentPaid) {
-    // If enrollment is paid, we assume it's part of the total paid logic or handled separately.
-    // Wait, if enrollment is paid, it means they paid 500. So we add 500 to total paid, and 500 to currentFees expected, so it balances out?
-    // Let's add it to both so the numbers align perfectly.
+  if (isEnrolledInSchool && st.enrollmentPaid) {
     currentFees += enrollmentFee;
     totalPaid += enrollmentFee;
   }
