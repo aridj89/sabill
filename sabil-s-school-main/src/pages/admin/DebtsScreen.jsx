@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Filter, AlertCircle, CheckCircle2, UserPlus, X, Pencil, Trash2 } from "lucide-react";
+import { Search, Filter, AlertCircle, CheckCircle2, UserPlus, X, Pencil, Trash2, CreditCard, Wallet } from "lucide-react";
 import { C, getStudentFinancialSummary, uid, inputStyle } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
@@ -342,27 +342,38 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: "14px 16px" }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {d.totalUnpaid > 0 && (
-                        <button 
-                          onClick={() => {
-                            setPayModal({ studentId: d.student.id, studentName: `${d.student.prenom} ${d.student.nom}`, maxAmount: d.totalUnpaid });
-                            setPayAmount(d.totalUnpaid);
-                          }}
-                          style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.4)", color: "#4ade80", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
-                        >
-                          {lang === "ar" ? "تسديد" : "Payer"}
-                        </button>
-                      )}
+                  <td style={{ padding: "12px 16px" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {/* 1. Bouton Versement */}
+                      <button 
+                        onClick={() => {
+                          setPayModal({ studentId: d.student.id, studentName: `${d.student.prenom || ""} ${d.student.nom || ""}`, maxAmount: d.totalUnpaid });
+                          setPayAmount(d.totalUnpaid > 0 ? d.totalUnpaid : "");
+                        }}
+                        style={{
+                          padding: "6px 11px", borderRadius: 8,
+                          background: d.totalUnpaid > 0 ? "rgba(74,222,128,0.18)" : "rgba(255,255,255,0.06)",
+                          border: `1px solid ${d.totalUnpaid > 0 ? "rgba(74,222,128,0.4)" : C.border}`,
+                          color: d.totalUnpaid > 0 ? "#4ade80" : C.inkSoft,
+                          fontWeight: 700, fontSize: 12, cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          transition: "all 0.15s ease"
+                        }}
+                        title={lang === "ar" ? "تسجيل دفعة (Versement)" : "Effectuer un versement"}
+                      >
+                        <CreditCard size={13} />
+                        <span>{lang === "ar" ? "دفعة" : "Versement"}</span>
+                      </button>
+
+                      {/* 2. Bouton Modifier */}
                       <button 
                         onClick={() => {
                           const existingDebt = (data.debtCarryOvers || []).find(c => c.studentId === d.student.id);
                           setEditDebtModal({
                             studentId: d.student.id,
-                            studentName: `${d.student.prenom} ${d.student.nom}`,
-                            nom: d.student.nom,
-                            prenom: d.student.prenom,
+                            studentName: `${d.student.prenom || ""} ${d.student.nom || ""}`,
+                            nom: d.student.nom || "",
+                            prenom: d.student.prenom || "",
                             debtId: existingDebt ? existingDebt.id : null,
                             amount: existingDebt ? existingDebt.amount : d.totalUnpaid,
                             yearId: existingDebt ? existingDebt.toYearId : (activeYearId || "2026-2027"),
@@ -370,11 +381,36 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                             teacher: d.student.teacher || (existingDebt ? existingDebt.teacher : ""),
                           });
                         }}
-                        style={{ padding: "6px 10px", borderRadius: 8, background: "rgba(226,150,58,0.15)", border: "1px solid rgba(226,150,58,0.4)", color: "#e2963a", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                        style={{
+                          padding: "6px 10px", borderRadius: 8,
+                          background: "rgba(226,150,58,0.15)", border: "1px solid rgba(226,150,58,0.4)",
+                          color: "#e2963a", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          transition: "all 0.15s ease"
+                        }}
                         title={lang === "ar" ? "تعديل الدين" : "Modifier dette"}
                       >
                         <Pencil size={13} />
-                        {lang === "ar" ? "تعديل" : "Modifier"}
+                        <span>{lang === "ar" ? "تعديل" : "Modifier"}</span>
+                      </button>
+
+                      {/* 3. Bouton Supprimer */}
+                      <button 
+                        onClick={() => {
+                          const existingDebt = (data.debtCarryOvers || []).find(c => c.studentId === d.student.id);
+                          handleDeleteDebt(existingDebt ? existingDebt.id : null, d.student.id);
+                        }}
+                        style={{
+                          padding: "6px 10px", borderRadius: 8,
+                          background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.4)",
+                          color: "#f87171", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          transition: "all 0.15s ease"
+                        }}
+                        title={lang === "ar" ? "حذف هذا الدين بالكامل" : "Supprimer cette dette"}
+                      >
+                        <Trash2 size={13} />
+                        <span>{lang === "ar" ? "حذف" : "Supprimer"}</span>
                       </button>
                     </div>
                   </td>
@@ -573,29 +609,75 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
       )}
 
       {payModal && (
-        <Modal title={lang === "ar" ? `تسديد دين - ${payModal.studentName}` : `Payer dette - ${payModal.studentName}`} onClose={() => setPayModal(null)}>
+        <Modal 
+          title={lang === "ar" ? `تسجيل دفعة (Versement) - ${payModal.studentName}` : `Effectuer un versement - ${payModal.studentName}`} 
+          onClose={() => setPayModal(null)}
+        >
           <form onSubmit={handlePaySubmit} style={{ display: "grid", gap: 16 }}>
             <div>
-              <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>{lang === "ar" ? "المبلغ المراد تسديده (DA)" : "Montant à payer (DA)"}</label>
+              <label style={{ display: "block", color: C.inkSoft, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>
+                {lang === "ar" ? "مبلغ الدفعة / التسديد (Versement en DA)" : "Montant du versement (DA)"}
+              </label>
               <input 
                 type="number" 
-                style={inputStyle} 
+                style={{ ...inputStyle, fontSize: 18, fontWeight: 800, color: "#4ade80" }} 
                 value={payAmount} 
                 onChange={e => setPayAmount(e.target.value)} 
                 required 
                 min="1"
-                max={payModal.maxAmount}
+                placeholder="Montant en DA..."
+                autoFocus
               />
-              <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 6 }}>
-                {lang === "ar" ? "إجمالي الدين المستحق:" : "Dette totale:"} <strong style={{ color: "#f87171" }}>{payModal.maxAmount} DA</strong>
+              <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>{lang === "ar" ? "إجمالي الدين المتبقي:" : "Dette restante :"}</span>
+                <strong style={{ color: "#f87171", fontSize: 14 }}>{payModal.maxAmount.toLocaleString()} DA</strong>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button type="button" onClick={() => setPayModal(null)} style={{ padding: "10px 16px", borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "none", color: C.ink, cursor: "pointer", fontWeight: 600 }}>
+
+            {/* Quick amount shortcut presets */}
+            <div>
+              <div style={{ fontSize: 11.5, color: C.inkSoft, marginBottom: 6, fontWeight: 600 }}>
+                {lang === "ar" ? "مبالغ سريعة:" : "Raccourcis rapides :"}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[500, 1000, 1500, 2000].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setPayAmount(amt)}
+                    style={{
+                      padding: "5px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      background: Number(payAmount) === amt ? "rgba(74,222,128,0.25)" : "rgba(255,255,255,0.06)",
+                      border: `1px solid ${Number(payAmount) === amt ? "#4ade80" : C.border}`,
+                      color: Number(payAmount) === amt ? "#4ade80" : C.ink, cursor: "pointer"
+                    }}
+                  >
+                    {amt.toLocaleString()} DA
+                  </button>
+                ))}
+                {payModal.maxAmount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPayAmount(payModal.maxAmount)}
+                    style={{
+                      padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 800,
+                      background: "rgba(226,150,58,0.2)", border: "1px solid rgba(226,150,58,0.45)",
+                      color: "#e2963a", cursor: "pointer"
+                    }}
+                  >
+                    {lang === "ar" ? "كامل المبلغ (Tout verser)" : "Tout verser"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+              <button type="button" onClick={() => setPayModal(null)} style={{ padding: "10px 16px", borderRadius: 10, background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`, color: C.ink, cursor: "pointer", fontWeight: 600 }}>
                 {lang === "ar" ? "إلغاء" : "Annuler"}
               </button>
-              <button type="submit" style={{ padding: "10px 16px", borderRadius: 10, background: "#4ade80", border: "none", color: "#fff", cursor: "pointer", fontWeight: 700 }}>
-                {lang === "ar" ? "تأكيد الدفع" : "Confirmer Paiement"}
+              <button type="submit" style={{ padding: "10px 20px", borderRadius: 10, background: "#4ade80", border: "none", color: "#111", cursor: "pointer", fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <CheckCircle2 size={16} />
+                {lang === "ar" ? "تأكيد الدفعة (Valider)" : "Valider le versement"}
               </button>
             </div>
           </form>
