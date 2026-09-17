@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Filter, AlertCircle, CheckCircle2, UserPlus, X } from "lucide-react";
+import { Search, Filter, AlertCircle, CheckCircle2, UserPlus, X, Pencil, Trash2 } from "lucide-react";
 import { C, getStudentFinancialSummary, uid, inputStyle } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
@@ -22,6 +22,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
   });
   const [payModal, setPayModal] = useState(null); // { studentId, studentName, maxAmount }
   const [payAmount, setPayAmount] = useState("");
+  const [editDebtModal, setEditDebtModal] = useState(null);
 
   const handlePaySubmit = (e) => {
     e.preventDefault();
@@ -49,6 +50,84 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
     setPayModal(null);
     setPayAmount("");
     if (toastFn) toastFn(lang === "ar" ? "تم تسديد الدين بنجاح" : "Dette payée avec succès");
+  };
+
+  const handleEditDebtSubmit = (e) => {
+    e.preventDefault();
+    if (!editDebtModal) return;
+
+    const newAmt = Number(editDebtModal.amount) || 0;
+    const targetStudentId = editDebtModal.studentId;
+
+    setData(d => {
+      // 1. Update the student info (level, teacher, nom, prenom)
+      const updatedStudents = (d.students || []).map(s => {
+        if (s.id === targetStudentId) {
+          return {
+            ...s,
+            nom: editDebtModal.nom !== undefined ? editDebtModal.nom : s.nom,
+            prenom: editDebtModal.prenom !== undefined ? editDebtModal.prenom : s.prenom,
+            level: editDebtModal.level !== undefined ? editDebtModal.level : s.level,
+            teacher: editDebtModal.teacher !== undefined ? editDebtModal.teacher : s.teacher,
+          };
+        }
+        return s;
+      });
+
+      // 2. Update or insert the debt in debtCarryOvers
+      let updatedDebts = [...(d.debtCarryOvers || [])];
+      if (editDebtModal.debtId) {
+        if (newAmt <= 0) {
+          updatedDebts = updatedDebts.filter(c => c.id !== editDebtModal.debtId);
+        } else {
+          updatedDebts = updatedDebts.map(c => {
+            if (c.id === editDebtModal.debtId) {
+              return {
+                ...c,
+                amount: newAmt,
+                toYearId: editDebtModal.yearId || c.toYearId,
+                level: editDebtModal.level || c.level,
+                teacher: editDebtModal.teacher || c.teacher,
+                note: [editDebtModal.level, editDebtModal.teacher].filter(Boolean).join(" - ")
+              };
+            }
+            return c;
+          });
+        }
+      } else if (newAmt > 0) {
+        updatedDebts.push({
+          id: uid(),
+          studentId: targetStudentId,
+          fromYearId: "manual",
+          toYearId: editDebtModal.yearId || activeYearId || "2026-2027",
+          amount: newAmt,
+          level: editDebtModal.level || "2ème CEM",
+          teacher: editDebtModal.teacher || "",
+          note: [editDebtModal.level, editDebtModal.teacher].filter(Boolean).join(" - "),
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      return {
+        ...d,
+        students: updatedStudents,
+        debtCarryOvers: updatedDebts
+      };
+    });
+
+    setEditDebtModal(null);
+    if (toastFn) toastFn(lang === "ar" ? "تم تعديل الدين بنجاح ✓" : "Dette modifiée avec succès ✓");
+  };
+
+  const handleDeleteDebt = (debtId, studentId) => {
+    if (window.confirm(lang === "ar" ? "هل أنت متأكد من حذف هذا الدين؟" : "Confirmer la suppression de cette dette ?")) {
+      setData(d => ({
+        ...d,
+        debtCarryOvers: (d.debtCarryOvers || []).filter(c => debtId ? c.id !== debtId : c.studentId !== studentId)
+      }));
+      setEditDebtModal(null);
+      if (toastFn) toastFn(lang === "ar" ? "تم حذف الدين ✓" : "Dette supprimée ✓");
+    }
   };
 
   const handleAddSubmit = (e) => {
@@ -264,17 +343,40 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                     )}
                   </td>
                   <td style={{ padding: "14px 16px" }} onClick={e => e.stopPropagation()}>
-                    {d.totalUnpaid > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {d.totalUnpaid > 0 && (
+                        <button 
+                          onClick={() => {
+                            setPayModal({ studentId: d.student.id, studentName: `${d.student.prenom} ${d.student.nom}`, maxAmount: d.totalUnpaid });
+                            setPayAmount(d.totalUnpaid);
+                          }}
+                          style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.4)", color: "#4ade80", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                        >
+                          {lang === "ar" ? "تسديد" : "Payer"}
+                        </button>
+                      )}
                       <button 
                         onClick={() => {
-                          setPayModal({ studentId: d.student.id, studentName: `${d.student.prenom} ${d.student.nom}`, maxAmount: d.totalUnpaid });
-                          setPayAmount(d.totalUnpaid);
+                          const existingDebt = (data.debtCarryOvers || []).find(c => c.studentId === d.student.id);
+                          setEditDebtModal({
+                            studentId: d.student.id,
+                            studentName: `${d.student.prenom} ${d.student.nom}`,
+                            nom: d.student.nom,
+                            prenom: d.student.prenom,
+                            debtId: existingDebt ? existingDebt.id : null,
+                            amount: existingDebt ? existingDebt.amount : d.totalUnpaid,
+                            yearId: existingDebt ? existingDebt.toYearId : (activeYearId || "2026-2027"),
+                            level: d.student.level || (existingDebt ? existingDebt.level : "2ème CEM"),
+                            teacher: d.student.teacher || (existingDebt ? existingDebt.teacher : ""),
+                          });
                         }}
-                        style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.4)", color: "#4ade80", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                        style={{ padding: "6px 10px", borderRadius: 8, background: "rgba(226,150,58,0.15)", border: "1px solid rgba(226,150,58,0.4)", color: "#e2963a", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                        title={lang === "ar" ? "تعديل الدين" : "Modifier dette"}
                       >
-                        {lang === "ar" ? "تسديد" : "Payer"}
+                        <Pencil size={13} />
+                        {lang === "ar" ? "تعديل" : "Modifier"}
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -495,6 +597,191 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
               <button type="submit" style={{ padding: "10px 16px", borderRadius: 10, background: "#4ade80", border: "none", color: "#fff", cursor: "pointer", fontWeight: 700 }}>
                 {lang === "ar" ? "تأكيد الدفع" : "Confirmer Paiement"}
               </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {editDebtModal && (
+        <Modal 
+          title={lang === "ar" ? `تعديل دين : ${editDebtModal.studentName}` : `Modifier la dette : ${editDebtModal.studentName}`} 
+          onClose={() => setEditDebtModal(null)}
+        >
+          <form onSubmit={handleEditDebtSubmit} style={{ display: "grid", gap: 14 }}>
+            {/* Student Name */}
+            <div>
+              <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+                {lang === "ar" ? "اسم ولقب التلميذ" : "Nom et prénom"}
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={editDebtModal.nom || ""}
+                  onChange={e => setEditDebtModal({ ...editDebtModal, nom: e.target.value })}
+                  placeholder="Nom"
+                  required
+                />
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={editDebtModal.prenom || ""}
+                  onChange={e => setEditDebtModal({ ...editDebtModal, prenom: e.target.value })}
+                  placeholder="Prénom"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Montant de la dette */}
+            <div>
+              <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+                {lang === "ar" ? "مبلغ الدين (DA)" : "Montant de la dette (DA)"}
+              </label>
+              <input
+                type="number"
+                style={{ ...inputStyle, fontSize: 16, fontWeight: 700, color: "#f87171" }}
+                value={editDebtModal.amount}
+                onChange={e => setEditDebtModal({ ...editDebtModal, amount: e.target.value })}
+                required
+                min="0"
+              />
+            </div>
+
+            {/* Année scolaire & Niveau */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+                  {lang === "ar" ? "السنة الدراسية" : "Année scolaire"}
+                </label>
+                <select
+                  style={{ ...inputStyle, cursor: "pointer" }}
+                  value={editDebtModal.yearId}
+                  onChange={e => setEditDebtModal({ ...editDebtModal, yearId: e.target.value })}
+                >
+                  {(data.academicYears || []).map(y => (
+                    <option key={y.id} value={y.id} style={{ background: "#1e1a38", color: "#fff" }}>
+                      {y.name || y.id}
+                    </option>
+                  ))}
+                  <option value="2026-2027" style={{ background: "#1e1a38", color: "#fff" }}>2026 / 2027</option>
+                  <option value="2025-2026" style={{ background: "#1e1a38", color: "#fff" }}>2025 / 2026</option>
+                  <option value="2024-2025" style={{ background: "#1e1a38", color: "#fff" }}>2024 / 2025</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+                  {lang === "ar" ? "المستوى الدراسي" : "Niveau"}
+                </label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={editDebtModal.level || ""}
+                  onChange={e => setEditDebtModal({ ...editDebtModal, level: e.target.value })}
+                  placeholder="ex: 2ème CEM"
+                  list="edit-debt-levels-list"
+                />
+                <datalist id="edit-debt-levels-list">
+                  <option value="2ème CEM" />
+                  <option value="1ère CEM" />
+                  <option value="3ème CEM" />
+                  <option value="4ème CEM" />
+                  <option value="4ème Primaire" />
+                  <option value="5ème Primaire" />
+                  <option value="1ère Lycée" />
+                  <option value="2ème Lycée" />
+                  <option value="3ème Lycée (BAC)" />
+                  <option value="Langues" />
+                  <option value="Zoom" />
+                </datalist>
+              </div>
+            </div>
+
+            {/* Quick Level Presets Buttons */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["2ème CEM", "1ère CEM", "3ème CEM", "4ème CEM", "Primaire", "Lycée", "Zoom"].map(lvl => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setEditDebtModal({ ...editDebtModal, level: lvl })}
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    border: editDebtModal.level === lvl ? "1px solid #e2963a" : "1px solid rgba(255,255,255,0.15)",
+                    background: editDebtModal.level === lvl ? "rgba(226,150,58,0.25)" : "rgba(255,255,255,0.04)",
+                    color: editDebtModal.level === lvl ? "#e2963a" : C.inkSoft,
+                    cursor: "pointer",
+                    fontWeight: 600
+                  }}
+                >
+                  {lvl}
+                </button>
+              ))}
+            </div>
+
+            {/* Professeur / Groupe */}
+            <div>
+              <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+                {lang === "ar" ? "الأستاذ / الفوج (Professeur / Groupe)" : "Professeur / Groupe"}
+              </label>
+              <input
+                type="text"
+                style={inputStyle}
+                value={editDebtModal.teacher || ""}
+                onChange={e => setEditDebtModal({ ...editDebtModal, teacher: e.target.value })}
+                placeholder={lang === "ar" ? "اسم الأستاذ أو الفوج..." : "Nom de l'enseignant ou du groupe..."}
+                list="edit-debt-teachers-list"
+              />
+              <datalist id="edit-debt-teachers-list">
+                {(data.groups || []).map(g => (
+                  <option key={g.id} value={g.nom} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* Actions: Delete & Save */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+              <button
+                type="button"
+                onClick={() => handleDeleteDebt(editDebtModal.debtId, editDebtModal.studentId)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "9px 14px", borderRadius: 10,
+                  background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.35)",
+                  color: "#f87171", cursor: "pointer", fontWeight: 700, fontSize: 13
+                }}
+              >
+                <Trash2 size={15} />
+                {lang === "ar" ? "حذف الدين" : "Supprimer"}
+              </button>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setEditDebtModal(null)}
+                  style={{
+                    padding: "9px 16px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                    color: C.ink, cursor: "pointer", fontWeight: 600
+                  }}
+                >
+                  {lang === "ar" ? "إلغاء" : "Annuler"}
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "9px 18px", borderRadius: 10,
+                    background: C.accent, border: "none",
+                    color: "#fff", cursor: "pointer", fontWeight: 700
+                  }}
+                >
+                  <Pencil size={15} />
+                  {lang === "ar" ? "حفظ التعديلات" : "Enregistrer"}
+                </button>
+              </div>
             </div>
           </form>
         </Modal>

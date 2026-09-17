@@ -380,8 +380,9 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
           groupId={st.groupId}
           initial={st}
           enrollmentFee={data.settings?.enrollmentFee || 500}
-          allStudents={data.students}
-          allSubgroups={[...(data.groups || [])]}
+          allStudents={data.students || []}
+          allGroups={data.groups || []}
+          allSubgroups={data.groups || []}
           onClose={() => setShowEdit(false)}
           onSave={saveStudent}
         />
