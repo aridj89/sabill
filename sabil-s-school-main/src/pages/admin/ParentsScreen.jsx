@@ -176,6 +176,274 @@ function SendNotificationModal({ student, onClose, onSend }) {
 }
 
 
+/* ── Modal: Modifier / Créer le compte d'un élève ── */
+function StudentAccountModal({ initial, groups, onClose, onSave }) {
+  const { lang } = useLanguage();
+  const isEdit = !!initial;
+
+  const [form, setForm] = useState(initial ? {
+    id: initial.id,
+    nom: initial.nom || "",
+    prenom: initial.prenom || "",
+    phone: initial.phone || "",
+    password: initial.password || "",
+    groupId: initial.groupId || "",
+    level: initial.level || "2ème CEM",
+    studyClass: initial.studyClass || "",
+    school: initial.school || "",
+    nfcCardId: initial.nfcCardId || "",
+    accountStatus: initial.accountStatus || "active",
+    parentPhone: initial.parentPhone || "",
+    monthlyPrice: initial.monthlyPrice || 0,
+    enrollmentPaid: initial.enrollmentPaid || false,
+  } : {
+    id: uid(),
+    nom: "",
+    prenom: "",
+    phone: "",
+    password: uid().slice(0, 6),
+    groupId: groups?.[0]?.id || "",
+    level: "2ème CEM",
+    studyClass: "",
+    school: "",
+    nfcCardId: "",
+    accountStatus: "active",
+    parentPhone: "",
+    monthlyPrice: 0,
+    enrollmentPaid: false,
+  });
+
+  const [showPwd, setShowPwd] = useState(false);
+
+  const generatePass = () => {
+    const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+    let p = "";
+    for (let i = 0; i < 6; i++) {
+      p += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setForm(f => ({ ...f, password: p }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.nom.trim() || !form.prenom.trim()) return;
+    onSave(form);
+    onClose();
+  };
+
+  return (
+    <Modal
+      title={
+        isEdit
+          ? (lang === "ar" ? `تعديل حساب : ${initial.prenom} ${initial.nom}` : `Modifier le compte : ${initial.prenom} ${initial.nom}`)
+          : (lang === "ar" ? "إنشاء حساب تلميذ جديد" : "Créer un compte élève")
+      }
+      onClose={onClose}
+    >
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }}>
+        {/* Nom & Prénom */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "اللقب (Nom)" : "Nom"}
+            </label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={form.nom}
+              onChange={e => setForm({ ...form, nom: e.target.value })}
+              required
+              placeholder="Nom"
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "الاسم (Prénom)" : "Prénom"}
+            </label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={form.prenom}
+              onChange={e => setForm({ ...form, prenom: e.target.value })}
+              required
+              placeholder="Prénom"
+            />
+          </div>
+        </div>
+
+        {/* Téléphone (Identifiant) & Mot de passe */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "رقم الهاتف (معرّف الدخول)" : "Téléphone (Identifiant)"}
+            </label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={form.phone}
+              onChange={e => setForm({ ...form, phone: e.target.value })}
+              placeholder="06XXXXXXXX"
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "كلمة المرور" : "Mot de passe"}
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                type={showPwd ? "text" : "password"}
+                style={{ ...inputStyle, flex: 1, fontFamily: "monospace", letterSpacing: 1 }}
+                value={form.password}
+                onChange={e => setForm({ ...form, password: e.target.value })}
+                required
+                placeholder="Mot de passe"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(!showPwd)}
+                style={{
+                  padding: "0 10px",
+                  borderRadius: 8,
+                  background: "rgba(255,255,255,0.08)",
+                  border: `1px solid ${C.border}`,
+                  color: C.ink,
+                  cursor: "pointer"
+                }}
+              >
+                {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+              <button
+                type="button"
+                onClick={generatePass}
+                style={{
+                  padding: "0 10px",
+                  borderRadius: 8,
+                  background: "rgba(226,150,58,0.2)",
+                  border: "1px solid rgba(226,150,58,0.4)",
+                  color: C.accent,
+                  cursor: "pointer"
+                }}
+                title={lang === "ar" ? "توليد كلمة مرور" : "Générer"}
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Niveau & Groupe */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "المستوى الدراسي" : "Niveau scolaire"}
+            </label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={form.level}
+              onChange={e => setForm({ ...form, level: e.target.value })}
+              placeholder="ex: 2ème CEM"
+              list="student-levels-list"
+            />
+            <datalist id="student-levels-list">
+              <option value="2ème CEM" />
+              <option value="1ère CEM" />
+              <option value="3ème CEM" />
+              <option value="4ème CEM" />
+              <option value="4ème Primaire" />
+              <option value="5ème Primaire" />
+              <option value="1ère Lycée" />
+              <option value="2ème Lycée" />
+              <option value="3ème Lycée (BAC)" />
+              <option value="Langues" />
+              <option value="Zoom" />
+            </datalist>
+          </div>
+
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "الفوج / المجموعة" : "Groupe"}
+            </label>
+            <select
+              style={{ ...inputStyle, cursor: "pointer" }}
+              value={form.groupId}
+              onChange={e => setForm({ ...form, groupId: e.target.value })}
+            >
+              <option value="" style={{ background: "#1c1836", color: "#fff" }}>
+                {lang === "ar" ? "-- بدون فوج --" : "-- Sans groupe --"}
+              </option>
+              {(groups || []).map(g => (
+                <option key={g.id} value={g.id} style={{ background: "#1c1836", color: "#fff" }}>
+                  {g.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Statut du compte & Carte NFC */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "حالة الحساب" : "Statut du compte"}
+            </label>
+            <select
+              style={{ ...inputStyle, cursor: "pointer" }}
+              value={form.accountStatus}
+              onChange={e => setForm({ ...form, accountStatus: e.target.value })}
+            >
+              <option value="active" style={{ background: "#1c1836", color: "#fff" }}>
+                {lang === "ar" ? "✅ مفعّل (Actif)" : "✅ Actif"}
+              </option>
+              <option value="suspended" style={{ background: "#1c1836", color: "#fff" }}>
+                {lang === "ar" ? "⛔ معلّق (Suspendu)" : "⛔ Suspendu"}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
+              {lang === "ar" ? "معرّف بطاقة NFC (اختياري)" : "Carte NFC (Optionnel)"}
+            </label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={form.nfcCardId}
+              onChange={e => setForm({ ...form, nfcCardId: e.target.value })}
+              placeholder="Ex: 04A1B2C3"
+            />
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.06)",
+              border: `1px solid ${C.border}`,
+              color: C.ink,
+              cursor: "pointer",
+              fontWeight: 600
+            }}
+          >
+            {lang === "ar" ? "إلغاء" : "Annuler"}
+          </button>
+          <PrimaryBtn type="submit">
+            <Check size={16} />
+            {isEdit
+              ? (lang === "ar" ? "حفظ التعديلات" : "Enregistrer")
+              : (lang === "ar" ? "إنشاء الحساب" : "Créer le compte")}
+          </PrimaryBtn>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 /* ═════════════════════════════════════════════════════════════════
    MAIN COMPONENT: Student Accounts Dashboard
 ══════════════════════════════════════════════════════════════════ */
