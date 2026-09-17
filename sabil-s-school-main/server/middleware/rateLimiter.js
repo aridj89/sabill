@@ -10,7 +10,7 @@ export const loginRateLimiter = rateLimit({
   skipSuccessfulRequests: true, // Don't count successful logins
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false, trustProxy: false },
+  validate: false,
   message: {
     success: false,
     message: "Trop de tentatives de connexion. Veuillez réessayer après 15 minutes.",
@@ -26,7 +26,7 @@ export const apiRateLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false, trustProxy: false },
+  validate: false,
   message: {
     success: false,
     message: "Quota de requêtes dépassé. Veuillez patienter un moment.",
