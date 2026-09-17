@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm --prefix sabil-s-school-main install"]
+
+[phases.build]
+cmds = ["npm --prefix sabil-s-school-main run build"]
+
+[start]
+cmd = "node sabil-s-school-main/server/index.js"

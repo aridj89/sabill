@@ -1,0 +1,13 @@
+{
+  "name": "sabill-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "sabil-s-school-main"
+  ],
+  "scripts": {
+    "build": "npm --workspace=sabil-s-school-main run build",
+    "start": "npm --workspace=sabil-s-school-main start"
+  }
+}

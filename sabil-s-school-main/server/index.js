@@ -184,6 +184,16 @@ app.post("/api/reset", authenticateToken, requireRole("admin"), (req, res) => {
   }
 });
 
+// Serve static frontend files if dist exists (Production Hosting)
+const distPath = path.resolve(__dirname, "../dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) return next();
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
 // Global Error Handler Middleware
 app.use(errorHandler);
 
