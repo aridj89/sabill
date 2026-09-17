@@ -4,9 +4,9 @@ import { C, inputStyle, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
-import PrimaryBtn from "../../components/ui/PrimaryBtn";
+import { API_BASE_URL } from "../../config/api";
 
-const API_BASE_URL = "http://localhost:5000/api/nfc";
+const NFC_API_URL = `${API_BASE_URL}/api/nfc`;
 
 function playScanTone() {
   try {
@@ -85,7 +85,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
     // Check status
     const checkStatus = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/status`);
+        const res = await fetch(`${NFC_API_URL}/status`);
         const json = await res.json();
         if (json.success && json.reader) {
           setNfcConnected(!!json.reader.connected);
@@ -98,7 +98,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
 
     // Subscribe to SSE stream for live card taps
     try {
-      eventSource = new EventSource(`${API_BASE_URL}/stream`);
+      eventSource = new EventSource(`${NFC_API_URL}/stream`);
 
       eventSource.addEventListener("connected", (e) => {
         try {

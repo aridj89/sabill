@@ -1,6 +1,7 @@
 import { uid } from "../theme/tokens";
+import { API_BASE_URL } from "../config/api";
 
-const API_URL = "http://localhost:5000/api/data";
+const API_URL = `${API_BASE_URL}/api/data`;
 
 function getAuthHeaders() {
   const token = localStorage.getItem("auth_token");
@@ -115,7 +116,7 @@ export async function persistData(data) {
 export async function resetData() {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    await fetch("http://localhost:5000/api/reset", {
+    await fetch(`${API_BASE_URL}/api/reset`, {
       method: "POST",
       headers: getAuthHeaders(),
     });

@@ -3,6 +3,7 @@ import { Eye, EyeOff, User, Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import LanguageToggle from "../components/ui/LanguageToggle";
+import { API_BASE_URL } from "../config/api";
 import "./LoginPage.css";
 
 export default function LoginPage({ data, setData, toastFn }) {
@@ -18,7 +19,7 @@ export default function LoginPage({ data, setData, toastFn }) {
   const handleLogin = async () => {
     const cleanId = identifier.trim();
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: cleanId, password }),

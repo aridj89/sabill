@@ -10,9 +10,9 @@ import { useLanguage } from "../../context/LanguageContext";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
 import IconBtn from "../../components/ui/IconBtn";
 import Modal from "../../components/ui/Modal";
-import Field from "../../components/ui/Field";
+import { API_BASE_URL } from "../../config/api";
 
-const API_BASE_URL = "http://localhost:5000/api/nfc";
+const NFC_API_URL = `${API_BASE_URL}/api/nfc`;
 
 /* ── Web Audio Beep generator ── */
 function playTone(type = "success") {
@@ -103,7 +103,7 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
     // Check initial status
     const checkStatus = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/status`);
+        const res = await fetch(`${NFC_API_URL}/status`);
         const json = await res.json();
         if (json.success && json.reader) {
           setHardwareConnected(!!json.reader.connected);
@@ -119,7 +119,7 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
 
     // Connect to real-time events stream
     try {
-      eventSource = new EventSource(`${API_BASE_URL}/stream`);
+      eventSource = new EventSource(`${NFC_API_URL}/stream`);
 
       eventSource.addEventListener("connected", (e) => {
         try {
@@ -286,7 +286,7 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
     if (!code) return;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/scan`, {
+      const res = await fetch(`${NFC_API_URL}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cardUid: code }),
@@ -305,7 +305,7 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
     if (!trimmed) return;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/assign`, {
+      const res = await fetch(`${NFC_API_URL}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentId, cardUid: trimmed }),
