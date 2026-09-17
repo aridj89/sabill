@@ -11,7 +11,8 @@ import { generateToken } from "./utils/jwt.js";
 import { authenticateToken, requireRole } from "./middleware/auth.js";
 import { loginRateLimiter, apiRateLimiter } from "./middleware/rateLimiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
-import { loadDatabase, saveDatabase, INITIAL_DATA, sanitizeAndHashDatabase } from "./utils/db.js";
+import { loadDatabase, saveDatabase } from "./dbHelpers.js";
+import { INITIAL_DATA, sanitizeAndHashDatabase } from "./utils/db.js";
 import nfcRoutes from "./routes/nfcRoutes.js";
 import { nfcReaderService } from "./services/nfcReaderService.js";
 
