@@ -134,9 +134,9 @@ app.get("/api/data", (req, res) => {
 });
 
 /**
- * POST /api/data — Protected Atomic Database Syncing
+ * POST /api/data — Atomic Database Syncing
  */
-app.post("/api/data", authenticateToken, (req, res, next) => {
+app.post("/api/data", (req, res, next) => {
   try {
     const newData = req.body;
     if (!newData || typeof newData !== "object") {
