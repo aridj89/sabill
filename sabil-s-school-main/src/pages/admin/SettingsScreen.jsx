@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Upload, Globe, X } from "lucide-react";
+import { Upload, Globe, X, Download, HardDrive, ShieldCheck, Database, RefreshCw } from "lucide-react";
 import { C, inputStyle, getStudentFinancialSummary, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Field from "../../components/ui/Field";
@@ -12,12 +12,48 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
   const { t, isRTL, lang } = useLanguage();
   const [form, setForm] = useState(admin);
   const fileInputRef = useRef(null);
+  const backupInputRef = useRef(null);
 
   // Rollover state
   const [newYearName, setNewYearName] = useState("");
   const [rolloverPreview, setRolloverPreview] = useState(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleExportBackup = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+      const downloadAnchor = document.createElement("a");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `sabill_school_backup_${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      if (toastFn) toastFn(lang === "ar" ? "تم تحميل نسخة احتياطية كاملة ✓" : "Sauvegarde complète téléchargée ✓");
+    } catch (err) {
+      if (toastFn) toastFn(lang === "ar" ? "فشل تصدير النسخة الاحتياطية" : "Échec du téléchargement");
+    }
+  };
+
+  const handleImportBackup = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const importedData = JSON.parse(event.target.result);
+        if (importedData && typeof importedData === "object") {
+          setData(importedData);
+          if (toastFn) toastFn(lang === "ar" ? "تم استعادة كافة البيانات بنجاح ✓" : "Base de données restaurée avec succès ✓");
+        }
+      } catch (err) {
+        if (toastFn) toastFn(lang === "ar" ? "خطأ في قراءة ملف النسخة الاحتياطية" : "Erreur de format JSON");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -250,6 +286,66 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── Section Sauvegarde & Restauration (Données Permanentes) ── */}
+      <div style={{ marginTop: 24, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(74,222,128,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <HardDrive size={22} color="#4ade80" />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: 0 }}>
+                {lang === "ar" ? "النسخ الاحتياطي وحماية البيانات الدائمة" : "Sauvegarde & Protection des Données"}
+              </h3>
+              <p style={{ fontSize: 12.5, color: C.inkSoft, margin: "3px 0 0" }}>
+                {lang === "ar" ? "بياناتك محفوظة دائماً في قاعدة بيانات SQLite. يمكنك تنزيل نسخة احتياطية أو استعادتها بضغطة زر." : "Vos données sont sauvegardées en continu dans SQLite. Exportez ou restaurez votre base en 1 clic."}
+              </p>
+            </div>
+          </div>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80", padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+            <ShieldCheck size={14} /> {lang === "ar" ? "حفظ تلقائي دائم" : "Persistance Active"}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button
+            onClick={handleExportBackup}
+            style={{
+              padding: "10px 18px", borderRadius: 10,
+              background: "rgba(226,150,58,0.15)", border: "1px solid rgba(226,150,58,0.4)",
+              color: "#e2963a", fontWeight: 700, fontSize: 13, cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 8,
+              transition: "all 0.15s ease"
+            }}
+          >
+            <Download size={16} />
+            {lang === "ar" ? "تحميل نسخة احتياطية كاملة (Backup JSON)" : "Télécharger sauvegarde (JSON)"}
+          </button>
+
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportBackup}
+            style={{ display: "none" }}
+          />
+
+          <button
+            onClick={() => backupInputRef.current && backupInputRef.current.click()}
+            style={{
+              padding: "10px 18px", borderRadius: 10,
+              background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+              color: C.ink, fontWeight: 700, fontSize: 13, cursor: "pointer",
+              display: "inline-flex", alignItems: "center", gap: 8,
+              transition: "all 0.15s ease"
+            }}
+          >
+            <Upload size={16} />
+            {lang === "ar" ? "استعادة نسخة احتياطية (Restaurer)" : "Restaurer une sauvegarde"}
+          </button>
         </div>
       </div>
     </div>
