@@ -231,7 +231,7 @@ function PaymentEditModal({ student, group, payment, selectedMonth, onClose, onS
 }
 
 /* ─── Main FinancialScreen ──────────────────────────────────── */
-export default function FinancialScreen({ data, setData, toastFn, onNav }) {
+export default function FinancialScreen({ data, setData, toastFn, onNav, activeYearId }) {
   const { lang, t } = useLanguage();
 
   const currentMonthStr = new Date().toISOString().slice(0, 7);
@@ -267,7 +267,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
     let totalDebtUnpaid = 0;
 
     data.students.forEach(st => {
-      const fin = getStudentFinancialSummary(data, st.id, data.activeYearId);
+      const fin = getStudentFinancialSummary(data, st.id, activeYearId);
       if (fin.totalUnpaid > 0) {
         totalDebtUnpaid += fin.totalUnpaid;
       }
@@ -278,12 +278,12 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
     sgFilter.forEach(sg => {
       // Find students enrolled in this group for the active year
       const sgStudents = data.students.filter(s => {
-        const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === data.activeYearId);
+        const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === activeYearId);
         return en && en.groupId === sg.id;
       });
       
       expectedIncome += sgStudents.reduce((sum, st) => {
-        const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === data.activeYearId);
+        const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
         return sum + (en ? (en.monthlyPrice || 0) : 0);
       }, 0);
       
@@ -291,9 +291,9 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
       doneSessions += (data.sessions || []).filter(s => s.groupId === sg.id && s.date.startsWith(selectedMonth) && s.status === "done").length;
 
       sgStudents.forEach(st => {
-        const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === data.activeYearId);
+        const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
         const stPrice = en ? (en.monthlyPrice || 0) : 0;
-        const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === selectedMonth);
+        const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === selectedMonth && (p.academicYearId === activeYearId || !p.academicYearId));
         if (!pmt || pmt.status === "unpaid") {
           unpaidIncome += stPrice;
           unpaidStudentsCount++;
@@ -339,7 +339,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
       totalDebtUnpaid,
       totalGroups: data.groups.length,
     };
-  }, [data, selectedMonth, filterGroup]);
+  }, [data, selectedMonth, filterGroup, activeYearId]);
 
   // ── Chart data (last 6 months) ───────────────────────────────
   const chartData = useMemo(() => {
@@ -347,17 +347,17 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
       let expected = 0, paid = 0;
       data.groups.forEach(sg => {
         const sgStudents = data.students.filter(s => {
-          const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === data.activeYearId);
+          const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === activeYearId);
           return en && en.groupId === sg.id;
         });
         expected += sgStudents.reduce((sum, st) => {
-          const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === data.activeYearId);
+          const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
           return sum + (en ? (en.monthlyPrice || 0) : 0);
         }, 0);
         sgStudents.forEach(st => {
-          const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === data.activeYearId);
+          const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
           const stPrice = en ? (en.monthlyPrice || 0) : 0;
-          const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === month);
+          const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === month && (p.academicYearId === activeYearId || !p.academicYearId));
           if (pmt?.status === "paid") paid += pmt.expectedAmount || stPrice;
           else if (pmt?.status === "partial") paid += pmt.paidAmount || 0;
         });
@@ -368,7 +368,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
       });
       return { month, expected, paid };
     });
-  }, [data, allMonths]);
+  }, [data, allMonths, activeYearId]);
 
   // ── Student list for payment table ───────────────────────────
   const studentRows = useMemo(() => {
@@ -376,34 +376,35 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
     const rows = [];
     sgFilter.forEach(sg => {
       const sgStudents = data.students.filter(s => {
-        const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === data.activeYearId);
+        const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === activeYearId);
         return en && en.groupId === sg.id;
       });
       sgStudents.forEach(st => {
-        const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === selectedMonth);
+        const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === selectedMonth && (p.academicYearId === activeYearId || !p.academicYearId));
         const name = `${st.prenom} ${st.nom}`.toLowerCase();
         if (searchQ && !name.includes(searchQ.toLowerCase())) return;
         rows.push({ student: st, group: sg, payment: pmt });
       });
     });
     return rows;
-  }, [data, filterGroup, selectedMonth, searchQ]);
+  }, [data, filterGroup, selectedMonth, searchQ, activeYearId]);
 
   // ── Save payment ─────────────────────────────────────────────
   const handleSavePayment = (pmtData) => {
+    const pmtToSave = { ...pmtData, academicYearId: activeYearId };
     setData(d => {
-      const existing = d.payments.find(p => p.id === pmtData.id);
+      const existing = d.payments.find(p => p.id === pmtToSave.id);
       const newPayments = existing
-        ? d.payments.map(p => p.id === pmtData.id ? pmtData : p)
-        : [...d.payments, pmtData];
+        ? d.payments.map(p => p.id === pmtToSave.id ? pmtToSave : p)
+        : [...d.payments, pmtToSave];
       
       let nextNotifs = d.userNotifications || [];
-      if (pmtData.status === "paid" || (pmtData.status === "partial" && pmtData.paidAmount > 0)) {
-        const amount = pmtData.status === "paid" ? (pmtData.expectedAmount || pmtData.paidAmount) : pmtData.paidAmount;
-        nextNotifs = notifyPaymentReceived(d, pmtData.studentId, amount, {
+      if (pmtToSave.status === "paid" || (pmtToSave.status === "partial" && pmtToSave.paidAmount > 0)) {
+        const amount = pmtToSave.status === "paid" ? (pmtToSave.expectedAmount || pmtToSave.paidAmount) : pmtToSave.paidAmount;
+        nextNotifs = notifyPaymentReceived(d, pmtToSave.studentId, amount, {
           type: "course",
-          groupId: pmtData.groupId,
-          month: pmtData.month
+          groupId: pmtToSave.groupId,
+          month: pmtToSave.month
         }, lang);
       }
 
@@ -418,21 +419,22 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
     const sg = data.groups.find(s => s.id === sgId);
     if (!sg) return;
     const sgStudents = data.students.filter(s => {
-      const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === data.activeYearId);
+      const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === activeYearId);
       return en && en.groupId === sgId;
     });
     setData(d => {
       let payments = [...d.payments];
       let notifs = d.userNotifications || [];
       sgStudents.forEach(st => {
-        const en = (d.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === d.activeYearId);
+        const en = (d.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
         const stPrice = en ? (en.monthlyPrice || 0) : 0;
-        const idx = payments.findIndex(p => p.studentId === st.id && p.groupId === sgId && p.month === selectedMonth);
+        const idx = payments.findIndex(p => p.studentId === st.id && p.groupId === sgId && p.month === selectedMonth && (p.academicYearId === activeYearId || !p.academicYearId));
         const pmt = {
           id: idx >= 0 ? payments[idx].id : uid(),
           studentId: st.id, groupId: sgId, month: selectedMonth,
           expectedAmount: stPrice, paidAmount: stPrice,
           status: "paid", paidDate: new Date().toISOString().slice(0, 10),
+          academicYearId: activeYearId,
         };
         if (idx >= 0) payments[idx] = pmt;
         else payments.push(pmt);
@@ -454,7 +456,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
     return { label: lang === "ar" ? "جزئي" : "Partiel", color: C.accent, bg: "rgba(226,150,58,0.15)", border: "rgba(226,150,58,0.4)" };
   };
 
-  const sgOptions = data.groups.filter(sg => sg.academicYearId === data.activeYearId);
+  const sgOptions = data.groups.filter(sg => sg.academicYearId === activeYearId);
 
   const thStyle = {
     textAlign: "left", padding: "12px 14px",
@@ -525,7 +527,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
           {sgOptions.map(sg => {
             const students = data.students.filter(s => {
-              const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === data.activeYearId);
+              const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === activeYearId);
               return en && en.groupId === sg.id;
             });
             const cat = CAT_BY_ID[sg.categoryId];
@@ -534,11 +536,11 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
 
             let expected = 0;
             students.forEach(st => {
-              const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === data.activeYearId);
+              const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
               const stPrice = en ? (en.monthlyPrice || 0) : 0;
               expected += stPrice;
 
-              const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === selectedMonth);
+              const pmt = data.payments.find(p => p.studentId === st.id && p.groupId === sg.id && p.month === selectedMonth && (p.academicYearId === activeYearId || !p.academicYearId));
               if (pmt?.status === "paid") { sgPaid += pmt.expectedAmount || stPrice; paidCount++; }
               else if (pmt?.status === "partial") { sgPaid += pmt.paidAmount || 0; sgPartial += (pmt.expectedAmount || stPrice) - (pmt.paidAmount || 0); partialCount++; }
               else { sgUnpaid += stPrice || 0; unpaidCount++; }
@@ -660,7 +662,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav }) {
                   </td>
                 </tr>
               ) : studentRows.map(({ student: st, group: sg, payment: pmt }) => {
-                const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === data.activeYearId);
+                const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
                 const price = en ? (en.monthlyPrice || 0) : 0;
                 const paidAmt = !pmt || pmt.status === "unpaid" ? 0 : pmt.status === "paid" ? price : (pmt.paidAmount || 0);
                 const remaining = price - paidAmt;
