@@ -14,6 +14,7 @@ import SessionDetailModal from "./SessionDetailModal";
 import GroupFormModal from "./GroupFormModal";
 import ExtraSessionModal from "./ExtraSessionModal";
 import { notifyPresenceChange, notifyPaymentRequired, notifyExtraSessionAdded, notifyPaymentReceived, notifyAccountUpdated } from "../../utils/notificationEngine";
+import { deleteGroupApi, updateGroupApi } from "../../utils/groupApi";
 
 /* ── TAB button ──────────────────────────────────────────────── */
 function Tab({ label, icon: Icon, active, onClick, badge }) {
@@ -577,17 +578,42 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
 
   const sg = foundSg || fallbackSg;
 
-  // Persist fallback to groups if it was not in database yet
-  useEffect(() => {
-    if (!foundSg && sg) {
-      const newSessions = generateSessions(sg).map(s => ({ ...s, groupId: sg.id, academicYearId: activeYearId }));
+  const saveSubgroup = async (updatedSg) => {
+    try {
+      await updateGroupApi(updatedSg.id, updatedSg);
+    } catch (err) {
+      console.warn("Backend group update notice:", err.message);
+    }
+    setData(d => ({
+      ...d,
+      groups: (d.groups || []).map(g => g.id === updatedSg.id ? updatedSg : g)
+    }));
+    setShowEditSg(false);
+    if (toastFn) toastFn(lang === "ar" ? "تم تعديل الفوج ✓" : "Groupe modifié ✓");
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!window.confirm(lang === "ar" ? "هل تريد حذف هذه المجموعة وكل بياناتها؟" : "Supprimer ce groupe et toutes ses données ?")) return;
+    try {
+      await deleteGroupApi(sg.id);
       setData(d => ({
         ...d,
-        groups: [...(d.groups || []).filter(g => g.id !== sg.id), sg],
-        sessions: [...(d.sessions || []), ...newSessions]
+        groups:      (d.groups || []).filter(g => g.id !== sg.id),
+        students:    (d.students || []).filter(s => s.groupId !== sg.id),
+        sessions:    (d.sessions || []).filter(s => s.groupId !== sg.id),
+        attendances: (d.attendances || []).filter(a => {
+          const sess = (d.sessions || []).find(s => s.id === a.sessionId);
+          return sess && sess.groupId !== sg.id;
+        }),
+        payments:    (d.payments || []).filter(p => p.groupId !== sg.id),
       }));
+      if (toastFn) toastFn(lang === "ar" ? "تم الحذف" : "Groupe supprimé");
+      if (onBack) onBack();
+    } catch (err) {
+      console.error("Erreur suppression groupe:", err);
+      alert(err.message || (lang === "ar" ? "فشل حذف الفوج" : "Échec de la suppression du groupe."));
     }
-  }, [foundSg, sg.id]);
+  };
 
   const cat = CAT_BY_ID[sg.categoryId] || catObj;
   const students = (data.students || []).filter(s => s.groupId === sg.id);
@@ -644,12 +670,6 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
     if (!window.confirm(lang === "ar" ? "حذف هذا التلميذ؟" : "Supprimer cet élève ?")) return;
     setData(d => ({ ...d, students: d.students.filter(s => s.id !== id) }));
     if (toastFn) toastFn(lang === "ar" ? "تم الحذف" : "Élève supprimé");
-  };
-
-  const saveSubgroup = (updatedSg) => {
-    setData(d => ({ ...d, subgroups: [...(d.subgroups || [])].map(x => x.id === updatedSg.id ? updatedSg : x), groups: (d.groups || []).map(x => x.id === updatedSg.id ? updatedSg : x) }));
-    setShowEditSg(false);
-    if (toastFn) toastFn(lang === "ar" ? "تم تعديل المجموعة ✓" : "Groupe modifié ✓");
   };
 
   const toggleEnrollment = (studentId) => {
@@ -710,12 +730,34 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
           <span>{lang === "ar" ? "← العودة إلى قائمة الأفواج" : "← Retour aux groupes"}</span>
         </button>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <PrimaryBtn onClick={() => setShowAddStudent(true)}>
             <Plus size={16} /> {lang === "ar" ? "+ تسجيل تلميذ" : "+ Inscrire un élève"}
           </PrimaryBtn>
           <button onClick={() => setShowEditSg(true)} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600 }}>
             <Edit2 size={14} /> {lang === "ar" ? "تعديل الفوج" : "Modifier"}
+          </button>
+          <button
+            onClick={handleDeleteGroup}
+            title={lang === "ar" ? "حذف الفوج" : "Supprimer le groupe"}
+            style={{
+              background: "rgba(248,113,113,0.12)",
+              border: "1px solid rgba(248,113,113,0.3)",
+              borderRadius: 10,
+              padding: "7px 12px",
+              color: "#f87171",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13.5,
+              fontWeight: 600,
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.25)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(248,113,113,0.12)"}
+          >
+            <Trash2 size={14} /> {lang === "ar" ? "حذف" : "Supprimer"}
           </button>
         </div>
       </div>

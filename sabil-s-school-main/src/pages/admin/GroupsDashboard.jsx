@@ -32,13 +32,11 @@ export default function GroupsDashboard({ data, setData, filter, setFilter, toas
 
   useEffect(() => {
     if (filter && filter.type === "Individuel") {
-      const existing = data.groups.find(g => g.niveau === filter.niveau && g.annee === filter.annee && g.type === "Individuel");
+      const existing = (data.groups || []).find(g => g.niveau === filter.niveau && g.annee === filter.annee && g.type === "Individuel");
       if (existing) {
         setOpenGroupId(existing.id);
       } else {
-        const newGrp = { id: uid(), niveau: filter.niveau, annee: filter.annee, type: "Individuel", nom: t("typeIndividuel") };
-        setData(d => ({ ...d, groups: [...d.groups, newGrp] }));
-        setOpenGroupId(newGrp.id);
+        setOpenGroupId(null);
       }
     } else {
       setOpenGroupId(null);
