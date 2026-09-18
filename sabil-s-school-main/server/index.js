@@ -27,18 +27,41 @@ const PORT = process.env.PORT || 5000;
 // ─── Trust Proxy (Required for Railway / Render / Reverse Proxies) ──
 app.set("trust proxy", 1);
 
-// ─── HTTP Security Headers & CORS ────────────────────────────
+// ─── HTTP Security Headers & CORS ──────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
 }));
 
+// ─── Enhanced CORS for Production & Development ──
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // Allow all origins for development; restrict in production
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://localhost:8080",
+      "http://localhost:5000",
+      process.env.FRONTEND_URL,
+    ].filter(Boolean);
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else if (process.env.NODE_ENV === "development") {
+      // In development, allow all origins
+      callback(null, true);
+    } else {
+      // In production, enforce whitelist
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.use(express.json({ limit: "10mb" }));
+app.use(express.static(path.join(__dirname, "../dist"))); // Serve static files
 app.use("/api", apiRateLimiter);
 
 // ─── NFC Hardware Attendance API ─────────────────────────────
@@ -215,3 +238,4 @@ function cleanup() {
 
 process.on("SIGINT", cleanup);
 process.on("SIGTERM", cleanup);
+
