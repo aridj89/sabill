@@ -12,6 +12,7 @@ import Pill from "../../components/ui/Pill";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
 import { notifyPaymentReceived, notifyAccountUpdated } from "../../utils/notificationEngine";
+import StudentFormModal from "./StudentFormModal";
 
 /* ── Modal: Modifier le mot de passe ── */
 function PasswordModal({ student, onClose, onSave }) {
@@ -867,9 +868,12 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       )}
 
       {(showAddModal || editTarget) && (
-        <StudentAccountModal
-          initial={editTarget}
-          groups={groups}
+        <StudentFormModal
+          initial={editTarget || null}
+          groupId={editTarget?.groupId || ""}
+          allStudents={students}
+          allGroups={groups}
+          enrollmentFee={data.settings?.enrollmentFee || 500}
           onClose={() => { setShowAddModal(false); setEditTarget(null); }}
           onSave={handleSaveStudentAccount}
         />
