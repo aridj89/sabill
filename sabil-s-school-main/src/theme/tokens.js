@@ -183,8 +183,8 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
 
   // 1. Calculate Previous Debt (carried over to this year)
   let previousDebt = 0;
-  const carryOvers = (data.debtCarryOvers || []).filter(c => c.studentId === studentId && c.toYearId === yearId);
-  carryOvers.forEach(c => previousDebt += c.amount);
+  const carryOvers = (data.debtCarryOvers || []).filter(c => c.studentId === studentId && (!yearId || !c.toYearId || c.toYearId === yearId || c.toYearId === "manual"));
+  carryOvers.forEach(c => previousDebt += (Number(c.amount) || 0));
 
   // 2. Calculate Current Year Expected Fees
   let currentFees = 0;
