@@ -6,8 +6,8 @@ import {
 import { C, uid, CAT_BY_ID, SCHOOL_CATS, computeCycles, generateSessions } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
-import IconBtn from "../../components/ui/IconBtn";
 import GroupFormModal from "./GroupFormModal";
+import { createGroupApi, updateGroupApi, deleteGroupApi } from "../../utils/groupApi";
 
 /* ── Sub-group card ──────────────────────────────────────────── */
 function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent, onEdit, onDelete }) {
@@ -134,33 +134,14 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
     return true;
   });
 
-  // Guarantee the 3 standard groups (Normal, Individuel, Spécial) appear for any selected level
-  if (cat && levelId) {
-    const defaultTypes = (cat.groups && cat.groups.length > 0) ? cat.groups : ["Normal", "Individuel", "Spécial"];
-    const typesToShow = groupType ? [groupType] : defaultTypes;
-    const displayName = isLangues ? (levelLabel || levelId) : levelId;
-    typesToShow.forEach(gType => {
-      const exists = groups.some(g => g.groupType === gType || g.nom === `${displayName} - ${gType}`);
-      if (!exists) {
-        groups.push({
-          id: `${catId}_${levelId}_${gType.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-          nom: `${displayName} - ${gType}`,
-          categoryId: catId,
-          levelId: levelId,
-          groupType: gType,
-          days: [],
-          time: "10:00",
-          sessionsPerCycle: 4,
-          academicYearId: null,
-        });
-      }
-    });
-  }
-
-  const handleCreate = (sg, newSessions) => {
-    // Store in groups array (main data store) and generate sessions using groupId
+  const handleCreate = async (sg, newSessions) => {
     const sgWithGroupId = { ...sg };
     const sessionsWithGroupId = (newSessions || []).map(s => ({ ...s, groupId: sg.id }));
+    try {
+      await createGroupApi(sgWithGroupId, sessionsWithGroupId);
+    } catch (err) {
+      console.warn("Backend group create notice:", err.message);
+    }
     setData(d => ({
       ...d,
       groups: [...(d.groups || []), sgWithGroupId],
@@ -170,26 +151,37 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
     if (toastFn) toastFn(lang === "ar" ? "تم إنشاء المجموعة ✓" : "Groupe créé ✓");
   };
 
-  const handleEdit = (sg) => {
+  const handleEdit = async (sg) => {
+    try {
+      await updateGroupApi(sg.id, sg);
+    } catch (err) {
+      console.warn("Backend group update notice:", err.message);
+    }
     setData(d => ({ ...d, groups: (d.groups || []).map(x => x.id === sg.id ? sg : x) }));
     setEditing(null);
     if (toastFn) toastFn(lang === "ar" ? "تم تعديل المجموعة ✓" : "Groupe modifié ✓");
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm(lang === "ar" ? "هل تريد حذف هذه المجموعة وكل بياناتها؟" : "Supprimer ce groupe et toutes ses données ?")) return;
-    setData(d => ({
-      ...d,
-      groups:   (d.groups || []).filter(sg => sg.id !== id),
-      students:    (d.students || []).filter(s => s.groupId !== id && s.groupId !== id),
-      sessions:    (d.sessions || []).filter(s => s.groupId !== id && s.groupId !== id),
-      attendances: (d.attendances || []).filter(a => {
-        const sess = (d.sessions || []).find(s => s.id === a.sessionId);
-        return sess && sess.groupId !== id && sess.groupId !== id;
-      }),
-      payments:    (d.payments || []).filter(p => p.groupId !== id && p.groupId !== id),
-    }));
-    if (toastFn) toastFn(lang === "ar" ? "تم الحذف" : "Supprimé");
+    try {
+      await deleteGroupApi(id);
+      setData(d => ({
+        ...d,
+        groups:      (d.groups || []).filter(sg => sg.id !== id),
+        students:    (d.students || []).filter(s => s.groupId !== id),
+        sessions:    (d.sessions || []).filter(s => s.groupId !== id),
+        attendances: (d.attendances || []).filter(a => {
+          const sess = (d.sessions || []).find(s => s.id === a.sessionId);
+          return sess && sess.groupId !== id;
+        }),
+        payments:    (d.payments || []).filter(p => p.groupId !== id),
+      }));
+      if (toastFn) toastFn(lang === "ar" ? "تم الحذف" : "Supprimé");
+    } catch (err) {
+      console.error("Erreur suppression groupe:", err);
+      alert(err.message || (lang === "ar" ? "فشل حذف الفوج" : "Échec de la suppression du groupe."));
+    }
   };
 
   const addLangLevel = () => {

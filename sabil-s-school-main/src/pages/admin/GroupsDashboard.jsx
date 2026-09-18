@@ -8,6 +8,7 @@ import Pill from "../../components/ui/Pill";
 import AttendanceDots from "../../components/ui/AttendanceDots";
 import StudentFormModal from "./StudentFormModal";
 import GroupFormModal from "./GroupFormModal";
+import { deleteGroupApi, createGroupApi } from "../../utils/groupApi";
 
 export default function GroupsDashboard({ data, setData, filter, setFilter, toastFn }) {
   const { t, isRTL } = useLanguage();
@@ -76,15 +77,21 @@ export default function GroupsDashboard({ data, setData, filter, setFilter, toas
     setData(d => ({ ...d, students: d.students.filter(s => s.id !== id) }));
   };
 
-  const removeGroup = (id, e) => {
+  const removeGroup = async (id, e) => {
     e.stopPropagation();
     if (window.confirm(t("deleteGroupConfirm"))) {
-      setData(d => ({
-        ...d,
-        groups: d.groups.filter(g => g.id !== id),
-        students: d.students.filter(s => s.groupId !== id)
-      }));
-      toastFn(t("groupDeleted"));
+      try {
+        await deleteGroupApi(id);
+        setData(d => ({
+          ...d,
+          groups: d.groups.filter(g => g.id !== id),
+          students: d.students.filter(s => s.groupId !== id)
+        }));
+        toastFn(t("groupDeleted"));
+      } catch (err) {
+        console.error("Erreur suppression groupe:", err);
+        alert(err.message || t("groupDeletedError") || "Échec de la suppression du groupe.");
+      }
     }
   };
 
@@ -262,7 +269,12 @@ export default function GroupsDashboard({ data, setData, filter, setFilter, toas
       </div>
 
       {showAddGroup && filter && (
-        <GroupFormModal filter={filter} onClose={() => setShowAddGroup(false)} onSave={(g) => {
+        <GroupFormModal filter={filter} onClose={() => setShowAddGroup(false)} onSave={async (g) => {
+          try {
+            await createGroupApi(g);
+          } catch (err) {
+            console.warn("Backend group create notice:", err.message);
+          }
           setData(d => ({ ...d, groups: [...d.groups, g] }));
           setShowAddGroup(false);
           toastFn(t("groupCreated"));

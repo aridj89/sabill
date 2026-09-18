@@ -14,6 +14,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { loadDatabase, saveDatabase } from "./dbHelpers.js";
 import { INITIAL_DATA, sanitizeAndHashDatabase } from "./utils/db.js";
 import nfcRoutes from "./routes/nfcRoutes.js";
+import groupRoutes from "./routes/groupRoutes.js";
 import { nfcReaderService } from "./services/nfcReaderService.js";
 
 dotenv.config();
@@ -42,6 +43,9 @@ app.use(apiRateLimiter);
 
 // ─── NFC Hardware Attendance API ─────────────────────────────
 app.use("/api/nfc", nfcRoutes);
+
+// ─── Group CRUD API ──────────────────────────────────────────
+app.use("/api/groups", groupRoutes);
 
 // ─── API Routes ───────────────────────────────────────────────
 

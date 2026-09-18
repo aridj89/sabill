@@ -27,4 +27,5 @@ export const API_ENDPOINTS = {
   login: `${API_BASE_URL}/api/auth/login`,
   reset: `${API_BASE_URL}/api/reset`,
   nfc: `${API_BASE_URL}/api/nfc`,
+  groups: `${API_BASE_URL}/api/groups`,
 };

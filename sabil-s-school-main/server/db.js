@@ -192,8 +192,19 @@ db.exec(`
 
 // ─── Schema Migration ────────────
 try {
-  // If subgroups exist and groups doesn't, we can try to migrate them over, 
-  // but it's safe to just ignore since we are restructuring.
+  const sessionCols = db.prepare("PRAGMA table_info(sessions)").all().map(c => c.name);
+  if (!sessionCols.includes("groupId")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN groupId TEXT;");
+  }
+  if (!sessionCols.includes("subgroupId")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN subgroupId TEXT;");
+  }
+  if (!sessionCols.includes("academicYearId")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN academicYearId TEXT;");
+  }
+  // Sync groupId and subgroupId values if one is null
+  db.exec("UPDATE sessions SET groupId = subgroupId WHERE (groupId IS NULL OR groupId = '') AND subgroupId IS NOT NULL;");
+  db.exec("UPDATE sessions SET subgroupId = groupId WHERE (subgroupId IS NULL OR subgroupId = '') AND groupId IS NOT NULL;");
 } catch (e) {
   console.warn("Migration warning:", e.message);
 }
