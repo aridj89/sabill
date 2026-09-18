@@ -69,7 +69,6 @@ export async function fetchCleanData() {
     const res = await fetch(API_URL, { headers: getAuthHeaders() });
     if (res.ok) {
       const data = await res.json();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       return data;
     }
   } catch (err) {
@@ -83,9 +82,6 @@ export async function fetchCleanData() {
   } catch {}
 
   const d = defaultData();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
-  } catch {}
   return d;
 }
 

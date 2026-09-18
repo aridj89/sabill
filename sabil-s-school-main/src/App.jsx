@@ -28,7 +28,16 @@ export default function App() {
         
         const fetched = await fetchCleanData();
         if (fetched) {
-          setDataRaw(fetched);
+          const localHasData = local && ((local.students || []).length > 0 || (local.debtCarryOvers || []).length > 0 || (local.payments || []).length > 0);
+          const serverHasData = fetched && ((fetched.students || []).length > 0 || (fetched.debtCarryOvers || []).length > 0 || (fetched.payments || []).length > 0);
+
+          if (localHasData && !serverHasData) {
+            console.log("Local browser has data but server is empty - syncing local data to server...");
+            setDataRaw(local);
+            persistData(local);
+          } else {
+            setDataRaw(fetched);
+          }
         }
       } catch (err) {
         console.warn("Error fetching data:", err);
