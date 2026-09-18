@@ -180,10 +180,12 @@ function SendNotificationModal({ student, onClose, onSend }) {
 /* ═════════════════════════════════════════════════════════════════
    MAIN COMPONENT: Student Accounts Dashboard
 ══════════════════════════════════════════════════════════════════ */
-export default function ParentsScreen({ data, setData, toastFn, openChat, onBack }) {
+export default function ParentsScreen({ data, setData, toastFn, openChat, onBack, activeYearId }) {
   const { lang, isRTL } = useLanguage();
 
   const [search, setSearch] = useState("");
+  const [filterCycle, setFilterCycle] = useState("all");
+  const [filterLevel, setFilterLevel] = useState("all");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'has_pass' | 'no_pass' | 'paid' | 'unpaid'
 
@@ -222,10 +224,15 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
   // ── Filtered Students ──
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
-      // Group filter
-      if (selectedGroupFilter !== "all" && s.groupId !== selectedGroupFilter) {
-        return false;
-      }
+      // Find active enrollment
+      const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === activeYearId);
+      const sGroupId = en ? en.groupId : null;
+      const sGroup = sGroupId ? groupMap[sGroupId] : null;
+
+      // Group/Hierarchy filter
+      if (filterCycle !== "all" && sGroup?.categoryId !== filterCycle) return false;
+      if (filterLevel !== "all" && sGroup?.levelId !== filterLevel) return false;
+      if (selectedGroupFilter !== "all" && sGroupId !== selectedGroupFilter) return false;
 
       // Status filter
       if (statusFilter === "has_pass" && (!s.password || !s.password.trim())) return false;
@@ -233,11 +240,11 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       if (statusFilter === "paid" && !s.enrollmentPaid) return false;
       if (statusFilter === "unpaid" && s.enrollmentPaid) return false;
       if (statusFilter === "debt") {
-        const fin = getStudentFinancialSummary(data, s.id);
+        const fin = getStudentFinancialSummary(data, s.id, activeYearId);
         if (fin.totalUnpaid === 0) return false;
       }
       if (statusFilter === "settled") {
-        const fin = getStudentFinancialSummary(data, s.id);
+        const fin = getStudentFinancialSummary(data, s.id, activeYearId);
         if (fin.totalUnpaid > 0) return false;
       }
 
@@ -246,15 +253,32 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
         const q = search.toLowerCase().trim();
         const fullName = `${s.prenom || ""} ${s.nom || ""}`.toLowerCase();
         const phone = (s.phone || "").toLowerCase();
-        const sg = groupMap[s.groupId];
-        const sgName = sg ? sg.nom.toLowerCase() : "";
+        const sgName = sGroup ? sGroup.nom.toLowerCase() : "";
 
         return fullName.includes(q) || phone.includes(q) || sgName.includes(q);
       }
 
       return true;
     });
-  }, [students, selectedGroupFilter, statusFilter, search, groupMap]);
+  }, [students, filterCycle, filterLevel, selectedGroupFilter, statusFilter, search, groupMap, data.enrollments, activeYearId]);
+
+  const sgOptions = groups.filter(sg => {
+    if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+    if (filterCycle !== "all" && sg.categoryId !== filterCycle) return false;
+    if (filterLevel !== "all" && sg.levelId !== filterLevel) return false;
+    return true;
+  });
+  
+  const levelOptions = [...new Set(groups.filter(sg => {
+    if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+    if (filterCycle !== "all" && sg.categoryId !== filterCycle) return false;
+    return true;
+  }).map(g => g.levelId))].filter(Boolean);
+  
+  const cycleOptions = [...new Set(groups.filter(sg => {
+    if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+    return true;
+  }).map(g => g.categoryId))].filter(Boolean);
 
   // ── Handlers ──
   const handleSavePassword = (studentId, newPassword, sendNotif) => {
@@ -556,24 +580,37 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
           )}
         </div>
 
-        {/* Group select filter */}
+        {/* Hierarchy filters */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 12, color: C.inkSoft, fontWeight: 600 }}>{lang === "ar" ? "الفوج:" : "Groupe :"}</span>
-            <select
-              value={selectedGroupFilter}
-              onChange={e => setSelectedGroupFilter(e.target.value)}
-              style={{
-                height: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${C.border}`,
-                background: "rgba(255,255,255,0.06)", color: C.ink, fontSize: 12.5, fontWeight: 600, outline: "none"
-              }}
-            >
-              <option value="all">{lang === "ar" ? "جميع الأفواج" : "Tous les groupes"}</option>
-              {groups.map(sg => (
-                <option key={sg.id} value={sg.id}>{sg.nom}</option>
-              ))}
-            </select>
-          </div>
+          
+          <select
+            value={filterCycle}
+            onChange={e => { setFilterCycle(e.target.value); setFilterLevel("all"); setSelectedGroupFilter("all"); }}
+            style={{ height: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.06)", color: C.ink, fontSize: 12.5, fontWeight: 600, outline: "none" }}
+          >
+            <option value="all">{lang === "ar" ? "كل الأطوار" : "Tous les cycles"}</option>
+            {cycleOptions.map(c => <option key={c} value={c}>{CAT_BY_ID[c]?.label || c}</option>)}
+          </select>
+
+          <select
+            value={filterLevel}
+            onChange={e => { setFilterLevel(e.target.value); setSelectedGroupFilter("all"); }}
+            style={{ height: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.06)", color: C.ink, fontSize: 12.5, fontWeight: 600, outline: "none" }}
+          >
+            <option value="all">{lang === "ar" ? "كل المستويات" : "Tous les niveaux"}</option>
+            {levelOptions.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+
+          <select
+            value={selectedGroupFilter}
+            onChange={e => setSelectedGroupFilter(e.target.value)}
+            style={{ height: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.06)", color: C.ink, fontSize: 12.5, fontWeight: 600, outline: "none" }}
+          >
+            <option value="all">{lang === "ar" ? "جميع الأفواج" : "Tous les groupes"}</option>
+            {sgOptions.map(sg => (
+              <option key={sg.id} value={sg.id}>{sg.nom}</option>
+            ))}
+          </select>
 
           {/* Status filter tabs */}
           <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.05)", padding: 3, borderRadius: 10, border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
@@ -605,11 +642,13 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       {/* ── Student Accounts Cards Grid ─────────────────────── */}
       <div style={{ display: "grid", gap: 12 }}>
         {filteredStudents.map(st => {
-          const sg = groupMap[st.groupId];
+          const en = (data.enrollments || []).find(e => e.studentId === st.id && e.academicYearId === activeYearId);
+          const stGroupId = en ? en.groupId : null;
+          const sg = stGroupId ? groupMap[stGroupId] : null;
           const cat = sg ? CAT_BY_ID[sg.categoryId] : null;
           const isRevealed = !!revealedPasswords[st.id];
           const initials = `${(st.prenom || "")[0] || ""}${(st.nom || "")[0] || ""}`.toUpperCase() || "ST";
-          const fin = getStudentFinancialSummary(data, st.id);
+          const fin = getStudentFinancialSummary(data, st.id, activeYearId);
 
           return (
             <div

@@ -599,7 +599,7 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
       setData(d => ({
         ...d,
         groups:      (d.groups || []).filter(g => g.id !== sg.id),
-        students:    (d.students || []).filter(s => s.groupId !== sg.id),
+        enrollments: (d.enrollments || []).filter(e => e.groupId !== sg.id),
         sessions:    (d.sessions || []).filter(s => s.groupId !== sg.id),
         attendances: (d.attendances || []).filter(a => {
           const sess = (d.sessions || []).find(s => s.id === a.sessionId);
@@ -616,7 +616,14 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
   };
 
   const cat = CAT_BY_ID[sg.categoryId] || catObj;
-  const students = (data.students || []).filter(s => s.groupId === sg.id);
+
+  const students = (data.enrollments || [])
+    .filter(e => e.groupId === sg.id && (!activeYearId || e.academicYearId === activeYearId))
+    .map(e => {
+      const st = (data.students || []).find(s => s.id === e.studentId);
+      return st ? { ...st, monthlyPrice: e.monthlyPrice || st.monthlyPrice || st.montant || 0 } : null;
+    })
+    .filter(Boolean);
   const sessions = (data.sessions || []).filter(s => s.groupId === sg.id);
   const payments = (data.payments || []).filter(p => p.groupId === sg.id);
   const unpaidPmt = payments.filter(p => !p.paid).length;
@@ -667,9 +674,12 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
   };
 
   const deleteStudent = (id) => {
-    if (!window.confirm(lang === "ar" ? "حذف هذا التلميذ؟" : "Supprimer cet élève ?")) return;
-    setData(d => ({ ...d, students: d.students.filter(s => s.id !== id) }));
-    if (toastFn) toastFn(lang === "ar" ? "تم الحذف" : "Élève supprimé");
+    if (!window.confirm(lang === "ar" ? "حذف التلميذ من هذا الفوج؟" : "Retirer cet élève du groupe ?")) return;
+    setData(d => ({
+      ...d,
+      enrollments: (d.enrollments || []).filter(e => !(e.studentId === id && e.groupId === sg.id && e.academicYearId === activeYearId))
+    }));
+    if (toastFn) toastFn(lang === "ar" ? "تم سحب التلميذ من الفوج" : "Élève retiré du groupe");
   };
 
   const toggleEnrollment = (studentId) => {

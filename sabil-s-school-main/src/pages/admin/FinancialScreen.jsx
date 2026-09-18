@@ -114,7 +114,8 @@ function MiniBarChart({ data: chartData, lang }) {
 function PaymentEditModal({ student, group, payment, selectedMonth, onClose, onSave, data, activeYearId }) {
   const { lang } = useLanguage();
   const fin = getStudentFinancialSummary(data, student.id, activeYearId);
-  const expectedAmount = student.monthlyPrice || student.montant || 0;
+  const en = (data.enrollments || []).find(e => e.studentId === student.id && e.academicYearId === activeYearId && e.groupId === group.id);
+  const expectedAmount = en ? (en.monthlyPrice || student.monthlyPrice || student.montant || 0) : (student.monthlyPrice || student.montant || 0);
   
   const [paymentType, setPaymentType] = useState(payment?.type === "debt" ? "debt" : "normal");
 
@@ -279,6 +280,8 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
 
   const currentMonthStr = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  const [filterCycle, setFilterCycle] = useState("all");
+  const [filterLevel, setFilterLevel] = useState("all");
   const [filterGroup, setFilterGroup] = useState("all");
   const [searchQ, setSearchQ] = useState("");
   const [editPayment, setEditPayment] = useState(null); // { student, group, payment }
@@ -319,7 +322,13 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
       }
     });
 
-    const sgFilter = filterGroup === "all" ? data.groups : data.groups.filter(sg => sg.id === filterGroup);
+    const sgFilter = data.groups.filter(sg => {
+      if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+      if (filterCycle !== "all" && sg.categoryId !== filterCycle) return false;
+      if (filterLevel !== "all" && sg.levelId !== filterLevel) return false;
+      if (filterGroup !== "all" && sg.id !== filterGroup) return false;
+      return true;
+    });
 
     sgFilter.forEach(sg => {
       // Find students enrolled in this group for the active year
@@ -383,9 +392,9 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
       totalExpected: expectedIncome + extraIncome,
       collectionRate,
       totalDebtExpected, totalDebtPaid, totalDebtUnpaid,
-      totalGroups: data.groups.length,
+      totalGroups: sgFilter.length,
     };
-  }, [data, selectedMonth, filterGroup, activeYearId]);
+  }, [data, selectedMonth, filterCycle, filterLevel, filterGroup, activeYearId]);
 
   // ── Chart data (last 6 months) ───────────────────────────────
   const chartData = useMemo(() => {
@@ -418,7 +427,13 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
 
   // ── Student list for payment table ───────────────────────────
   const studentRows = useMemo(() => {
-    const sgFilter = filterGroup === "all" ? data.groups : data.groups.filter(sg => sg.id === filterGroup);
+    const sgFilter = data.groups.filter(sg => {
+      if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+      if (filterCycle !== "all" && sg.categoryId !== filterCycle) return false;
+      if (filterLevel !== "all" && sg.levelId !== filterLevel) return false;
+      if (filterGroup !== "all" && sg.id !== filterGroup) return false;
+      return true;
+    });
     const rows = [];
     sgFilter.forEach(sg => {
       const sgStudents = data.students.filter(s => {
@@ -433,7 +448,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
       });
     });
     return rows;
-  }, [data, filterGroup, selectedMonth, searchQ, activeYearId]);
+  }, [data, filterCycle, filterLevel, filterGroup, selectedMonth, searchQ, activeYearId]);
 
   // ── Save payment ─────────────────────────────────────────────
   const handleSavePayment = (pmtData) => {
@@ -502,8 +517,23 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
     return { label: lang === "ar" ? "جزئي" : "Partiel", color: C.accent, bg: "rgba(226,150,58,0.15)", border: "rgba(226,150,58,0.4)" };
   };
 
-  const sgOptions = data.groups.filter(sg => sg.academicYearId === activeYearId);
-
+  const sgOptions = data.groups.filter(sg => {
+    if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+    if (filterCycle !== "all" && sg.categoryId !== filterCycle) return false;
+    if (filterLevel !== "all" && sg.levelId !== filterLevel) return false;
+    return true;
+  });
+  
+  const levelOptions = [...new Set(data.groups.filter(sg => {
+    if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+    if (filterCycle !== "all" && sg.categoryId !== filterCycle) return false;
+    return true;
+  }).map(g => g.levelId))].filter(Boolean);
+  
+  const cycleOptions = [...new Set(data.groups.filter(sg => {
+    if (sg.academicYearId && sg.academicYearId !== activeYearId) return false;
+    return true;
+  }).map(g => g.categoryId))].filter(Boolean);
   const thStyle = {
     textAlign: "left", padding: "12px 14px",
     color: C.inkSoft, fontWeight: 700,
@@ -588,7 +618,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
           {lang === "ar" ? "ملخص الأفواج" : "Bilan par groupe"}
         </h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
-          {sgOptions.map(sg => {
+          {sgOptions.filter(sg => filterGroup === "all" || sg.id === filterGroup).map(sg => {
             const students = data.students.filter(s => {
               const en = (data.enrollments || []).find(e => e.studentId === s.id && e.academicYearId === activeYearId);
               return en && en.groupId === sg.id;
@@ -680,6 +710,32 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
             {/* Group filter */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "6px 12px" }}>
               <Filter size={14} color={C.inkSoft} />
+              
+              {/* Cycle Filter */}
+              <select
+                value={filterCycle}
+                onChange={e => { setFilterCycle(e.target.value); setFilterLevel("all"); setFilterGroup("all"); }}
+                style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", colorScheme: "dark" }}
+              >
+                <option value="all">{lang === "ar" ? "كل الأطوار" : "Tous les cycles"}</option>
+                {cycleOptions.map(c => <option key={c} value={c}>{CAT_BY_ID[c]?.label || c}</option>)}
+              </select>
+
+              <span style={{ color: C.border }}>|</span>
+
+              {/* Level Filter */}
+              <select
+                value={filterLevel}
+                onChange={e => { setFilterLevel(e.target.value); setFilterGroup("all"); }}
+                style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", colorScheme: "dark" }}
+              >
+                <option value="all">{lang === "ar" ? "كل المستويات" : "Tous les niveaux"}</option>
+                {levelOptions.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+
+              <span style={{ color: C.border }}>|</span>
+
+              {/* Group Filter */}
               <select
                 value={filterGroup}
                 onChange={e => setFilterGroup(e.target.value)}

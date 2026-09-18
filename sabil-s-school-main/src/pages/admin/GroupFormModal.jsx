@@ -15,7 +15,7 @@ const INITIAL = {
 };
 
 export default function GroupFormModal({
-  catId, levelId, levelLabel, groupType,    // context (where we are in hierarchy)
+  catId, levelId, levelLabel, groupType, activeYearId,    // context (where we are in hierarchy)
   initial,                       // null → create, object → edit
   onClose, onSave,
 }) {
@@ -64,6 +64,7 @@ export default function GroupFormModal({
       categoryId: catId,
       levelId,
       groupType: groupType || null,
+      academicYearId: activeYearId,
       days: form.days,
       time: form.time,
       startDate: form.startDate,

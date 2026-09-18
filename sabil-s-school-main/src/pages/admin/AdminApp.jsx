@@ -79,9 +79,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
           (!activeYearId || !s.academicYearId || s.academicYearId === activeYearId)
         );
       }
-      if (!existing && resolvedLevel) {
-        existing = (data.groups || []).find(s => s.levelId === resolvedLevel && (!navState.groupType || s.groupType === navState.groupType));
-      }
+
 
       if (existing) {
         setNav({
@@ -356,7 +354,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
         {nav.screen === "debts" && <DebtsScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
         {nav.screen === "nfc" && <NfcAttendanceScreen data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
 
-        {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} />}
+        {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} activeYearId={activeYearId} />}
         {nav.screen === "settings" && <SettingsScreen admin={data.admin} data={data} setData={setData} toastFn={toastFn} onSave={(a) => setData(d => ({ ...d, admin: a }))} onBack={goBack} />}
       </div>
     </div>

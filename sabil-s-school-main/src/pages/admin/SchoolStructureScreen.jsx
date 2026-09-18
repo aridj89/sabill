@@ -112,7 +112,7 @@ function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent,
 }
 
 /* ── Main screen ─────────────────────────────────────────────── */
-export default function SchoolStructureScreen({ catId, levelId, groupType, data, setData, toastFn, onNav }) {
+export default function SchoolStructureScreen({ catId, levelId, groupType, data, setData, toastFn, onNav, activeYearId }) {
   const { lang } = useLanguage();
   const cat = CAT_BY_ID[catId];
   const [showAdd, setShowAdd]   = useState(false);
@@ -128,6 +128,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
   // Filter groups
   const allGroups = [...(data.groups || [])];
   let groups = allGroups.filter(sg => {
+    if (activeYearId && sg.academicYearId && sg.academicYearId !== activeYearId) return false;
     if (catId && sg.categoryId !== catId) return false;
     if (levelId && sg.levelId !== levelId) return false;
     if (!isLangues && groupType && sg.groupType !== groupType) return false;
@@ -310,6 +311,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
       {showAdd && (
         <GroupFormModal
           catId={catId} levelId={levelId} levelLabel={levelLabel} groupType={groupType}
+          activeYearId={activeYearId}
           onClose={() => setShowAdd(false)}
           onSave={handleCreate}
         />
@@ -318,6 +320,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
         <GroupFormModal
           catId={editing.categoryId || editing.catId || catId}
           levelId={editing.levelId} levelLabel={isLangues ? (data.langLevels?.find(l => l.id === editing.levelId)?.nom || editing.levelId) : editing.levelId} groupType={editing.groupType}
+          activeYearId={activeYearId}
           initial={editing}
           onClose={() => setEditing(null)}
           onSave={handleEdit}
