@@ -41,9 +41,12 @@ const GROUP_TYPES = [
   { value: "Individuel", labelFr: "Individuel", labelAr: "فردي", color: "#f472b6" },
 ];
 
-export default function StudentFormModal({ groupId, initial, enrollmentFee, onClose, onSave, allStudents, allGroups }) {
+export default function StudentFormModal({ groupId, initial, enrollmentFee, onClose, onSave, allStudents, allGroups, allSubgroups }) {
   const { t, lang } = useLanguage();
   const isEdit = !!initial;
+
+  const groupList = allGroups || allSubgroups || [];
+  const defaultGroup = groupList.find(g => g.id === groupId);
 
   const [form, setForm] = useState(initial ? {
     nom: initial.nom,
@@ -69,7 +72,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
     enrollmentPaid: false,
     enrollmentFeeExempt: false,
     enrollmentDate: new Date().toISOString().slice(0, 10),
-    monthlyPrice: 0,
+    monthlyPrice: defaultGroup?.price || 0,
     groupId: groupId || "",
     studentCode: generateStudentCode(allStudents),
     accountStatus: "active",
@@ -82,12 +85,16 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Auto-fill studyClass when group changes
+  // Auto-fill studyClass & price when group changes
   useEffect(() => {
     if (form.groupId) {
-      const selectedGroup = (allGroups || []).find(g => g.id === form.groupId);
-      if (selectedGroup && selectedGroup.levelId) {
-        setForm(f => ({ ...f, studyClass: selectedGroup.levelId }));
+      const selectedGroup = groupList.find(g => g.id === form.groupId);
+      if (selectedGroup) {
+        setForm(f => ({
+          ...f,
+          studyClass: selectedGroup.levelId || f.studyClass,
+          monthlyPrice: (!isEdit && !f.monthlyPrice && selectedGroup.price) ? selectedGroup.price : f.monthlyPrice,
+        }));
       }
     }
   }, [form.groupId]);
@@ -319,6 +326,61 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
                 ↻
               </button>
             </div>
+          </div>
+        </Field>
+      </div>
+
+      {/* ── Tarif mensuel / Prix & Groupe ── */}
+      <div style={{ display: "grid", gridTemplateColumns: !groupId ? "1.2fr 1fr" : "1fr", gap: 12 }}>
+        {!groupId && (
+          <Field label={lang === "ar" ? "الفوج / المجموعة" : "Groupe"}>
+            <select
+              style={selectStyle}
+              value={form.groupId}
+              onChange={e => {
+                const gid = e.target.value;
+                const foundGrp = groupList.find(g => g.id === gid);
+                setForm(f => ({
+                  ...f,
+                  groupId: gid,
+                  studyClass: foundGrp?.levelId || f.studyClass,
+                  monthlyPrice: (!isEdit && foundGrp?.price) ? foundGrp.price : f.monthlyPrice,
+                }));
+              }}
+            >
+              <option value="">{lang === "ar" ? "اختر الفوج..." : "Sélectionner un groupe..."}</option>
+              {groupList.map(g => (
+                <option key={g.id} value={g.id}>
+                  {g.name || g.nom} {g.levelId ? `(${g.levelId})` : ""} {g.price ? `— ${g.price} DA` : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        <Field label={lang === "ar" ? "سعر الاشتراك الشهري (دج)" : "Tarif mensuel / Prix (DA)"}>
+          <div style={{ position: "relative" }}>
+            <input
+              type="number"
+              min="0"
+              step="50"
+              style={{ ...inputStyle, paddingRight: 48, fontWeight: 700, fontSize: 14 }}
+              placeholder={lang === "ar" ? "مثال: 2500" : "ex: 2500"}
+              value={form.monthlyPrice === 0 ? "" : form.monthlyPrice}
+              onChange={e => set("monthlyPrice", e.target.value === "" ? 0 : Number(e.target.value))}
+            />
+            <span style={{
+              position: "absolute",
+              right: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: 12,
+              fontWeight: 800,
+              color: C.accent,
+              pointerEvents: "none"
+            }}>
+              DA
+            </span>
           </div>
         </Field>
       </div>
