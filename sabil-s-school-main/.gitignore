@@ -19,3 +19,16 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+server/*.db
+server/*.db-shm
+server/*.db-wal
+server/*.sqlite
+server/*.sqlite3

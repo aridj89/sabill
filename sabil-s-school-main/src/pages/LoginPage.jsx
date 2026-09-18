@@ -1,3 +1,4 @@
+import { API_ENDPOINTS } from "../config/api";
 import React, { useState } from "react";
 import { Eye, EyeOff, User, Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -18,7 +19,7 @@ export default function LoginPage({ data, setData, toastFn }) {
   const handleLogin = async () => {
     const cleanId = identifier.trim();
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(API_ENDPOINTS.login, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: cleanId, password }),

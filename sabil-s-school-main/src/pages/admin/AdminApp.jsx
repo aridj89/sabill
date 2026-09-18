@@ -36,6 +36,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const profileRef = useRef(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     function handleClick(e) {
@@ -46,6 +47,16 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
     if (profileOpen) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [profileOpen]);
+
+  useEffect(() => {
+    function handleClickOutsideNotif(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
+      }
+    }
+    if (notifOpen) document.addEventListener("mousedown", handleClickOutsideNotif);
+    return () => document.removeEventListener("mousedown", handleClickOutsideNotif);
+  }, [notifOpen]);
 
   const handleNav = (navState) => {
     if (navState.screen === "group" && (navState.levelId || navState.catId || navState.groupId)) {
@@ -191,7 +202,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
             <LanguageToggle />
             
             {/* Notifications Dropdown */}
-            <div style={{ position: "relative" }}>
+            <div ref={notifRef} style={{ position: "relative" }}>
               <IconBtn icon={Bell} onClick={() => setNotifOpen(!notifOpen)} title={lang === "ar" ? "الإشعارات" : "Notifications"} badge={unreadNotifs} />
               {notifOpen && (
                 <div style={{

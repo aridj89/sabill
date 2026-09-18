@@ -113,7 +113,7 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
         {onBack && <IconBtn icon={X} onClick={onBack} title={t("close")} />}
       </div>
       
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 24, alignItems: "start" }}>
         {/* Left Column: Admin Settings */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: 22 }}>
           {/* ── Avatar preview large ── */}
@@ -177,80 +177,7 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
           <PrimaryBtn onClick={() => { onSave(form); toastFn(t("settingsSavedToast")); }}>{t("saveSettingsBtn")}</PrimaryBtn>
         </div>
 
-        {/* Right Column: Academic Years */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: 22 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.ink, marginBottom: 16 }}>{lang === "ar" ? "السنوات الدراسية وترحيل الديون" : "Années Scolaires et Report de Dettes"}</h3>
-          
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 13, color: C.inkSoft, marginBottom: 8 }}>{lang === "ar" ? "السنة الحالية:" : "Année Courante:"}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>{currentYear?.name || (lang === "ar" ? "غير محدد" : "Non défini")}</div>
-          </div>
 
-          <Field label={lang === "ar" ? "إنشاء سنة دراسية جديدة (مثل 2026-2027)" : "Nouvelle année académique (ex: 2026-2027)"}>
-            <input 
-              style={inputStyle} 
-              value={newYearName} 
-              onChange={e => setNewYearName(e.target.value)} 
-              placeholder="2026-2027" 
-            />
-          </Field>
-          
-          {!rolloverPreview ? (
-            <button 
-              onClick={handlePreviewRollover}
-              style={{
-                width: "100%", padding: "12px", borderRadius: 10, background: C.accentSoft,
-                border: `1px solid ${C.accent}`, color: C.accent, fontWeight: 700, cursor: "pointer", marginTop: 10
-              }}
-            >
-              {lang === "ar" ? "معاينة ترحيل الديون" : "Aperçu du report des dettes"}
-            </button>
-          ) : (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)" }}>
-              <h4 style={{ color: "#f87171", margin: "0 0 10px 0", fontSize: 14 }}>
-                {rolloverPreview.debts.length} {lang === "ar" ? "طلاب لديهم ديون سابقة." : "élèves avec dettes en attente."}
-              </h4>
-              <p style={{ color: "#fff", fontSize: 13, margin: "0 0 16px 0", lineHeight: 1.5 }}>
-                {lang === "ar" 
-                  ? `إجمالي الديون المرحلة: ${rolloverPreview.totalDebt.toLocaleString()} DA`
-                  : `Total des dettes reportées: ${rolloverPreview.totalDebt.toLocaleString()} DA`}
-              </p>
-              
-              <div style={{ display: "flex", gap: 10 }}>
-                <button 
-                  onClick={handleConfirmRollover}
-                  style={{
-                    flex: 1, padding: "10px", borderRadius: 8, background: "#f87171",
-                    border: "none", color: "#fff", fontWeight: 700, cursor: "pointer"
-                  }}
-                >
-                  {lang === "ar" ? "تأكيد الترحيل" : "Confirmer le report"}
-                </button>
-                <button 
-                  onClick={() => setRolloverPreview(null)}
-                  style={{
-                    padding: "10px", borderRadius: 8, background: "transparent",
-                    border: "1px solid rgba(255,255,255,0.2)", color: "#fff", fontWeight: 700, cursor: "pointer"
-                  }}
-                >
-                  {lang === "ar" ? "إلغاء" : "Annuler"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 13, color: C.inkSoft, marginBottom: 8, fontWeight: 700 }}>{lang === "ar" ? "تاريخ السنوات الدراسية:" : "Historique des années:"}</div>
-            <div style={{ display: "grid", gap: 6 }}>
-              {(data.academicYears || []).map(y => (
-                <div key={y.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "rgba(255,255,255,0.05)", borderRadius: 8, border: `1px solid ${y.isCurrent ? C.accent : "transparent"}` }}>
-                  <span style={{ color: "#fff", fontSize: 13, fontWeight: y.isCurrent ? 700 : 400 }}>{y.name}</span>
-                  {y.isCurrent && <span style={{ color: C.accent, fontSize: 11, fontWeight: 700, background: C.accentSoft, padding: "2px 6px", borderRadius: 4 }}>{lang === "ar" ? "حالية" : "Active"}</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
