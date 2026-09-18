@@ -358,6 +358,19 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
         updatedStudents = [...(d.students || []), enrichedData];
       }
 
+      const existingEnrollment = (d.enrollments || []).find(e => e.studentId === studentData.id && e.academicYearId === activeYearId);
+      const enrollmentObj = {
+        id: existingEnrollment ? existingEnrollment.id : uid(),
+        studentId: studentData.id,
+        academicYearId: activeYearId,
+        groupId: studentData.groupId || null,
+        monthlyPrice: Number(studentData.monthlyPrice) || 0
+      };
+      
+      const newEnrollments = existingEnrollment 
+        ? (d.enrollments || []).map(e => e.id === existingEnrollment.id ? enrollmentObj : e)
+        : [...(d.enrollments || []), enrollmentObj];
+
       // Send notification to the student when their account is modified
       let updatedNotifs = d.userNotifications || [];
       if (isEdit) {
@@ -376,7 +389,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
         updatedNotifs = [...updatedNotifs, notif];
       }
 
-      return { ...d, students: updatedStudents, userNotifications: updatedNotifs };
+      return { ...d, students: updatedStudents, enrollments: newEnrollments, userNotifications: updatedNotifs };
     });
 
     setEditTarget(null);
@@ -398,6 +411,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
         students: (d.students || []).filter(s => s.id !== student.id),
         payments: (d.payments || []).filter(p => p.studentId !== student.id),
         attendances: (d.attendances || []).filter(a => a.studentId !== student.id),
+        enrollments: (d.enrollments || []).filter(e => e.studentId !== student.id),
         userNotifications: (d.userNotifications || []).filter(n => n.userId !== student.id),
       }));
       toastFn(lang === "ar" ? "تم حذف حساب التلميذ" : "Compte supprimé");
