@@ -107,8 +107,10 @@ export function processCardScan(rawUid) {
     return {
       success: false,
       isDuplicate: false,
-      reason: "unregistered_card",
+      reason: "CARD_NOT_REGISTERED",
+      unregistered: true,
       cardUid,
+      uid: cardUid,
       timestamp: timeStr,
       message: `Carte NFC inconnue (${cardUid}). Veuillez l'attribuer à un élève.`,
     };
@@ -197,9 +199,11 @@ export function processCardScan(rawUid) {
     success: true,
     isDuplicate: false,
     cardUid,
+    uid: cardUid,
     timestamp: timeStr,
     student: {
       id: student.id,
+      name: `${student.prenom} ${student.nom}`,
       nom: student.nom,
       prenom: student.prenom,
       phone: student.phone,
@@ -207,7 +211,10 @@ export function processCardScan(rawUid) {
       groupName,
       nfcCardId: student.nfcCardId,
     },
-    attendance: attendanceRecord,
+    attendance: {
+      marked: true,
+      ...attendanceRecord,
+    },
     notification: notif,
     message: `Présence validée avec succès pour ${student.prenom} ${student.nom}.`,
   };

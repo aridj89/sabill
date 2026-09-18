@@ -1,0 +1,17 @@
+{
+  "name": "sabil-nfc-agent",
+  "version": "1.0.0",
+  "description": "Local Windows PC agent for physical USB NFC/HID reader, forwarding scans to Railway API",
+  "type": "module",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "dependencies": {
+    "node-hid": "^3.4.0",
+    "dotenv": "^17.4.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

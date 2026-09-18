@@ -50,11 +50,11 @@ router.post("/assign", (req, res) => {
  * Body: { cardUid: string }
  */
 router.post("/scan", (req, res) => {
-  const { cardUid } = req.body;
+  const cardUid = req.body.uid || req.body.cardUid;
   if (!cardUid) {
     return res.status(400).json({
       success: false,
-      message: "cardUid est requis.",
+      message: "uid ou cardUid est requis.",
     });
   }
 
