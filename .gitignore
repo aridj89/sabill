@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Vite Cache
+.vite/
+*/.vite/
+node_modules/.vite/
+*/node_modules/.vite/
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite*
+*.sqlite3
+server/*.db
+server/*.db-shm
+server/*.db-wal
+server/*.sqlite
+server/*.sqlite3
+sabil-s-school-main/*.sqlite*
+sabil-s-school-main/*.db*
+sabil-s-school-main/server/*.sqlite*
+sabil-s-school-main/server/*.db*
+
+# Build output
+dist/
+*/dist/
+
+# Environment files
+.env
+.env.local
+.env.production
+*/.env*
+
+# OS files
+.DS_Store
+Thumbs.db
