@@ -11,8 +11,10 @@ import PrimaryBtn from "../../components/ui/PrimaryBtn";
 import IconBtn from "../../components/ui/IconBtn";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
+import { API_ENDPOINTS } from "../../config/api";
+import { useNfcReader } from "../../hooks/useNfcReader";
 
-const API_BASE_URL = "http://localhost:5000/api/nfc";
+const API_BASE_URL = API_ENDPOINTS.nfc;
 
 /* ── Web Audio Beep generator ── */
 function playTone(type = "success") {
@@ -279,23 +281,45 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
     return () => clearInterval(focusTimer);
   }, [assignModalStudent]);
 
+  // ── Send Card Scan to Backend API ──
+  const sendCardScan = async (code) => {
+    const trimmed = (code || "").trim();
+    if (!trimmed) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardUid: trimmed }),
+      });
+      const resJson = await res.json();
+      handleBackendScanEvent(resJson);
+    } catch (err) {
+      console.warn("NFC scan error:", err);
+    }
+  };
+
+  // ── Keyboard Wedge / HID NFC Reader Hook ──
+  useNfcReader({
+    enabled: true,
+    onScan: (scannedUid) => {
+      if (assignModalStudentRef.current) {
+        setAssignCardInput(scannedUid);
+        if (soundEnabled) playTone("success");
+        toastFn(lang === "ar" ? `تم التقاط رمز البطاقة: ${scannedUid}` : `Badge détecté : ${scannedUid}`);
+      } else {
+        sendCardScan(scannedUid);
+      }
+    },
+  });
+
   // ── Manual Input or Barcode Submit ──
   const handleManualSubmit = async (e) => {
     if (e) e.preventDefault();
     const code = manualCode.trim();
     if (!code) return;
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/scan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardUid: code }),
-      });
-      const resJson = await res.json();
-      handleBackendScanEvent(resJson);
-    } catch (err) {
-      console.warn("Manual scan fallback:", err);
-    }
+    await sendCardScan(code);
     setManualCode("");
   };
 

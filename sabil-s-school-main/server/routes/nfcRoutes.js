@@ -58,10 +58,7 @@ router.post("/scan", (req, res) => {
     });
   }
 
-  const result = processCardScan(cardUid);
-  // Also notify any connected SSE clients
-  nfcReaderService.emit("card_scanned", result);
-
+  const result = nfcReaderService.handleCardScan(cardUid);
   res.json(result);
 });
 

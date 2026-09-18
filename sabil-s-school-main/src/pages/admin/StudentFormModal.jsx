@@ -1,11 +1,12 @@
-import { API_ENDPOINTS } from "../../config/api";
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Radio, CheckCircle2, Usb, AlertTriangle } from "lucide-react";
 import { C, inputStyle, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
+import { API_ENDPOINTS } from "../../config/api";
+import { useNfcReader } from "../../hooks/useNfcReader";
 
 const API_BASE_URL = API_ENDPOINTS.nfc;
 
@@ -90,6 +91,22 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
       }
     }
   }, [form.groupId]);
+
+  // ── Keyboard Wedge / HID mode NFC Reader Hook ──
+  useNfcReader({
+    enabled: true,
+    onScan: (scannedUid) => {
+      const uidClean = scannedUid.toUpperCase().trim();
+      set("nfcCardId", uidClean);
+      setJustScanned(true);
+      playScanTone();
+
+      clearTimeout(justScannedTimer.current);
+      justScannedTimer.current = setTimeout(() => {
+        setJustScanned(false);
+      }, 3500);
+    },
+  });
 
   // ── Live 5YOA NFC Reader Stream Connection ──
   useEffect(() => {

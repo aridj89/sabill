@@ -1,0 +1,20 @@
+{
+  "name": "sabil-local-nfc-bridge",
+  "version": "1.0.0",
+  "description": "Local PC bridge agent for USB NFC readers (5YOA HID & ACR122U PC/SC) to Sabil School Railway Cloud API",
+  "type": "module",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js"
+  },
+  "dependencies": {
+    "node-hid": "^3.4.0",
+    "dotenv": "^17.4.2"
+  },
+  "optionalDependencies": {
+    "@pokusew/pcsclite": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

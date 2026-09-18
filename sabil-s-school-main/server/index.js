@@ -26,7 +26,6 @@ const PORT = process.env.PORT || 5000;
 
 // ─── HTTP Security Headers & CORS ────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
-
 app.use(cors({ origin: true, credentials: true }));
 
 app.use(express.json({ limit: "10mb" }));
@@ -192,7 +191,7 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   console.log(`🔒 Serveur Express sécurisé démarré sur http://localhost:${PORT}`);
-  // Start 5YOA NFC Reader Hardware Listener
+  // Start NFC Service Listener
   nfcReaderService.start();
 });
 
