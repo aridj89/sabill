@@ -107,7 +107,6 @@ class NfcReaderService extends EventEmitter {
       return null;
     }
   }
-  }
 
   /**
    * Start the reader service and connect to USB device.
