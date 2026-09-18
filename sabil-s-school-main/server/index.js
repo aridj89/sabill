@@ -25,20 +25,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── HTTP Security Headers & CORS ────────────────────────────
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:5174").split(",");
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or same-origin)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Accès CORS bloqué par la politique de sécurité."));
-    }
-  },
-  credentials: true,
-}));
+app.use(cors({ origin: true, credentials: true }));
 
 app.use(express.json({ limit: "10mb" }));
 app.use(apiRateLimiter);
