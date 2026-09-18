@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+sabil-s-school-main/node_modules
+dist
+**/dist
+sabil-s-school-main/dist
+.git
+.github
+.vite
+**/sqlite*
+*.sqlite*
+*.db*
+.env*

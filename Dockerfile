@@ -1,6 +1,6 @@
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
-# Install system dependencies for compiling better-sqlite3
+# Install system build dependencies for better-sqlite3 native compilation
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -10,14 +10,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy package manifests and install
+# Copy package manifests first
 COPY sabil-s-school-main/package*.json ./
+
+# Cleanly install dependencies inside Linux environment
 RUN npm install
 
-# Copy application source code
+# Copy application source code (node_modules is excluded via .dockerignore)
 COPY sabil-s-school-main/ ./
 
-# Build React frontend
+# Ensure Linux bin executables have +x permissions
+RUN chmod -R +x node_modules/.bin
+
+# Build the React production bundle using Linux vite
 RUN npm run build
 
 ENV PORT=5000
