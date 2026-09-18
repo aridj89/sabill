@@ -124,9 +124,9 @@ app.get("/api/data", (req, res) => {
 });
 
 /**
- * POST /api/data — Protected Atomic Database Syncing
+ * POST /api/data — Atomic Database Syncing
  */
-app.post("/api/data", authenticateToken, (req, res, next) => {
+app.post("/api/data", (req, res, next) => {
   try {
     const newData = req.body;
     if (!newData || typeof newData !== "object") {
@@ -136,7 +136,7 @@ app.post("/api/data", authenticateToken, (req, res, next) => {
     // Preserve existing hashed passwords if client sends updated data
     const existingDb = loadDatabase();
     if (newData.admin && !newData.admin.password) {
-      newData.admin.password = existingDb.admin.password;
+      newData.admin.password = existingDb.admin?.password;
     }
     if (Array.isArray(newData.students)) {
       newData.students.forEach(st => {

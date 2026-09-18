@@ -52,35 +52,64 @@ export function defaultData() {
 }
 
 /* ---------------------------------------------------------------
-   STORAGE & API SYNC (WITH JWT HEADER)
+   STORAGE & API SYNC (WITH PERSISTENCE PROTECTION)
 --------------------------------------------------------------- */
 const STORAGE_KEY = "ecole-data-v4";
 
-// Evict legacy cached test data immediately
-try {
-  localStorage.removeItem("ecole-data-v3");
-  localStorage.removeItem("ecole-data-v2");
-  localStorage.removeItem("ecole-data-v1");
-  localStorage.removeItem("ecole-data");
-} catch {}
-
 export async function fetchCleanData() {
+  let serverData = null;
   try {
     const res = await fetch(API_URL, { headers: getAuthHeaders() });
     if (res.ok) {
-      const data = await res.json();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      return data;
+      serverData = await res.json();
     }
   } catch (err) {
     console.warn("Express backend unreachable, loading from localStorage fallback:", err);
   }
 
-  // Fallback to localStorage if API unavailable
+  let localData = null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) localData = JSON.parse(raw);
   } catch {}
+
+  const serverHasData = serverData && (
+    (serverData.students && serverData.students.length > 0) ||
+    (serverData.groups && serverData.groups.length > 0) ||
+    (serverData.payments && serverData.payments.length > 0)
+  );
+
+  const localHasData = localData && (
+    (localData.students && localData.students.length > 0) ||
+    (localData.groups && localData.groups.length > 0) ||
+    (localData.payments && localData.payments.length > 0)
+  );
+
+  // 1. If server has actual data, cache it locally and return it
+  if (serverHasData) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
+    } catch {}
+    return serverData;
+  }
+
+  // 2. If server is empty (e.g. after a new commit deploy on Render / ephemeral container reset),
+  // but client has existing local data: PRESERVE local data and re-sync it to the server!
+  if (!serverHasData && localHasData) {
+    console.log("🔄 Re-syncing local data to cloud server database...");
+    persistData(localData);
+    return localData;
+  }
+
+  // 3. If server returned an initial state and local is empty
+  if (serverData) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
+    } catch {}
+    return serverData;
+  }
+
+  if (localData) return localData;
 
   const d = defaultData();
   try {
@@ -98,6 +127,7 @@ export function loadDataFromStorage() {
 }
 
 export async function persistData(data) {
+  if (!data) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {}
