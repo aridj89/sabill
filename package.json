@@ -1,0 +1,12 @@
+{
+  "name": "sabil-school",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd sabil-s-school-main && npm install && npm run build",
+    "start": "cd sabil-s-school-main && node server/index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
