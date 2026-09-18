@@ -25,7 +25,16 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── HTTP Security Headers & CORS ────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+// Required for Express behind Railway proxy to prevent ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+app.set("trust proxy", 1);
+
+// Disable some strict helmet policies that cause CORS errors on static Vite assets
+app.use(helmet({ 
+  contentSecurityPolicy: false, 
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginOpenerPolicy: false 
+}));
 app.use(cors({ origin: true, credentials: true }));
 
 app.use(express.json({ limit: "10mb" }));
