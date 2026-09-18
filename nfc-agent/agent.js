@@ -3,7 +3,7 @@ import HID from "node-hid";
 
 dotenv.config();
 
-const NFC_BACKEND_URL = (process.env.NFC_BACKEND_URL || "http://localhost:5000").replace(/\/+$/, "");
+const NFC_BACKEND_URL = (process.env.NFC_BACKEND_URL || "https://sabill-volume.up.railway.app").replace(/\/+$/, "");
 const SCAN_ENDPOINT = `${NFC_BACKEND_URL}/api/nfc/scan`;
 const DEBOUNCE_MS = parseInt(process.env.SCAN_DEBOUNCE_MS || "3000", 10);
 
