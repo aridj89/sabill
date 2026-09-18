@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3"]
+
+[phases.install]
+cmds = ["cd sabil-s-school-main && npm install"]
+
+[phases.build]
+cmds = ["cd sabil-s-school-main && npm run build"]
+
+[start]
+cmd = "cd sabil-s-school-main && node server/index.js"
