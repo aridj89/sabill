@@ -182,21 +182,20 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
   const price = enrollment ? (enrollment.monthlyPrice || 0) : 0;
 
   // 1. Calculate Previous Debt (carried over to this year)
-  let previousDebt = 0;
+  let previousDebtTotal = 0;
   const carryOvers = (data.debtCarryOvers || []).filter(c => c.studentId === studentId && (!yearId || !c.toYearId || c.toYearId === yearId || c.toYearId === "manual"));
-  carryOvers.forEach(c => previousDebt += (Number(c.amount) || 0));
+  carryOvers.forEach(c => previousDebtTotal += (Number(c.amount) || 0));
 
   // 2. Calculate Current Year Expected Fees
-  let currentFees = 0;
+  let currentFeesExpected = 0;
   const sg = (data.groups || []).find(s => s.id === groupId);
   const enrollmentFee = data.settings?.enrollmentFee || 500;
 
   if (!st.enrollmentPaid) {
-    currentFees += enrollmentFee;
+    currentFeesExpected += enrollmentFee;
   }
 
   // Calculate fees from sessions in this year
-  // For safety, only consider sessions that belong to the active year if sg is active in this year
   if (sg) {
     const doneSessions = (data.sessions || []).filter(s => 
       (s.groupId === sg.id || s.groupId === sg.id) && 
@@ -204,54 +203,56 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
       (!yearId || s.academicYearId === yearId || !s.academicYearId)
     ).length;
     const cycles = Math.max(1, Math.floor(doneSessions / (sg.sessionsPerCycle || 4)));
-    currentFees += (cycles * price);
+    currentFeesExpected += (cycles * price);
   }
 
-  // 3. Calculate Total Paid in this Year
-  let totalPaid = 0;
-  const stPayments = (data.payments || []).filter(p => 
-    p.studentId === studentId && 
-    (!yearId || p.academicYearId === yearId || !p.academicYearId)
-  );
+  // 3. Calculate Payments
+  let currentFeesPaid = 0;
+  let previousDebtPaid = 0;
+
+  // Fetch all payments for this student
+  const stPayments = (data.payments || []).filter(p => p.studentId === studentId);
   
   stPayments.forEach(p => {
     const expected = p.expectedAmount || p.amount || price;
     const paid = (p.paid === true || p.status === "paid") ? expected : (p.paidAmount || 0);
-    totalPaid += paid;
+    
+    if (p.type === "debt") {
+      // This is a payment specifically towards a past debt
+      previousDebtPaid += paid;
+    } else if (!yearId || p.academicYearId === yearId || !p.academicYearId) {
+      // Normal current year fee payment
+      currentFeesPaid += paid;
+    }
   });
 
   if (st.enrollmentPaid) {
-    // If enrollment is paid, we assume it's part of the total paid logic or handled separately.
-    // Wait, if enrollment is paid, it means they paid 500. So we add 500 to total paid, and 500 to currentFees expected, so it balances out?
-    // Let's add it to both so the numbers align perfectly.
-    currentFees += enrollmentFee;
-    totalPaid += enrollmentFee;
+    currentFeesExpected += enrollmentFee;
+    currentFeesPaid += enrollmentFee;
   }
 
-  // 4. Waterfall Allocation
-  let allocatedPaid = totalPaid;
-  
-  let previousDebtRemaining = previousDebt;
-  if (allocatedPaid >= previousDebtRemaining) {
-    allocatedPaid -= previousDebtRemaining;
-    previousDebtRemaining = 0;
-  } else {
-    previousDebtRemaining -= allocatedPaid;
-    allocatedPaid = 0;
-  }
+  // 4. Separate Balances (No Waterfall Allocation)
+  let previousDebtRemaining = previousDebtTotal - previousDebtPaid;
+  if (previousDebtRemaining < 0) previousDebtRemaining = 0;
 
-  let currentFeesRemaining = currentFees - allocatedPaid;
+  let currentFeesRemaining = currentFeesExpected - currentFeesPaid;
   if (currentFeesRemaining < 0) currentFeesRemaining = 0;
 
   const totalUnpaid = previousDebtRemaining + currentFeesRemaining;
 
   return {
-    previousDebt,
-    currentFees,
-    totalExpected: previousDebt + currentFees,
-    totalPaid,
+    previousDebt: previousDebtTotal, // Kept for backward compatibility
+    previousDebtTotal,
+    previousDebtPaid,
     previousDebtRemaining,
+
+    currentFees: currentFeesExpected, // Kept for backward compatibility
+    currentFeesExpected,
+    currentFeesPaid,
     currentFeesRemaining,
+
+    totalExpected: previousDebtTotal + currentFeesExpected,
+    totalPaid: previousDebtPaid + currentFeesPaid,
     totalUnpaid,
     isSettled: totalUnpaid === 0,
     enrollmentPaid: !!st.enrollmentPaid,

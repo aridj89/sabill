@@ -111,9 +111,12 @@ function MiniBarChart({ data: chartData, lang }) {
 }
 
 /* ─── Payment edit modal ────────────────────────────────────── */
-function PaymentEditModal({ student, group, payment, selectedMonth, onClose, onSave }) {
+function PaymentEditModal({ student, group, payment, selectedMonth, onClose, onSave, data, activeYearId }) {
   const { lang } = useLanguage();
+  const fin = getStudentFinancialSummary(data, student.id, activeYearId);
   const expectedAmount = student.monthlyPrice || student.montant || 0;
+  
+  const [paymentType, setPaymentType] = useState(payment?.type === "debt" ? "debt" : "normal");
 
   const [status, setStatus] = useState(payment?.status || "unpaid");
   const [paidAmount, setPaidAmount] = useState(payment?.paidAmount ?? (payment?.status === "paid" ? expectedAmount : 0));
@@ -126,9 +129,10 @@ function PaymentEditModal({ student, group, payment, selectedMonth, onClose, onS
       studentId: student.id,
       groupId: group.id,
       month: selectedMonth,
-      expectedAmount,
+      expectedAmount: paymentType === "debt" ? fin.previousDebtRemaining : expectedAmount,
       paidAmount: finalPaid,
       status,
+      type: paymentType,
       paidDate: status !== "unpaid" ? paidDate : null,
     });
   };
@@ -152,10 +156,49 @@ function PaymentEditModal({ student, group, payment, selectedMonth, onClose, onS
       onClose={onClose}
     >
       <div style={{ display: "grid", gap: 16 }}>
-        {/* Month info */}
+        {/* Payment Type */}
+        <div>
+          <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", marginBottom: 8 }}>
+            {lang === "ar" ? "نوع الدفع" : "Type de paiement"}
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => { setPaymentType("normal"); setPaidAmount(expectedAmount); setStatus("paid"); }}
+              style={{
+                flex: 1, padding: "8px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                border: `1.5px solid ${paymentType === "normal" ? "#818cf8" : "rgba(255,255,255,0.15)"}`,
+                background: paymentType === "normal" ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.04)",
+                color: paymentType === "normal" ? "#818cf8" : "rgba(255,255,255,0.5)", cursor: "pointer"
+              }}
+            >
+              {lang === "ar" ? "دفع هذه السنة" : "Paiement cette année"}
+            </button>
+            <button
+              onClick={() => { setPaymentType("debt"); setPaidAmount(fin.previousDebtRemaining); setStatus("paid"); }}
+              style={{
+                flex: 1, padding: "8px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                border: `1.5px solid ${paymentType === "debt" ? "#f87171" : "rgba(255,255,255,0.15)"}`,
+                background: paymentType === "debt" ? "rgba(248,113,113,0.2)" : "rgba(255,255,255,0.04)",
+                color: paymentType === "debt" ? "#f87171" : "rgba(255,255,255,0.5)", cursor: "pointer"
+              }}
+            >
+              {lang === "ar" ? "تسديد ديون" : "Paiement dettes"}
+            </button>
+          </div>
+        </div>
+
+        {/* Info */}
         <div style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 14px" }}>
-          <div style={{ fontSize: 12, color: C.inkSoft }}>{lang === "ar" ? "الشهر" : "Mois"}: <strong style={{ color: C.ink }}>{fmtMonth(selectedMonth, lang)}</strong></div>
-          <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 4 }}>{lang === "ar" ? "السعر الشهري" : "Mensualité"}: <strong style={{ color: C.accent }}>{DA(expectedAmount)}</strong></div>
+          {paymentType === "normal" ? (
+            <>
+              <div style={{ fontSize: 12, color: C.inkSoft }}>{lang === "ar" ? "الشهر" : "Mois"}: <strong style={{ color: C.ink }}>{fmtMonth(selectedMonth, lang)}</strong></div>
+              <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 4 }}>{lang === "ar" ? "السعر الشهري" : "Mensualité"}: <strong style={{ color: C.accent }}>{DA(expectedAmount)}</strong></div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: C.inkSoft }}>{lang === "ar" ? "الديون السابقة" : "Dettes précédentes"}: <strong style={{ color: "#f87171" }}>{DA(fin.previousDebtRemaining)}</strong></div>
+            </>
+          )}
         </div>
 
         {/* Status selector */}
@@ -196,12 +239,12 @@ function PaymentEditModal({ student, group, payment, selectedMonth, onClose, onS
               type="number"
               value={paidAmount}
               min={0}
-              max={expectedAmount}
+              max={paymentType === "debt" ? fin.previousDebtRemaining : expectedAmount}
               onChange={e => setPaidAmount(e.target.value)}
               style={inputStyle}
             />
             <div style={{ fontSize: 11.5, color: C.accent, marginTop: 6, fontWeight: 600 }}>
-              {lang === "ar" ? "المتبقي" : "Reste"}: {DA(expectedAmount - Number(paidAmount))}
+              {lang === "ar" ? "المتبقي" : "Reste"}: {DA((paymentType === "debt" ? fin.previousDebtRemaining : expectedAmount) - Number(paidAmount))}
             </div>
           </div>
         )}
@@ -264,12 +307,15 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
     let totalStudents = 0;
     let doneSessions = 0;
     let extraIncome = 0;
-    let totalDebtUnpaid = 0;
+    let totalDebtExpected = 0;
+    let totalDebtPaid = 0;
 
     data.students.forEach(st => {
       const fin = getStudentFinancialSummary(data, st.id, activeYearId);
-      if (fin.totalUnpaid > 0) {
-        totalDebtUnpaid += fin.totalUnpaid;
+      if (fin.previousDebtTotal > 0) {
+        totalDebtExpected += fin.previousDebtTotal;
+        totalDebtPaid += fin.previousDebtPaid;
+        totalDebtUnpaid += fin.previousDebtRemaining;
       }
     });
 
@@ -321,9 +367,9 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
       }
     });
 
-    // Debt Payments and other generic payments in this month
+    // Debt Payments and other generic payments in this month (already tracked in totalDebtPaid globally, but for monthly charting)
     let debtIncome = 0;
-    (data.payments || []).filter(p => p.month === selectedMonth && p.type === "debt").forEach(p => {
+    (data.payments || []).filter(p => p.month === selectedMonth && p.type === "debt" && (p.academicYearId === activeYearId || !p.academicYearId)).forEach(p => {
       debtIncome += (p.paidAmount || p.amount || 0);
     });
 
@@ -333,10 +379,10 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
       expectedIncome, paidIncome, unpaidIncome,
       paidStudentsCount, unpaidStudentsCount, partialStudentsCount,
       totalStudents, doneSessions, extraIncome, debtIncome,
-      totalCollected: paidIncome + extraIncome + debtIncome,
+      totalCollected: paidIncome + extraIncome,
       totalExpected: expectedIncome + extraIncome,
       collectionRate,
-      totalDebtUnpaid,
+      totalDebtExpected, totalDebtPaid, totalDebtUnpaid,
       totalGroups: data.groups.length,
     };
   }, [data, selectedMonth, filterGroup, activeYearId]);
@@ -491,14 +537,31 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
         </div>
       </div>
 
-      {/* ── KPI Cards ─────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14, marginBottom: 14 }}>
-        <StatCard icon={Landmark} label={lang === "ar" ? "إجمالي المحصل" : "Total encaissé"} value={DA(stats.totalCollected)}
+      {/* ── KPI Cards: PAIEMENT CETTE ANNÉE ───────────────────── */}
+      <h3 className="f-display" style={{ margin: "0 0 16px", fontSize: 18, color: C.ink, fontWeight: 700 }}>
+        {lang === "ar" ? "أ. مدفوعات هذه السنة" : "A. Paiements cette année"}
+      </h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14, marginBottom: 28 }}>
+        <StatCard icon={Landmark} label={lang === "ar" ? "إجمالي المحصل (سنة حالية)" : "Encaissé (année)"} value={DA(stats.totalCollected)}
           sub={`${stats.collectionRate}%`} color="#4ade80" bg="rgba(74,222,128,0.18)" border="rgba(74,222,128,0.35)" />
-        <StatCard icon={TrendingUp} label={lang === "ar" ? "الدخل المتوقع" : "Revenus attendus"} value={DA(stats.totalExpected)}
+        <StatCard icon={TrendingUp} label={lang === "ar" ? "الدخل المتوقع (سنة حالية)" : "Attendu (année)"} value={DA(stats.totalExpected)}
           color="#818cf8" bg="rgba(99,102,241,0.2)" border="rgba(99,102,241,0.35)" />
-        <StatCard icon={DollarSign} label={lang === "ar" ? "تسديدات الديون" : "Paiements dettes"} value={DA(stats.debtIncome)}
+        <StatCard icon={CheckCircle2} label={lang === "ar" ? "تلاميذ دفعوا" : "Élèves payés"} value={stats.paidStudentsCount}
+          color="#4ade80" bg="rgba(74,222,128,0.1)" border="rgba(74,222,128,0.25)" />
+        <StatCard icon={Users} label={lang === "ar" ? "إجمالي التلاميذ (انقر للعرض)" : "Total élèves (cliquer)"} value={stats.totalStudents}
+          color="#818cf8" bg="rgba(99,102,241,0.12)" border="rgba(99,102,241,0.28)"
+          onClick={() => onNav && onNav({ screen: "parents" })} />
+      </div>
+
+      {/* ── KPI Cards: PAIEMENT DETTES ──────────────────────── */}
+      <h3 className="f-display" style={{ margin: "0 0 16px", fontSize: 18, color: C.ink, fontWeight: 700 }}>
+        {lang === "ar" ? "ب. مدفوعات الديون السابقة" : "B. Paiements dettes précédentes"}
+      </h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14, marginBottom: 28 }}>
+        <StatCard icon={DollarSign} label={lang === "ar" ? "ديون سابقة مسددة" : "Dettes encaissées"} value={DA(stats.totalDebtPaid)}
           color={C.accent} bg="rgba(226,150,58,0.15)" border="rgba(226,150,58,0.35)" />
+        <StatCard icon={AlertCircle} label={lang === "ar" ? "إجمالي الديون (تاريخي)" : "Total Dettes"} value={DA(stats.totalDebtExpected)}
+          color="#f87171" bg="rgba(248,113,113,0.12)" border="rgba(248,113,113,0.28)" />
         <StatCard icon={AlertCircle} label={lang === "ar" ? "الديون غير المسددة" : "Dettes Impayées"} value={DA(stats.totalDebtUnpaid)}
           color="#f87171" bg="rgba(248,113,113,0.18)" border="rgba(248,113,113,0.35)"
           onClick={() => onNav && onNav({ screen: "debts" })} />
@@ -668,6 +731,9 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
                 const remaining = price - paidAmt;
                 const pill = statusPill(pmt, price);
                 const cat = CAT_BY_ID[sg.categoryId];
+                
+                const fin = getStudentFinancialSummary(data, st.id, activeYearId);
+                const hasOldDebt = fin.previousDebtRemaining > 0;
 
                 return (
                   <tr
@@ -684,6 +750,11 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>{st.prenom} {st.nom}</div>
+                          {hasOldDebt && (
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", marginTop: 2, background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)", padding: "2px 6px", borderRadius: 4, display: "inline-block" }}>
+                              {lang === "ar" ? `عليه ديون: ${DA(fin.previousDebtRemaining)}` : `Dette: ${DA(fin.previousDebtRemaining)}`}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -747,6 +818,8 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
           selectedMonth={selectedMonth}
           onClose={() => setEditPayment(null)}
           onSave={handleSavePayment}
+          data={data}
+          activeYearId={activeYearId}
         />
       )}
     </div>
