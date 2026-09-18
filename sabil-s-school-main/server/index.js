@@ -185,6 +185,15 @@ app.post("/api/reset", authenticateToken, requireRole("admin"), (req, res) => {
   }
 });
 
+// ─── Serve Vite Frontend in Production ─────────────────────────
+const distPath = path.join(__dirname, "..", "dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get(/^(?!\/api).+/, (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
 // Global Error Handler Middleware
 app.use(errorHandler);
 
