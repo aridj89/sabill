@@ -1,4 +1,4 @@
-import { uid } from "../theme/tokens";
+import { uid } from "../theme/tokens.js";
 
 /**
  * Moteur de notifications automatique.
@@ -27,24 +27,41 @@ export function notifyExtraSessionAdded(data, groupId, extraSession, lang = "ar"
   const students = (data.students || []).filter(s => s.groupId === groupId);
   if (students.length === 0) return data.userNotifications || [];
 
+  const sg = (data.groups || []).find(g => g.id === groupId);
+  const groupName = sg ? sg.nom : "";
   const dateFormatted = extraSession.date;
-  const timeFormatted = extraSession.time;
-  const noteText = extraSession.note ? extraSession.note.trim() : "";
+  const timeFormatted = extraSession.time || extraSession.startTime || "";
+  const noteText = extraSession.note ? extraSession.note.trim() : (extraSession.title || "");
+  const priceText = extraSession.price > 0 
+    ? (lang === "ar" ? ` · السعر: ${extraSession.price} دج` : ` · Prix : ${extraSession.price} DA`) 
+    : "";
 
-  const title = lang === "ar" ? "حصة إضافية جديدة 📅" : "Nouvelle séance supplémentaire 📅";
+  const title = lang === "ar" ? "🔵 حصة إضافية جديدة 📅" : "🔵 Nouvelle séance supplémentaire 📅";
   const message = lang === "ar"
-    ? `تمت برمجة حصة إضافية جديدة يوم ${dateFormatted} على الساعة ${timeFormatted}.${noteText ? ` الموضوع: ${noteText}` : ""}`
-    : `Une séance supplémentaire a été programmée le ${dateFormatted} à ${timeFormatted}.${noteText ? ` Sujet : ${noteText}` : ""}`;
+    ? `تمت برمجة حصة إضافية للفوج ${groupName} يوم ${dateFormatted} على الساعة ${timeFormatted}.${noteText ? ` الموضوع: ${noteText}` : ""}${priceText}`
+    : `Une séance supplémentaire pour le groupe ${groupName} a été programmée le ${dateFormatted} à ${timeFormatted}.${noteText ? ` Sujet : ${noteText}` : ""}${priceText}`;
 
-  const newNotifs = students.map(st => createNotification(
+  // Student notifications
+  const studentNotifs = students.map(st => createNotification(
     st.id,
     "session",
     title,
     message,
-    { screen: "calendar", groupId, date: extraSession.date, time: extraSession.time }
+    { screen: "calendar", groupId, date: extraSession.date, time: extraSession.time, isExtra: true }
   ));
 
-  return [...(data.userNotifications || []), ...newNotifs];
+  // Linked parent notifications (gracefully skipped if no parent linked)
+  const studentIds = new Set(students.map(s => s.id));
+  const linkedParents = (data.parents || []).filter(p => p.studentId && studentIds.has(p.studentId));
+  const parentNotifs = linkedParents.map(p => createNotification(
+    p.id,
+    "session",
+    title,
+    message,
+    { screen: "calendar", groupId, date: extraSession.date, time: extraSession.time, isExtra: true }
+  ));
+
+  return [...(data.userNotifications || []), ...studentNotifs, ...parentNotifs];
 }
 
 /**

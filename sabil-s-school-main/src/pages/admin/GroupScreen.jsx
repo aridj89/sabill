@@ -226,9 +226,11 @@ function PayEditModal({ student, subgroup, payment, month, onClose, onSave }) {
       studentId: student.id,
       subgroupId: subgroup.id,
       month,
+      amount: price,
       expectedAmount: price,
       paidAmount: finalPaid,
       status,
+      paid: status === "paid",
       paidDate: status !== "unpaid" ? paidDate : null,
     });
   };
@@ -420,31 +422,101 @@ function PaymentsTab({ subgroup, students, data, setData }) {
 import NfcAttendanceScreen from "./NfcAttendanceScreen";
 
 /* ── Presences tab ───────────────────────────────────────────── */
-function PresencesTab({ subgroup, students, data, setData, toastFn, onNav }) {
-  const { lang } = useLanguage();
+function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, activeYearId: propYearId }) {
+  const { lang, t } = useLanguage();
   const currentMonthStr = new Date().toISOString().slice(0, 7);
   const todayStr = new Date().toISOString().slice(0, 10);
+  const activeYearId = propYearId || data.activeYearId;
+
+  const [selectedYearId, setSelectedYearId] = useState(activeYearId || (data.academicYears?.[0]?.id || ""));
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
 
-  const toggleAttendance = (studentId, existingAtt, idx) => {
+  const academicYears = data.academicYears || [];
+
+  // Filter sessions for selected year and month
+  const normalSessions = (data.sessions || [])
+    .filter(s => s.groupId === subgroup.id && (!selectedYearId || s.academicYearId === selectedYearId || !s.academicYearId) && s.date && s.date.startsWith(selectedMonth))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const extraSessions = (data.extraSessions || [])
+    .filter(s => (s.groupId === subgroup.id || s.subgroupId === subgroup.id) && (!selectedYearId || s.academicYearId === selectedYearId || !s.academicYearId) && s.date && s.date.startsWith(selectedMonth))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const toggleAttendance = (studentId, sess, existingAtt, isExtra = false) => {
     setData(d => {
-      let newAtt;
-      if (existingAtt) {
-        // Remove existing attendance
-        newAtt = d.attendances.filter(a => a.id !== existingAtt.id);
+      let newNotifs = d.userNotifications || [];
+      const sessionDate = sess ? sess.date : (todayStr.startsWith(selectedMonth) ? todayStr : `${selectedMonth}-01`);
+      const sessionTime = sess ? (sess.time || "10:00") : "10:00";
+      const sessionId = sess ? sess.id : null;
+
+      const existing = (d.attendances || []).find(a => 
+        a.studentId === studentId && 
+        (sessionId ? a.sessionId === sessionId : (a.groupId === subgroup.id && a.date === sessionDate))
+      );
+
+      let updatedAttArray;
+      if (existing) {
+        const nextPresent = !existing.present;
+        const updatedRecord = {
+          ...existing,
+          present: nextPresent,
+          status: nextPresent ? "PRÉSENT" : "ABSENT",
+          originalMethod: existing.originalMethod || existing.method || "NFC",
+          lastModifiedMethod: "MANUEL",
+          lastModifiedAt: new Date().toISOString()
+        };
+        updatedAttArray = (d.attendances || []).map(a => a.id === existing.id ? updatedRecord : a);
+
+        // Notify parent only when transitioning to ABSENT
+        if (!nextPresent && existing.present) {
+          newNotifs = notifyPresenceChange(d, studentId, sessionDate, false);
+        }
       } else {
-        // Add new attendance
-        // Ensure date falls within selected month (use today if in current month, else 1st of month)
-        const dateToUse = todayStr.startsWith(selectedMonth) ? todayStr : `${selectedMonth}-01`;
-        newAtt = [...(d.attendances || []), { id: uid(), studentId, date: dateToUse, present: true }];
+        const newRecord = {
+          id: uid(),
+          studentId,
+          groupId: subgroup.id,
+          academicYearId: selectedYearId || d.activeYearId,
+          sessionId,
+          date: sessionDate,
+          time: sessionTime,
+          method: "MANUEL",
+          originalMethod: "MANUEL",
+          status: "PRÉSENT",
+          present: true,
+          isExtraSession: isExtra
+        };
+        updatedAttArray = [...(d.attendances || []), newRecord];
       }
-      return { ...d, attendances: newAtt };
+
+      return {
+        ...d,
+        attendances: updatedAttArray,
+        userNotifications: newNotifs
+      };
     });
   };
 
+  // Overall statistics calculations
+  const totalNormalSessionsCount = normalSessions.length;
+  let totalNormalPresentCount = 0;
+  let totalNormalAbsentCount = 0;
+
+  students.forEach(st => {
+    normalSessions.forEach(sess => {
+      const att = (data.attendances || []).find(a => a.studentId === st.id && (a.sessionId === sess.id || (a.groupId === subgroup.id && a.date === sess.date)));
+      if (att && att.present) totalNormalPresentCount++;
+      else if (att && !att.present) totalNormalAbsentCount++;
+    });
+  });
+
+  const totalPossibleNormal = totalNormalSessionsCount * (students.length || 1);
+  const avgNormalRate = totalPossibleNormal > 0 ? Math.round((totalNormalPresentCount / totalPossibleNormal) * 100) : 0;
+
   return (
     <div>
-      <div style={{ marginBottom: 30 }}>
+      {/* ── Protected NFC Scanner ── */}
+      <div style={{ marginBottom: 24 }}>
         <NfcAttendanceScreen 
           data={data} 
           setData={setData} 
@@ -453,83 +525,196 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav }) {
           onNav={onNav} 
         />
       </div>
-      
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ fontSize: 13, color: C.inkSoft, fontWeight: 700 }}>
-          {lang === "ar" ? "سجل الحضور - 4 حصص شهرياً" : "Registre de présence (4 séances/mois)"}
+
+      {/* ── Controls Header: Academic Year & Month Selectors ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 12, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 18px" }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.ink, display: "flex", alignItems: "center", gap: 8 }}>
+            <Calendar size={18} color={C.accent} />
+            {lang === "ar" ? "سجل الحضور الشهري" : "Registre de présence mensuel"}
+          </div>
+          <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
+            {lang === "ar" ? "عرض وتقييم الحضور حسب الشهر والعام الدراسي" : "Consultez les sélections et les présences par mois"}
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "5px 10px" }}>
-          <Calendar size={14} color={C.accent} />
-          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
-            style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", colorScheme: "dark" }} />
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {/* Academic Year Selector */}
+          <select
+            value={selectedYearId}
+            onChange={e => setSelectedYearId(e.target.value)}
+            style={{
+              background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: "7px 12px", color: C.ink, fontSize: 13, fontWeight: 700, outline: "none"
+            }}
+          >
+            {academicYears.map(y => (
+              <option key={y.id} value={y.id} style={{ background: "#1e1e2d", color: "#fff" }}>
+                {y.name || y.annee || y.id}
+              </option>
+            ))}
+          </select>
+
+          {/* Month Selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "6px 12px" }}>
+            <input 
+              type="month" 
+              value={selectedMonth} 
+              onChange={e => setSelectedMonth(e.target.value)}
+              style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, fontWeight: 700, outline: "none", colorScheme: "dark" }} 
+            />
+          </div>
         </div>
       </div>
 
-      <div style={{ overflowX: "auto", borderRadius: 14, border: `1px solid ${C.border}` }}>
+      {/* ── Summary Stats Badges (Separated Normal vs Extra) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+        {/* Normal Sessions Stats */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.inkSoft, textTransform: "uppercase" }}>
+            {lang === "ar" ? "حصص عادية" : "Séances normales"}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 2 }}>{totalNormalSessionsCount}</div>
+        </div>
+
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#4ade80", textTransform: "uppercase" }}>
+            {lang === "ar" ? "حضور عادي" : "Présences normales"}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#4ade80", marginTop: 2 }}>{totalNormalPresentCount}</div>
+        </div>
+
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#f87171", textTransform: "uppercase" }}>
+            {lang === "ar" ? "غياب عادي" : "Absences normales"}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#f87171", marginTop: 2 }}>{totalNormalAbsentCount}</div>
+        </div>
+
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.accent, textTransform: "uppercase" }}>
+            {lang === "ar" ? "نسبة الحضور العادي" : "Taux normal"}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.accent, marginTop: 2 }}>{avgNormalRate}%</div>
+        </div>
+
+        {/* Extra Sessions Stats */}
+        <div style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 14, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#818cf8", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 4 }}>
+            <span>🔵</span> {lang === "ar" ? "حصص إضافية" : "Séances suppl."}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#818cf8", marginTop: 2 }}>{extraSessions.length}</div>
+        </div>
+      </div>
+
+      {/* ── Table Grid (Desktop) / Cards (Mobile Responsive) ── */}
+      <div style={{ overflowX: "auto", borderRadius: 16, border: `1px solid ${C.border}`, background: C.surface }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr>
-              <th style={{ textAlign: "left", padding: "10px 12px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
+            <tr style={{ background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${C.border}` }}>
+              <th style={{ textAlign: "left", padding: "12px 16px", color: C.inkSoft, fontWeight: 800, fontSize: 12, textTransform: "uppercase" }}>
                 {lang === "ar" ? "التلميذ" : "Élève"}
               </th>
-              {[1, 2, 3, 4].map(num => (
-                <th key={num} style={{ textAlign: "center", padding: "8px 6px", color: C.inkSoft, fontWeight: 600, fontSize: 11, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", width: 70 }}>
-                  {lang === "ar" ? `حصة ${num}` : `S${num}`}
+              {normalSessions.map((sess, idx) => (
+                <th key={sess.id} style={{ textAlign: "center", padding: "10px 8px", color: C.inkSoft, fontWeight: 700, fontSize: 11, borderLeft: `1px solid ${C.border}`, minWidth: 80 }}>
+                  <div style={{ color: C.ink, fontWeight: 800 }}>S{idx + 1}</div>
+                  <div style={{ fontSize: 10, color: C.inkSoft }}>{sess.date.slice(8, 10)}/{sess.date.slice(5, 7)}</div>
                 </th>
               ))}
-              <th style={{ textAlign: "center", padding: "8px 10px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
-                %
+              {extraSessions.map((es, idx) => (
+                <th key={es.id} style={{ textAlign: "center", padding: "10px 8px", color: "#818cf8", fontWeight: 700, fontSize: 11, borderLeft: `1px solid ${C.border}`, background: "rgba(99,102,241,0.08)", minWidth: 90 }}>
+                  <div>🔵 ES{idx + 1}</div>
+                  <div style={{ fontSize: 10, color: "#a5b4fc" }}>{es.date.slice(8, 10)}/{es.date.slice(5, 7)}</div>
+                </th>
+              ))}
+              <th style={{ textAlign: "center", padding: "12px 14px", color: C.inkSoft, fontWeight: 800, fontSize: 12, borderLeft: `1px solid ${C.border}`, textTransform: "uppercase" }}>
+                {lang === "ar" ? "نسبة الحضور العادي" : "Taux Normal"}
               </th>
             </tr>
           </thead>
           <tbody>
             {students.map(st => {
-              // Get attendances for this student in the selected month
-              const stAttendances = (data.attendances || [])
-                .filter(a => a.studentId === st.id && a.date.startsWith(selectedMonth))
-                .sort((a, b) => a.date.localeCompare(b.date));
-              
-              const presentCount = stAttendances.filter(a => a.present).length;
+              // Calculate per student stats for normal sessions
+              let stNormalPresent = 0;
+              normalSessions.forEach(sess => {
+                const att = (data.attendances || []).find(a => a.studentId === st.id && (a.sessionId === sess.id || (a.groupId === subgroup.id && a.date === sess.date)));
+                if (att && att.present) stNormalPresent++;
+              });
+
+              const stRate = totalNormalSessionsCount > 0 ? Math.round((stNormalPresent / totalNormalSessionsCount) * 100) : 0;
 
               return (
-                <tr key={st.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.06)`, transition: "background 0.12s" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "10px 12px", fontWeight: 600, color: C.ink, whiteSpace: "nowrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, color: C.accent, flexShrink: 0 }}>
+                <tr key={st.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.06)`, transition: "background 0.15s" }}>
+                  <td style={{ padding: "12px 16px", fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 10, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, color: C.accent, flexShrink: 0 }}>
                         {st.prenom?.[0]}{st.nom?.[0]}
                       </div>
-                      <div>{st.prenom} {st.nom}</div>
+                      <div>
+                        <div style={{ color: C.ink, fontSize: 14, fontWeight: 700 }}>{st.prenom} {st.nom}</div>
+                        {st.nfcCardId && <div style={{ fontSize: 10, color: "#818cf8", fontWeight: 700 }}>NFC: {st.nfcCardId}</div>}
+                      </div>
                     </div>
                   </td>
-                  {[0, 1, 2, 3].map(idx => {
-                    const att = stAttendances[idx]; // Chronological mapping
+
+                  {/* Normal Sessions Columns */}
+                  {normalSessions.map(sess => {
+                    const att = (data.attendances || []).find(a => a.studentId === st.id && (a.sessionId === sess.id || (a.groupId === subgroup.id && a.date === sess.date)));
                     const isPresent = att ? att.present : false;
+                    const isNfc = att?.originalMethod === "NFC" || att?.method === "NFC";
+
                     return (
-                      <td key={idx} style={{ textAlign: "center", padding: "8px 6px" }}>
-                        <div style={{ display: "flex", justifyContent: "center" }}>
+                      <td key={sess.id} style={{ textAlign: "center", padding: "10px 8px", borderLeft: `1px solid ${C.border}` }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                           <input 
                             type="checkbox" 
-                            className="theme-checkbox" 
                             checked={isPresent} 
-                            onChange={() => toggleAttendance(st.id, att, idx)} 
-                            style={{ width: 20, height: 20, cursor: "pointer" }}
+                            onChange={() => toggleAttendance(st.id, sess, att, false)} 
+                            style={{ width: 20, height: 20, cursor: "pointer", accentColor: "#000000" }}
                           />
+                          <span style={{ fontSize: 10, fontWeight: 700, color: isPresent ? (isNfc ? "#818cf8" : "#4ade80") : "#f87171" }}>
+                            {isPresent ? (isNfc ? "✓ NFC" : "✓ Man.") : "✕ Abs"}
+                          </span>
                         </div>
                       </td>
                     );
                   })}
-                  <td style={{ textAlign: "center", padding: "8px 10px", fontWeight: 700, color: presentCount >= 3 ? "#4ade80" : (presentCount > 0 ? "#fbbf24" : "#f87171"), fontSize: 13 }}>
-                    {Math.round((presentCount / 4) * 100)}%
+
+                  {/* Extra Sessions Columns */}
+                  {extraSessions.map(es => {
+                    const att = (data.attendances || []).find(a => a.studentId === st.id && (a.sessionId === es.id || (a.groupId === subgroup.id && a.date === es.date)));
+                    const isPresent = att ? att.present : false;
+                    const isNfc = att?.originalMethod === "NFC" || att?.method === "NFC";
+
+                    return (
+                      <td key={es.id} style={{ textAlign: "center", padding: "10px 8px", borderLeft: `1px solid ${C.border}`, background: "rgba(99,102,241,0.04)" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isPresent} 
+                            onChange={() => toggleAttendance(st.id, es, att, true)} 
+                            style={{ width: 20, height: 20, cursor: "pointer", accentColor: "#000000" }}
+                          />
+                          <span style={{ fontSize: 10, fontWeight: 700, color: isPresent ? (isNfc ? "#818cf8" : "#4ade80") : "#f87171" }}>
+                            {isPresent ? (isNfc ? "✓ NFC" : "✓ Man.") : "✕ Abs"}
+                          </span>
+                        </div>
+                      </td>
+                    );
+                  })}
+
+                  {/* Normal Attendance Rate % */}
+                  <td style={{ textAlign: "center", padding: "12px 14px", borderLeft: `1px solid ${C.border}`, fontWeight: 800, color: stRate >= 75 ? "#4ade80" : (stRate > 0 ? "#fbbf24" : "#f87171"), fontSize: 14 }}>
+                    {stRate}%
                   </td>
                 </tr>
               );
             })}
+
             {students.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", color: C.inkSoft, padding: "30px 0" }}>
-                  {lang === "ar" ? "لا يوجد تلاميذ" : "Aucun élève"}
+                <td colSpan={2 + normalSessions.length + extraSessions.length} style={{ textAlign: "center", color: C.inkSoft, padding: "36px 0", fontSize: 14 }}>
+                  {lang === "ar" ? "لا يوجد تلاميذ في هذا الفوج" : "Aucun élève dans ce groupe"}
                 </td>
               </tr>
             )}

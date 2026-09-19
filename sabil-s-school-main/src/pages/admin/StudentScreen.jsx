@@ -59,7 +59,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
 
   const togglePaid = (pId) => {
     const targetPmt = payments.find(p => p.id === pId);
-    const isNowPaid = targetPmt ? !targetPmt.paid : true;
+    const isNowPaid = targetPmt ? !(targetPmt.paid === true || targetPmt.status === "paid") : true;
 
     setData(d => {
       let notifs = d.userNotifications || [];
@@ -75,6 +75,9 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
         payments: d.payments.map(p => p.id === pId ? {
           ...p,
           paid: isNowPaid,
+          status: isNowPaid ? "paid" : "unpaid",
+          paidAmount: isNowPaid ? (p.expectedAmount || p.amount || studentPrice) : 0,
+          expectedAmount: p.expectedAmount || p.amount || studentPrice,
           paidDate: isNowPaid ? new Date().toISOString().slice(0, 10) : null
         } : p),
         userNotifications: notifs,

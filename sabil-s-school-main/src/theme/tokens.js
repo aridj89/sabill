@@ -193,7 +193,9 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
   const enrollment = (data.enrollments || []).find(e => e.studentId === studentId && (e.academicYearId === yearId || !yearId));
   const isEnrolled = !!enrollment;
   const groupId = enrollment ? enrollment.groupId : null;
-  const price = enrollment ? (enrollment.monthlyPrice || 0) : 0;
+  const price = enrollment 
+    ? (enrollment.monthlyPrice ?? enrollment.courseFeeAmount ?? enrollment.agreedPrice ?? (st.monthlyPrice || st.montant || 0)) 
+    : (st.monthlyPrice || st.montant || 0);
   const sg = (data.groups || []).find(s => s.id === groupId);
 
   // 2. Previous Debt (carried over to this year)
@@ -248,21 +250,28 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
 
   // Step B: Registration Fee
   let registrationFeePaid = 0;
-  if (enrollment?.registrationFeePaid !== undefined) {
-    registrationFeePaid = Number(enrollment.registrationFeePaid) || 0;
+  if (enrollment?.registrationFeePaid !== undefined && enrollment?.registrationFeePaid !== null) {
+    registrationFeePaid = Math.max(Number(enrollment.registrationFeePaid) || 0, Math.min(unallocatedPaid, registrationFeeAmount));
   } else if (enrollment?.registrationFeeStatus === "PAYÉ" || st.enrollmentPaid) {
     registrationFeePaid = registrationFeeAmount;
   } else {
     registrationFeePaid = Math.min(unallocatedPaid, registrationFeeAmount);
-    unallocatedPaid -= registrationFeePaid;
   }
+
+  const regFeeFromPayments = Math.min(unallocatedPaid, registrationFeeAmount);
+  if (enrollment?.registrationFeeStatus !== "PAYÉ" && !st.enrollmentPaid && (enrollment?.registrationFeePaid === undefined || enrollment?.registrationFeePaid === null)) {
+    unallocatedPaid -= regFeeFromPayments;
+  }
+
   const registrationFeeRemaining = Math.max(0, registrationFeeAmount - registrationFeePaid);
   
   let registrationFeeStatus = "NON PAYÉ";
-  if (registrationFeeRemaining === 0 && registrationFeeAmount > 0) {
+  if (registrationFeePaid >= registrationFeeAmount && registrationFeeAmount > 0) {
     registrationFeeStatus = "PAYÉ";
-  } else if (registrationFeePaid > 0 && registrationFeeRemaining > 0) {
+  } else if (registrationFeePaid > 0) {
     registrationFeeStatus = "PARTIELLEMENT PAYÉ";
+  } else {
+    registrationFeeStatus = "NON PAYÉ";
   }
 
   // Step C: Current Course Fees
