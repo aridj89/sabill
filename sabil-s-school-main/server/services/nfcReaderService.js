@@ -93,17 +93,7 @@ class NfcReaderService extends EventEmitter {
       if (matches.length === 0) return null;
       return matches.find(d => d.interface === 1) || matches[0];
     } catch (err) {
-      if (!this._hasWarnedHid) {
-        console.log("ℹ [NFC Service] Lecteur USB non disponible sur ce serveur (Mode Cloud / Pas de matériel USB) :", err.message);
-        this._hasWarnedHid = true;
-      }
-      if (err.message && (err.message.includes("libusb") || err.message.includes("cannot open shared object file"))) {
-        this.disabled = true;
-        if (this.reconnectTimer) {
-          clearInterval(this.reconnectTimer);
-          this.reconnectTimer = null;
-        }
-      }
+      console.warn("Erreur lors de l'énumération HID:", err.message);
       return null;
     }
   }
@@ -112,7 +102,6 @@ class NfcReaderService extends EventEmitter {
    * Start the reader service and connect to USB device.
    */
   start() {
-    if (this.disabled) return;
     this.connect();
     // Watchdog for auto-reconnect if disconnected
     if (!this.reconnectTimer) {

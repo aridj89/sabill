@@ -1,15 +1,5 @@
-import { API_ENDPOINTS } from "../config/api";
 import { uid } from "../theme/tokens";
-
-const API_URL = API_ENDPOINTS.data;
-
-function getAuthHeaders() {
-  const token = localStorage.getItem("auth_token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
+import { getApiUrl, getAuthHeaders } from "../config/api";
 
 /* ---------------------------------------------------------------
    DEFAULT DATA  —  Base de données vierge (Clean initial state)
@@ -52,11 +42,11 @@ export function defaultData() {
 }
 
 /* ---------------------------------------------------------------
-   STORAGE & API SYNC (WITH JWT HEADER)
+   STORAGE & API SYNC (WITH DYNAMIC API & JWT HEADER)
 --------------------------------------------------------------- */
 const STORAGE_KEY = "ecole-data-v4";
 
-// Evict legacy cached test data immediately
+// Clear outdated local storage keys if present
 try {
   localStorage.removeItem("ecole-data-v3");
   localStorage.removeItem("ecole-data-v2");
@@ -66,27 +56,24 @@ try {
 
 export async function fetchCleanData() {
   try {
-    const res = await fetch(API_URL, { headers: getAuthHeaders() });
+    const res = await fetch(getApiUrl("/api/data"), { headers: getAuthHeaders() });
     if (res.ok) {
       const data = await res.json();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {}
       return data;
     }
   } catch (err) {
-    console.warn("Express backend unreachable, loading from localStorage fallback:", err);
+    console.warn("Express backend unreachable, using cached state fallback:", err);
   }
 
-  // Fallback to localStorage if API unavailable
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
 
-  const d = defaultData();
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
-  } catch {}
-  return d;
+  return defaultData();
 }
 
 export function loadDataFromStorage() {
@@ -98,28 +85,34 @@ export function loadDataFromStorage() {
 }
 
 export async function persistData(data) {
+  // Save locally as temporary offline cache
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {}
 
+  // Sync to central school.db via Express backend
   try {
-    await fetch(API_URL, {
+    const res = await fetch(getApiUrl("/api/data"), {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      console.warn("Backend failed to save data, status:", res.status);
+    }
   } catch (err) {
-    console.warn("Failed to persist data to Express backend:", err);
+    console.warn("Failed to persist data to central Express backend:", err);
   }
 }
 
 export async function resetData() {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    await fetch(API_ENDPOINTS.reset, {
+    await fetch(getApiUrl("/api/reset"), {
       method: "POST",
       headers: getAuthHeaders(),
     });
   } catch {}
   return defaultData();
 }
+

@@ -11,8 +11,9 @@ import PrimaryBtn from "../../components/ui/PrimaryBtn";
 import IconBtn from "../../components/ui/IconBtn";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
+import { getApiUrl } from "../../config/api";
 
-const API_BASE_URL = "http://localhost:5000/api/nfc";
+const API_BASE_URL = getApiUrl("/api/nfc");
 
 /* ── Web Audio Beep generator ── */
 function playTone(type = "success") {

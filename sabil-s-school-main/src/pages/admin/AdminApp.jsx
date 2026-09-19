@@ -36,7 +36,6 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const profileRef = useRef(null);
-  const notifRef = useRef(null);
 
   useEffect(() => {
     function handleClick(e) {
@@ -48,39 +47,17 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [profileOpen]);
 
-  useEffect(() => {
-    function handleClickOutsideNotif(e) {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setNotifOpen(false);
-      }
-    }
-    if (notifOpen) document.addEventListener("mousedown", handleClickOutsideNotif);
-    return () => document.removeEventListener("mousedown", handleClickOutsideNotif);
-  }, [notifOpen]);
-
   const handleNav = (navState) => {
-    if (navState.screen === "group" && (navState.levelId || navState.catId || navState.groupId)) {
-      const gType = navState.groupType || "Normal";
-      const cat = CAT_BY_ID[navState.catId] || SCHOOL_CATS.find(c => c.levels?.includes(navState.levelId)) || SCHOOL_CATS[0];
-      const resolvedCatId = navState.catId || cat?.id || "cem";
-      const resolvedLevel = navState.levelId || "";
-      const langLevelObj = resolvedCatId === "langues" ? (data.langLevels || []).find(l => l.id === resolvedLevel) : null;
-      const levelDisplayName = langLevelObj ? langLevelObj.nom : resolvedLevel;
-      
+    if (navState.screen === "group") {
       let existing = null;
       if (navState.groupId) {
         existing = (data.groups || []).find(s => s.id === navState.groupId);
-      }
-      if (!existing && resolvedLevel && resolvedCatId) {
+      } else if (navState.catId && navState.levelId) {
         existing = (data.groups || []).find(s => 
-          s.categoryId === resolvedCatId && 
-          s.levelId === resolvedLevel && 
-          (navState.groupType ? s.groupType === navState.groupType : true) &&
+          s.categoryId === navState.catId && 
+          s.levelId === navState.levelId && 
           (!activeYearId || !s.academicYearId || s.academicYearId === activeYearId)
         );
-      }
-      if (!existing && resolvedLevel) {
-        existing = (data.groups || []).find(s => s.levelId === resolvedLevel && (!navState.groupType || s.groupType === navState.groupType));
       }
 
       if (existing) {
@@ -89,37 +66,18 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
           groupId: existing.id,
           catId: existing.categoryId,
           levelId: existing.levelId,
-          groupType: existing.groupType,
-          openAddStudent: navState.openAddStudent || false
-        });
-      } else {
-        const newG = {
-          id: navState.groupId || uid(),
-          nom: levelDisplayName ? `${levelDisplayName} - ${gType}` : `${cat?.label || "Groupe"} - ${gType}`,
-          categoryId: resolvedCatId,
-          levelId: resolvedLevel,
-          groupType: gType,
-          days: [],
-          time: "10:00",
-          startDate: new Date().toISOString().slice(0, 10),
-          endDate: new Date(Date.now() + 9 * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-          sessionsPerCycle: 4,
-          academicYearId: activeYearId || null
-        };
-        const newSessions = generateSessions(newG).map(s => ({ ...s, groupId: newG.id, academicYearId: activeYearId }));
-        setData(d => ({ 
-          ...d, 
-          groups: [...(d.groups || []).filter(g => g.id !== newG.id), newG],
-          sessions: [...(d.sessions || []), ...newSessions]
-        }));
-        setNav({
-          screen: "group",
-          groupId: newG.id,
-          catId: resolvedCatId,
-          levelId: resolvedLevel,
-          groupType: gType,
+          groupType: existing.groupType || null,
           openAddStudent: Boolean(navState.openAddStudent)
         });
+      } else if (navState.catId && navState.levelId) {
+        // If group does not exist yet, navigate to structure screen for that Category + Level
+        setNav({
+          screen: "structure",
+          catId: navState.catId,
+          levelId: navState.levelId,
+        });
+      } else {
+        setNav({ screen: "groups_dashboard" });
       }
     } else {
       setNav(navState);
@@ -202,7 +160,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
             <LanguageToggle />
             
             {/* Notifications Dropdown */}
-            <div ref={notifRef} style={{ position: "relative" }}>
+            <div style={{ position: "relative" }}>
               <IconBtn icon={Bell} onClick={() => setNotifOpen(!notifOpen)} title={lang === "ar" ? "الإشعارات" : "Notifications"} badge={unreadNotifs} />
               {notifOpen && (
                 <div style={{

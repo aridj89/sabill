@@ -1,10 +1,11 @@
-import { API_ENDPOINTS } from "../config/api";
 import React, { useState } from "react";
 import { Eye, EyeOff, User, Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import LanguageToggle from "../components/ui/LanguageToggle";
 import "./LoginPage.css";
+
+import { getApiUrl } from "../config/api";
 
 export default function LoginPage({ data, setData, toastFn }) {
   const { login } = useAuth();
@@ -19,7 +20,7 @@ export default function LoginPage({ data, setData, toastFn }) {
   const handleLogin = async () => {
     const cleanId = identifier.trim();
     try {
-      const res = await fetch(API_ENDPOINTS.login, {
+      const res = await fetch(getApiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: cleanId, password }),

@@ -1,0 +1,645 @@
+{
+  "admin": {
+    "nom": "Bensalem",
+    "prenom": "Karim",
+    "username": "admin",
+    "avatar": "🧑‍🏫",
+    "password": "$2b$10$sh9ecuRNE0BVfP2z5sVAfuzjynHWPZLc7rKGDTAZxnLzkJ9C3X/ju"
+  },
+  "settings": {
+    "enrollmentFee": 500
+  },
+  "langLevels": [
+    {
+      "id": "ll1",
+      "nom": "A1"
+    },
+    {
+      "id": "ll2",
+      "nom": "A2"
+    },
+    {
+      "id": "ll3",
+      "nom": "B1"
+    },
+    {
+      "id": "ll4",
+      "nom": "B2"
+    },
+    {
+      "id": "ll5",
+      "nom": "C1"
+    },
+    {
+      "id": "ll6",
+      "nom": "C2"
+    }
+  ],
+  "academicYears": [],
+  "debtCarryOvers": [
+    {
+      "id": "q65n6evk",
+      "studentId": "lrj0290u",
+      "fromYearId": "manual",
+      "toYearId": "2026-2027",
+      "amount": 123333,
+      "createdAt": "2026-09-17T23:57:41.960Z"
+    }
+  ],
+  "groups": [
+    {
+      "id": "sgxcjofg",
+      "nom": "4ème - Individuel",
+      "categoryId": "primaire",
+      "levelId": "4ème",
+      "groupType": "Individuel",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "cem_1ère_normal",
+      "nom": "1ère - Normal",
+      "categoryId": "cem",
+      "levelId": "1ère",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "j8u6qscq",
+      "nom": "4ème - Normal",
+      "categoryId": "primaire",
+      "levelId": "4ème",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "zoom_En ligne_unique",
+      "nom": "En ligne - Unique",
+      "categoryId": "zoom",
+      "levelId": "En ligne",
+      "groupType": "Unique",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "lycee_2ème_normal",
+      "nom": "2ème - Normal",
+      "categoryId": "lycee",
+      "levelId": "2ème",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-18",
+      "endDate": "2027-06-15",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    }
+  ],
+  "subgroups": [
+    {
+      "id": "sgxcjofg",
+      "nom": "4ème - Individuel",
+      "categoryId": "primaire",
+      "levelId": "4ème",
+      "groupType": "Individuel",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "cem_1ère_normal",
+      "nom": "1ère - Normal",
+      "categoryId": "cem",
+      "levelId": "1ère",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "j8u6qscq",
+      "nom": "4ème - Normal",
+      "categoryId": "primaire",
+      "levelId": "4ème",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "langues_ll1_normal",
+      "nom": "A1 - Normal",
+      "categoryId": "langues",
+      "levelId": "ll1",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "primaire_5ème_individuel",
+      "nom": "5ème - Individuel",
+      "categoryId": "primaire",
+      "levelId": "5ème",
+      "groupType": "Individuel",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "primaire_5ème_normal",
+      "nom": "5ème - Normal",
+      "categoryId": "primaire",
+      "levelId": "5ème",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "langues_ll2_individuel",
+      "nom": "A2 - Individuel",
+      "categoryId": "langues",
+      "levelId": "ll2",
+      "groupType": "Individuel",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "zoom_En ligne_unique",
+      "nom": "En ligne - Unique",
+      "categoryId": "zoom",
+      "levelId": "En ligne",
+      "groupType": "Unique",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-17",
+      "endDate": "2027-06-14",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    },
+    {
+      "id": "lycee_2ème_normal",
+      "nom": "2ème - Normal",
+      "categoryId": "lycee",
+      "levelId": "2ème",
+      "groupType": "Normal",
+      "days": [],
+      "time": "10:00",
+      "startDate": "2026-09-18",
+      "endDate": "2027-06-15",
+      "sessionsPerCycle": 4,
+      "academicYearId": null
+    }
+  ],
+  "enrollments": [
+    {
+      "id": "p663fphg",
+      "studentId": "n2y50rfe",
+      "academicYearId": null,
+      "groupId": "primaire_5ème_individuel",
+      "monthlyPrice": 0
+    }
+  ],
+  "students": [
+    {
+      "id": "cn41dd2i",
+      "nom": "",
+      "prenom": "tfghhfg",
+      "phone": null,
+      "subgroupId": null,
+      "nfcCardId": "",
+      "enrollmentPaid": false,
+      "enrollmentDate": "2026-09-17",
+      "lastModified": "2026-09-17T23:30:52.627Z",
+      "createdAt": "2026-09-17T23:15:05.228Z",
+      "monthlyPrice": 0,
+      "accountStatus": "active",
+      "studentCode": "",
+      "password": "$2b$10$4cZfSYrtf3T7v0aYxM4wQ.Z.MElim.4Am9nXOrp4SvNObrI7RAwkS"
+    },
+    {
+      "id": "ktmnqrlz",
+      "nom": "",
+      "prenom": "jhhgj",
+      "phone": null,
+      "subgroupId": null,
+      "nfcCardId": "",
+      "enrollmentPaid": false,
+      "enrollmentDate": null,
+      "lastModified": "2026-09-17T23:37:45.710Z",
+      "createdAt": "2026-09-17T23:34:04.206Z",
+      "monthlyPrice": 0,
+      "accountStatus": "active",
+      "studentCode": "",
+      "password": "$2b$10$ylS8JiAQQPpyESWACCI8HuMxc8nQ1cphQJ410laTCDxxVaw7A/aHO"
+    },
+    {
+      "id": "lrj0290u",
+      "nom": "yacin",
+      "prenom": "aridk",
+      "phone": "0669199897",
+      "subgroupId": null,
+      "nfcCardId": "",
+      "enrollmentPaid": false,
+      "enrollmentDate": null,
+      "lastModified": null,
+      "createdAt": "2026-09-17T23:57:41.960Z",
+      "monthlyPrice": 0,
+      "accountStatus": "active",
+      "studentCode": "",
+      "password": "$2b$10$zvrRsTdg8QcCHX4TSU9y8eawknd/mUTrjHt9zARXDJ66K3uBr0ujm"
+    },
+    {
+      "id": "n2y50rfe",
+      "nom": "yacin",
+      "prenom": "yassine",
+      "phone": "0669199897",
+      "subgroupId": null,
+      "nfcCardId": "",
+      "enrollmentPaid": false,
+      "enrollmentDate": "2026-09-18",
+      "lastModified": "2026-09-18T00:49:32.657Z",
+      "createdAt": "2026-09-18T00:49:32.657Z",
+      "monthlyPrice": 0,
+      "accountStatus": "active",
+      "studentCode": "STU-001",
+      "password": "$2b$10$GaWxxB9zN4j/nQwKHUyMzekJq3J5J8oQUyRa2WIncES/yfU5nJc.q"
+    }
+  ],
+  "sessions": [],
+  "attendances": [],
+  "payments": [
+    {
+      "id": "owbjkcot",
+      "studentId": "ktmnqrlz",
+      "amount": 500,
+      "expectedAmount": 500,
+      "paidAmount": 500,
+      "status": "paid",
+      "type": "debt",
+      "paidDate": "2026-09-17",
+      "month": "2026-09",
+      "academicYearId": null
+    },
+    {
+      "id": "hb04j9bv",
+      "studentId": "lrj0290u",
+      "debtId": "q65n6evk",
+      "amount": 123333,
+      "expectedAmount": 123333,
+      "paidAmount": 123333,
+      "status": "paid",
+      "paid": true,
+      "type": "debt",
+      "note": "Versement dette (manual)",
+      "paidDate": "2026-09-18",
+      "month": "2026-09",
+      "academicYearId": null
+    }
+  ],
+  "parents": [],
+  "extraSessions": [],
+  "userNotifications": [
+    {
+      "id": "2qac8xap",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "تحديث في بيانات حسابك 🔄",
+      "message": "تم تعطيل حسابك من قبل الإدارة.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:18",
+      "read": false
+    },
+    {
+      "id": "gz0mh50k",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "تحديث في بيانات حسابك 🔄",
+      "message": "تم تفعيل حسابك من قبل الإدارة.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:18",
+      "read": false
+    },
+    {
+      "id": "22avpa63",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "تحديث في بيانات حسابك 🔄",
+      "message": "تم إعادة تعيين كلمة المرور الخاصة بك. كلمة المرور الجديدة: 5p3hry",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:18",
+      "read": false
+    },
+    {
+      "id": "q3u3ptrp",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "تحديث في بيانات حسابك 🔄",
+      "message": "تم إعادة تعيين كلمة المرور الخاصة بك. كلمة المرور الجديدة: 8y0cdu",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:18",
+      "read": false
+    },
+    {
+      "id": "wbnkkcu8",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre mot de passe a été réinitialisé. Nouveau: xqv6vn",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:19",
+      "read": false
+    },
+    {
+      "id": "09lv17d5",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre compte a été désactivé par l'administration.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:19",
+      "read": false
+    },
+    {
+      "id": "xhotvtyu",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre compte a été activé par l'administration.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:19",
+      "read": false
+    },
+    {
+      "id": "tz0eojoh",
+      "userId": "cn41dd2i",
+      "type": "payment",
+      "title": "Rappel de paiement",
+      "message": "Bonjour tfghhfg, nous vous rappelons que vos frais de des dettes d'un montant de 500 DA sont en attente. Merci de régler votre situation au plus vite.",
+      "meta": {
+        "screen": "payments"
+      },
+      "date": "2026-09-17",
+      "time": "01:19",
+      "read": false
+    },
+    {
+      "id": "w662pm6i",
+      "userId": "cn41dd2i",
+      "type": "payment",
+      "title": "Reçu de paiement d'inscription 🧾",
+      "message": "Le règlement de vos frais d'inscription d'un montant de 500 DA a bien été enregistré. Merci !",
+      "meta": {
+        "screen": "payments",
+        "amount": 500,
+        "type": "enrollment",
+        "groupId": null
+      },
+      "date": "2026-09-17",
+      "time": "01:19",
+      "read": false
+    },
+    {
+      "id": "83oz79nd",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre compte a été désactivé par l'administration.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:30",
+      "read": false
+    },
+    {
+      "id": "a8gm358m",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre compte a été activé par l'administration.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:30",
+      "read": false
+    },
+    {
+      "id": "bn2dx3bb",
+      "userId": "cn41dd2i",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre mot de passe a été réinitialisé. Nouveau: r9wwuh",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:30",
+      "read": false
+    },
+    {
+      "id": "naxl6ibs",
+      "userId": "ktmnqrlz",
+      "type": "payment",
+      "title": "Rappel de paiement",
+      "message": "Bonjour jhhgj, nous vous rappelons que vos frais de des dettes d'un montant de 2000 DA sont en attente. Merci de régler votre situation au plus vite.",
+      "meta": {
+        "screen": "payments"
+      },
+      "date": "2026-09-17",
+      "time": "01:34",
+      "read": false
+    },
+    {
+      "id": "6m4in93s",
+      "userId": "ktmnqrlz",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre mot de passe a été réinitialisé. Nouveau: 6tzvi0",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:37",
+      "read": false
+    },
+    {
+      "id": "k187l4zs",
+      "userId": "ktmnqrlz",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre mot de passe a été réinitialisé. Nouveau: fje1w1",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:37",
+      "read": false
+    },
+    {
+      "id": "8ogk9hlz",
+      "userId": "ktmnqrlz",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre mot de passe a été réinitialisé. Nouveau: 50cfoe",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:37",
+      "read": false
+    },
+    {
+      "id": "r4ifu8ph",
+      "userId": "ktmnqrlz",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre compte a été désactivé par l'administration.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:37",
+      "read": false
+    },
+    {
+      "id": "bk024mel",
+      "userId": "ktmnqrlz",
+      "type": "info",
+      "title": "Compte mis à jour 🔄",
+      "message": "Votre compte a été activé par l'administration.",
+      "meta": {
+        "screen": "dashboard"
+      },
+      "date": "2026-09-17",
+      "time": "01:37",
+      "read": false
+    },
+    {
+      "id": "k9pq5m1l",
+      "userId": "cn41dd2i",
+      "type": "payment",
+      "title": "Rappel de paiement",
+      "message": "Bonjour tfghhfg, nous vous rappelons que vos frais de des dettes d'un montant de 500 DA sont en attente. Merci de régler votre situation au plus vite.",
+      "meta": {
+        "screen": "payments"
+      },
+      "date": "2026-09-18",
+      "time": "02:49",
+      "read": false
+    },
+    {
+      "id": "oiirmm25",
+      "userId": "lrj0290u",
+      "type": "payment",
+      "title": "Rappel de paiement",
+      "message": "Bonjour yacin, nous vous rappelons que vos frais de des dettes d'un montant de 500 DA sont en attente. Merci de régler votre situation au plus vite.",
+      "meta": {
+        "screen": "payments"
+      },
+      "date": "2026-09-18",
+      "time": "02:49",
+      "read": false
+    },
+    {
+      "id": "yaau42rh",
+      "userId": "cn41dd2i",
+      "type": "payment",
+      "title": "Rappel de paiement",
+      "message": "Bonjour tfghhfg, nous vous rappelons que vos frais de des dettes d'un montant de 500 DA sont en attente. Merci de régler votre situation au plus vite.",
+      "meta": {
+        "screen": "payments"
+      },
+      "date": "2026-09-18",
+      "time": "02:49",
+      "read": false
+    },
+    {
+      "id": "vqvxku1q",
+      "userId": "lrj0290u",
+      "type": "payment",
+      "title": "Rappel de paiement",
+      "message": "Bonjour yacin, nous vous rappelons que vos frais de des dettes d'un montant de 500 DA sont en attente. Merci de régler votre situation au plus vite.",
+      "meta": {
+        "screen": "payments"
+      },
+      "date": "2026-09-18",
+      "time": "02:49",
+      "read": false
+    }
+  ],
+  "privateMessages": [],
+  "messages": [],
+  "notifications": [],
+  "commCategories": [
+    {
+      "id": "cat1comm",
+      "nom": "Langue Française"
+    }
+  ],
+  "commGroups": [],
+  "commMessages": []
+}

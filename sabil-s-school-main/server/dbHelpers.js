@@ -125,7 +125,7 @@ export function saveDatabase(data) {
         db.prepare(`INSERT OR REPLACE INTO admin (id, nom, prenom, username, password, avatar)
                     VALUES (1, ?, ?, ?, ?, ?)`)
           .run(data.admin.nom, data.admin.prenom, data.admin.username,
-               data.admin.password, data.admin.avatar || "🧑‍🏫");
+            data.admin.password, data.admin.avatar || "🧑‍🏫");
       }
 
       // Settings
@@ -169,9 +169,9 @@ export function saveDatabase(data) {
           db.prepare(`INSERT INTO groups (id, nom, categoryId, levelId, groupType, days, time, startDate, endDate, sessionsPerCycle, academicYearId)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(g.id, g.nom, g.categoryId || null, g.levelId || null,
-                 g.groupType || "Normal", JSON.stringify(g.days || []),
-                 g.time || null, g.startDate || null, g.endDate || null,
-                 g.sessionsPerCycle || 4, g.academicYearId || null);
+              g.groupType || "Normal", JSON.stringify(g.days || []),
+              g.time || null, g.startDate || null, g.endDate || null,
+              g.sessionsPerCycle || 4, g.academicYearId || null);
         }
       }
 
@@ -185,10 +185,10 @@ export function saveDatabase(data) {
           db.prepare(`INSERT INTO students (id, nom, prenom, phone, password, nfcCardId, enrollmentPaid, enrollmentDate, lastModified, createdAt, accountStatus, studentCode)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(st.id, st.nom, st.prenom, st.phone || null, pw,
-                 st.nfcCardId || "",
-                 st.enrollmentPaid ? 1 : 0, st.enrollmentDate || null,
-                 st.lastModified || null, st.createdAt || null,
-                 st.accountStatus || 'active', st.studentCode || '');
+              st.nfcCardId || "",
+              st.enrollmentPaid ? 1 : 0, st.enrollmentDate || null,
+              st.lastModified || null, st.createdAt || null,
+              st.accountStatus || 'active', st.studentCode || '');
         }
       }
 
@@ -206,12 +206,12 @@ export function saveDatabase(data) {
       if (Array.isArray(data.sessions)) {
         db.prepare("DELETE FROM sessions").run();
         for (const s of data.sessions) {
-          db.prepare(`INSERT INTO sessions (id, groupId, academicYearId, date, time, status, note)
-                      VALUES (?, ?, ?, ?, ?, ?, ?)`)
-            .run(s.id, s.groupId, s.academicYearId || null, s.date, s.time || "00:00", s.status || "planned", s.note || "");
+          const gid = s.groupId || s.subgroupId || "default_group";
+          db.prepare(`INSERT INTO sessions (id, groupId, subgroupId, academicYearId, date, time, status, note)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(s.id, gid, gid, s.academicYearId || null, s.date, s.time || "00:00", s.status || "planned", s.note || "");
         }
       }
-
       // Attendances
       if (Array.isArray(data.attendances)) {
         db.prepare("DELETE FROM attendances").run();
@@ -219,10 +219,9 @@ export function saveDatabase(data) {
           db.prepare(`INSERT INTO attendances (id, sessionId, studentId, present, date, time, nfcVerified)
                       VALUES (?, ?, ?, ?, ?, ?, ?)`)
             .run(a.id, a.sessionId || null, a.studentId, a.present ? 1 : 0,
-                 a.date || null, a.time || null, a.nfcVerified ? 1 : 0);
+              a.date || null, a.time || null, a.nfcVerified ? 1 : 0);
         }
       }
-
       // Payments
       if (Array.isArray(data.payments)) {
         db.prepare("DELETE FROM payments").run();
@@ -252,7 +251,6 @@ export function saveDatabase(data) {
           db.prepare("INSERT INTO extra_sessions (id, data_json) VALUES (?, ?)").run(es.id, JSON.stringify(es));
         }
       }
-
       // User notifications
       if (Array.isArray(data.userNotifications)) {
         db.prepare("DELETE FROM user_notifications").run();
@@ -260,17 +258,16 @@ export function saveDatabase(data) {
           db.prepare(`INSERT INTO user_notifications (id, userId, type, title, message, meta, date, time, read)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(n.id, n.userId, n.type || "info", n.title || "", n.message || "",
-                 JSON.stringify(n.meta || {}), n.date || null, n.time || null, n.read ? 1 : 0);
+              JSON.stringify(n.meta || {}), n.date || null, n.time || null, n.read ? 1 : 0);
         }
       }
-
       // Generic blob tables
       const blobMap = [
-        ["private_messages",  data.privateMessages],
-        ["messages",          data.messages],
-        ["notifications",     data.notifications],
-        ["comm_groups",       data.commGroups],
-        ["comm_messages",     data.commMessages],
+        ["private_messages", data.privateMessages],
+        ["messages", data.messages],
+        ["notifications", data.notifications],
+        ["comm_groups", data.commGroups],
+        ["comm_messages", data.commMessages],
       ];
       for (const [table, arr] of blobMap) {
         if (Array.isArray(arr)) {

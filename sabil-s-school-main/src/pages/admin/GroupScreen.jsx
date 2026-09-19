@@ -547,37 +547,36 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
   const effectiveGroupId = groupId || subgroupId;
   let foundSg = (data.groups || []).find(s => s.id === effectiveGroupId);
   if (!foundSg && levelId && catId) {
-    foundSg = (data.groups || []).find(s => s.categoryId === catId && s.levelId === levelId && (!groupType || s.groupType === groupType));
+    foundSg = (data.groups || []).find(s => 
+      s.categoryId === catId && 
+      s.levelId === levelId && 
+      (!activeYearId || !s.academicYearId || s.academicYearId === activeYearId)
+    );
   }
-  if (!foundSg && levelId) {
-    foundSg = (data.groups || []).find(s => s.levelId === levelId && (!groupType || s.groupType === groupType));
+
+  if (!foundSg) {
+    return (
+      <div style={{ padding: "40px 20px", textAlign: "center", color: C.inkSoft }}>
+        <h3 style={{ color: C.ink, fontSize: 18, marginBottom: 12 }}>
+          {lang === "ar" ? "الفوج غير موجود" : "Groupe introuvable"}
+        </h3>
+        <p style={{ fontSize: 13, marginBottom: 20 }}>
+          {lang === "ar" ? "لم يتم العثور على هذا الفوج في هذه الفئة والمستوى." : "Ce groupe n'existe pas pour cette catégorie et ce niveau."}
+        </p>
+        <button
+          onClick={onBack}
+          style={{
+            padding: "8px 18px", borderRadius: 10, background: C.accent, color: "#120e2e",
+            fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer"
+          }}
+        >
+          {lang === "ar" ? "رجوع" : "Retour"}
+        </button>
+      </div>
+    );
   }
 
-  // Fallback group object so it NEVER crashes or says "Groupe introuvable"
-  const resolvedCatId = catId || (levelId?.includes("cem") ? "cem" : "primaire");
-  const resolvedLevel = levelId || "1ère";
-  const resolvedType = groupType || "Normal";
-  const catObj = CAT_BY_ID[resolvedCatId];
-  const langLevelObj = resolvedCatId === "langues" ? (data.langLevels || []).find(l => l.id === resolvedLevel) : null;
-  const levelDisplayName = langLevelObj ? langLevelObj.nom : resolvedLevel;
-
-  const fallbackSg = {
-    id: effectiveGroupId || uid(),
-    nom: levelDisplayName ? `${levelDisplayName} - ${resolvedType}` : `${catObj?.label || "Groupe"} - ${resolvedType}`,
-    categoryId: resolvedCatId,
-    levelId: resolvedLevel,
-    groupType: resolvedType,
-    days: [],
-    time: "10:00",
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: new Date(Date.now() + 9 * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    sessionsPerCycle: 4,
-    academicYearId: activeYearId || null,
-  };
-
-  const sg = foundSg || fallbackSg;
-
-  // Persist fallback to groups if it was not in database yet
+  const sg = foundSg;
   useEffect(() => {
     if (!foundSg && sg) {
       const newSessions = generateSessions(sg).map(s => ({ ...s, groupId: sg.id, academicYearId: activeYearId }));
@@ -589,8 +588,33 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
     }
   }, [foundSg, sg.id]);
 
-  const cat = CAT_BY_ID[sg.categoryId] || catObj;
-  const students = (data.students || []).filter(s => s.groupId === sg.id);
+  const cat = CAT_BY_ID[sg.categoryId];
+
+  // Resolve students enrolled in this group using exact groupId
+  const groupEnrollments = (data.enrollments || []).filter(e => 
+    e.groupId === sg.id && (!activeYearId || !e.academicYearId || e.academicYearId === activeYearId)
+  );
+  const enrolledStudentIds = new Set(groupEnrollments.map(e => e.studentId));
+
+  const students = (data.students || []).filter(s => {
+    if (enrolledStudentIds.has(s.id)) return true;
+    const hasEnrollment = (data.enrollments || []).some(e => 
+      e.studentId === s.id && (e.academicYearId === activeYearId || (!e.academicYearId && !activeYearId))
+    );
+    if (!hasEnrollment && s.groupId === sg.id) return true;
+    return false;
+  });
+
+  console.log("[STUDENT GROUP DEBUG]");
+  console.log("groupId =", sg.id);
+  console.log("groupName =", sg.nom);
+  console.log("categoryId =", sg.categoryId);
+  console.log("levelId =", sg.levelId);
+  console.log("academicYearId =", sg.academicYearId || activeYearId);
+  console.log("matching enrollments =", groupEnrollments.length);
+  console.log("studentIds =", Array.from(enrolledStudentIds));
+  console.log("students displayed =", students.length);
+
   const sessions = (data.sessions || []).filter(s => s.groupId === sg.id);
   const payments = (data.payments || []).filter(p => p.groupId === sg.id);
   const unpaidPmt = payments.filter(p => !p.paid).length;

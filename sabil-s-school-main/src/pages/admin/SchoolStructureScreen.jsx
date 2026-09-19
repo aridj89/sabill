@@ -12,11 +12,22 @@ import GroupFormModal from "./GroupFormModal";
 /* ── Sub-group card ──────────────────────────────────────────── */
 function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent, onEdit, onDelete }) {
   const { lang } = useLanguage();
-  const students  = (data.students || []).filter(s => s.groupId === sg.id || s.groupId === sg.id);
-  const sessions  = (data.sessions || []).filter(s => s.groupId === sg.id || s.groupId === sg.id);
+
+  // Find all student IDs enrolled in this specific group by groupId
+  const groupEnrollments = (data.enrollments || []).filter(e => e.groupId === sg.id);
+  const enrolledStudentIds = new Set(groupEnrollments.map(e => e.studentId));
+
+  const students = (data.students || []).filter(s => {
+    if (enrolledStudentIds.has(s.id)) return true;
+    const hasEnrollment = (data.enrollments || []).some(e => e.studentId === s.id);
+    if (!hasEnrollment && s.groupId === sg.id) return true;
+    return false;
+  });
+
+  const sessions  = (data.sessions || []).filter(s => s.groupId === sg.id);
   const done      = sessions.filter(s => s.status === "done").length;
   const planned   = sessions.filter(s => s.status === "planned").length;
-  const unpaidCount = (data.payments || []).filter(p => (p.groupId === sg.id || p.groupId === sg.id) && !p.paid).length;
+  const unpaidCount = (data.payments || []).filter(p => p.groupId === sg.id && !p.paid).length;
   const enrollUnpaid = students.filter(s => !s.enrollmentPaid).length;
 
   return (
@@ -112,7 +123,7 @@ function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent,
 }
 
 /* ── Main screen ─────────────────────────────────────────────── */
-export default function SchoolStructureScreen({ catId, levelId, groupType, data, setData, toastFn, onNav }) {
+export default function SchoolStructureScreen({ catId, levelId, groupType, data, setData, toastFn, onNav, activeYearId }) {
   const { lang } = useLanguage();
   const cat = CAT_BY_ID[catId];
   const [showAdd, setShowAdd]   = useState(false);
@@ -122,40 +133,21 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
 
   const isLangues = catId === "langues";
   const levelLabel = isLangues
-    ? (data.langLevels?.find(l => l.id === levelId)?.nom || "")
+    ? (data?.langLevels?.find(l => l.id === levelId)?.nom || "")
     : levelId;
 
-  // Filter groups
-  const allGroups = [...(data.groups || [])];
-  let groups = allGroups.filter(sg => {
+  // Safe checks & empty state fallbacks
+  const safeGroups = Array.isArray(data?.groups) ? data.groups : [];
+
+  // Filter groups strictly by categoryId AND levelId AND academicYearId
+  const effectiveYearId = activeYearId || data?.activeYearId;
+  let groups = safeGroups.filter(sg => {
+    if (!sg) return false;
     if (catId && sg.categoryId !== catId) return false;
     if (levelId && sg.levelId !== levelId) return false;
-    if (!isLangues && groupType && sg.groupType !== groupType) return false;
+    if (effectiveYearId && sg.academicYearId && sg.academicYearId !== effectiveYearId) return false;
     return true;
   });
-
-  // Guarantee the 3 standard groups (Normal, Individuel, Spécial) appear for any selected level
-  if (cat && levelId) {
-    const defaultTypes = (cat.groups && cat.groups.length > 0) ? cat.groups : ["Normal", "Individuel", "Spécial"];
-    const typesToShow = groupType ? [groupType] : defaultTypes;
-    const displayName = isLangues ? (levelLabel || levelId) : levelId;
-    typesToShow.forEach(gType => {
-      const exists = groups.some(g => g.groupType === gType || g.nom === `${displayName} - ${gType}`);
-      if (!exists) {
-        groups.push({
-          id: `${catId}_${levelId}_${gType.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-          nom: `${displayName} - ${gType}`,
-          categoryId: catId,
-          levelId: levelId,
-          groupType: gType,
-          days: [],
-          time: "10:00",
-          sessionsPerCycle: 4,
-          academicYearId: null,
-        });
-      }
-    });
-  }
 
   const handleCreate = (sg, newSessions) => {
     // Store in groups array (main data store) and generate sessions using groupId

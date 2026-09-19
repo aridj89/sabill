@@ -35,16 +35,21 @@ const STUDY_LEVELS = [
 
 export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearId }) {
   const { lang } = useLanguage();
+  const academicYears = data.academicYears || [{ id: "2025-2026", name: "2025-2026" }];
+  const [selectedYearId, setSelectedYearId] = useState(
+    activeYearId || (academicYears.find(y => y.isCurrent)?.id) || academicYears[0]?.id || "2025-2026"
+  );
+
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all"); // 'all' | 'unpaid' | 'paid'
   const [filterLevel, setFilterLevel] = useState("all");
   
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingDebt, setEditingDebt] = useState(null); // { debtId, studentId, studentName, amount, debtYear, level, phone, teacher }
-  const [payModal, setPayModal] = useState(null); // { studentId, studentName, debtId, maxAmount, remaining }
+  const [editingDebt, setEditingDebt] = useState(null);
+  const [payModal, setPayModal] = useState(null); // { studentId, studentName, debtId, maxAmount, remaining, finSummary }
   const [payAmount, setPayAmount] = useState("");
-  const [historyModal, setHistoryModal] = useState(null); // { studentId, studentName, payments }
+  const [historyModal, setHistoryModal] = useState(null);
 
   // Add Form State
   const [addForm, setAddForm] = useState({
@@ -55,7 +60,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
     phone: "",
     amount: "",
     paymentAmount: "",
-    debtYear: "2024/2025",
+    debtYear: selectedYearId || "2025-2026",
     level: "2ème AS",
     teacher: "",
     note: "",
@@ -69,8 +74,10 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
     const students = data.students || [];
     const payments = data.payments || [];
 
-    // Group debts by carryover item or by student
-    return carryOvers.map(debt => {
+    const map = new Map();
+
+    // First process explicit carry over debt records
+    carryOvers.forEach(debt => {
       const st = students.find(s => s.id === debt.studentId) || {
         id: debt.studentId,
         nom: debt.nom || "",
@@ -81,7 +88,6 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
 
       const debtAmount = Number(debt.amount) || 0;
       
-      // Calculate payments specifically tied to this debt or student debt payments
       const debtPayments = payments.filter(p => 
         (p.debtId === debt.id) || 
         (!p.debtId && p.studentId === st.id && (p.type === "debt" || p.note?.includes("dette")))
@@ -91,7 +97,9 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
       const remainingDebt = Math.max(0, debtAmount - totalPaidOnDebt);
       const isSettled = remainingDebt === 0;
 
-      return {
+      const fin = getStudentFinancialSummary(data, st.id, selectedYearId);
+
+      map.set(debt.id, {
         debtId: debt.id,
         debt,
         student: st,
@@ -108,11 +116,45 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
         isSettled,
         payments: debtPayments,
         createdAt: debt.createdAt || new Date().toISOString(),
-      };
+        finSummary: fin,
+      });
     });
-  }, [data.debtCarryOvers, data.students, data.payments]);
 
-  // Also include students who have overall unpaid previous debt if not in carryOvers
+    // Also scan all students to check if they have unpaid debt for selectedYearId or previous debt
+    students.forEach(st => {
+      const fin = getStudentFinancialSummary(data, st.id, selectedYearId);
+      if (fin.totalUnpaid > 0 || fin.previousDebtRemaining > 0) {
+        // If not already in carryovers map as an explicit debt item
+        const existingKey = Array.from(map.values()).find(d => d.student.id === st.id);
+        if (!existingKey) {
+          const autoDebtId = `auto_${st.id}_${selectedYearId}`;
+          const isSettled = fin.totalUnpaid === 0;
+          map.set(autoDebtId, {
+            debtId: autoDebtId,
+            debt: null,
+            student: st,
+            studentName: `${st.prenom} ${st.nom}`.trim() || "Élève",
+            nom: st.nom || "",
+            prenom: st.prenom || "",
+            phone: st.phone || "—",
+            debtYear: selectedYearId,
+            level: st.studyClass || st.level || "2ème AS",
+            teacher: "—",
+            amount: fin.totalUnpaid + fin.totalPaid,
+            totalPaid: fin.totalPaid,
+            remaining: fin.totalUnpaid,
+            isSettled,
+            payments: payments.filter(p => p.studentId === st.id),
+            createdAt: new Date().toISOString(),
+            finSummary: fin,
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values());
+  }, [data, selectedYearId]);
+
   const allDebtsCombined = useMemo(() => {
     return debtsList;
   }, [debtsList]);
@@ -270,30 +312,79 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
     const amount = Number(payAmount);
     if (!amount || amount <= 0 || !payModal) return;
 
+    const studentId = payModal.studentId;
+    const fin = payModal.finSummary || getStudentFinancialSummary(data, studentId, selectedYearId);
+    let remaining = amount;
+    
+    let paidPrevDebt = 0;
+    if (fin.previousDebtRemaining > 0 && remaining > 0) {
+      paidPrevDebt = Math.min(remaining, fin.previousDebtRemaining);
+      remaining -= paidPrevDebt;
+    }
+
+    let paidRegFee = 0;
+    if (fin.regFeeRemaining > 0 && remaining > 0) {
+      paidRegFee = Math.min(remaining, fin.regFeeRemaining);
+      remaining -= paidRegFee;
+    }
+
+    let paidCourseFees = 0;
+    if (fin.courseFeesRemaining > 0 && remaining > 0) {
+      paidCourseFees = Math.min(remaining, fin.courseFeesRemaining);
+      remaining -= paidCourseFees;
+    }
+
+    let creditCreated = 0;
+    if (remaining > 0) {
+      creditCreated = remaining;
+    }
+
     const newPayment = {
       id: uid(),
-      studentId: payModal.studentId,
-      debtId: payModal.debtId,
+      studentId: studentId,
+      debtId: payModal.debtId && !payModal.debtId.startsWith("auto_") ? payModal.debtId : null,
       amount: amount,
       expectedAmount: amount,
       paidAmount: amount,
       status: "paid",
       paid: true,
-      type: "debt",
-      note: `Versement dette (${payModal.debtYear || "Dette"})`,
+      type: creditCreated > 0 ? "credit" : "debt",
+      note: `Versement (${payModal.debtYear || selectedYearId}) [Dette prev: ${paidPrevDebt} DA, RegFee: ${paidRegFee} DA, Cours: ${paidCourseFees} DA${creditCreated > 0 ? `, Crédit: ${creditCreated} DA` : ""}]`,
       paidDate: new Date().toISOString().slice(0, 10),
       month: new Date().toISOString().slice(0, 7),
-      academicYearId: activeYearId || null,
+      academicYearId: selectedYearId || activeYearId || null,
+      breakdown: {
+        paidPrevDebt,
+        paidRegFee,
+        paidCourseFees,
+        creditCreated,
+      }
     };
 
-    setData(d => ({
-      ...d,
-      payments: [...(d.payments || []), newPayment]
-    }));
+    setData(d => {
+      let updatedStudents = d.students;
+      if (creditCreated > 0) {
+        updatedStudents = (d.students || []).map(st => {
+          if (st.id === studentId) {
+            return {
+              ...st,
+              credit: (Number(st.credit) || 0) + creditCreated,
+            };
+          }
+          return st;
+        });
+      }
+
+      return {
+        ...d,
+        students: updatedStudents,
+        payments: [...(d.payments || []), newPayment]
+      };
+    });
 
     setPayModal(null);
     setPayAmount("");
-    if (toastFn) toastFn(lang === "ar" ? `تم تسجيل دفعة بقيمة ${amount.toLocaleString()} DA ✓` : `Versement de ${amount.toLocaleString()} DA enregistré ✓`);
+    if (toastFn) toastFn(lang === "ar" ? `تم تسجيل دفعة بقيمة ${amount.toLocaleString()} DA ✓${creditCreated > 0 ? ` (رصيد دائن: ${creditCreated} DA)` : ""}` : `Versement de ${amount.toLocaleString()} DA enregistré ✓${creditCreated > 0 ? ` (Crédit: ${creditCreated} DA)` : ""}`);
   };
 
   // ── 6. Edit Debt Handler ──
@@ -383,17 +474,38 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 20px", borderRadius: 14,
-            background: "linear-gradient(135deg, #E2963A, #f59e0b)", color: "#fff", border: "none",
-            cursor: "pointer", fontWeight: 800, fontSize: 14, boxShadow: "0 6px 20px rgba(226,150,58,0.4)"
-          }}
-        >
-          <Plus size={18} />
-          {lang === "ar" ? "+ إضافة دين جديد" : "+ Ajouter une dette"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Academic Year Selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(99,102,241,0.12)", border: "1.5px solid rgba(99,102,241,0.35)", borderRadius: 14, padding: "6px 14px" }}>
+            <Calendar size={18} color="#818cf8" />
+            <select
+              value={selectedYearId}
+              onChange={e => setSelectedYearId(e.target.value)}
+              style={{
+                background: "transparent", border: "none", outline: "none", color: "#818cf8",
+                fontSize: 14, fontWeight: 800, cursor: "pointer"
+              }}
+            >
+              {academicYears.map(y => (
+                <option key={y.id} value={y.id} style={{ background: C.surface, color: C.ink }}>
+                  {y.name || y.id} {y.isCurrent ? (lang === "ar" ? "(الحالية)" : "(Actuelle)") : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 20px", borderRadius: 14,
+              background: "linear-gradient(135deg, #E2963A, #f59e0b)", color: "#fff", border: "none",
+              cursor: "pointer", fontWeight: 800, fontSize: 14, boxShadow: "0 6px 20px rgba(226,150,58,0.4)"
+            }}
+          >
+            <Plus size={18} />
+            {lang === "ar" ? "+ إضافة دين جديد" : "+ Ajouter une dette"}
+          </button>
+        </div>
       </div>
 
       {/* ── Summary Cards Bar ── */}
@@ -545,8 +657,17 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                         {d.prenom[0] || "E"}{d.nom[0] || ""}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 800, color: C.ink, fontSize: 14.5 }}>
+                        <div style={{ fontWeight: 800, color: C.ink, fontSize: 14.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                           {d.studentName}
+                          {d.finSummary?.previousDebtRemaining > 0 && (
+                            <span style={{
+                              fontSize: 11, fontWeight: 800, background: "rgba(239, 68, 68, 0.2)",
+                              color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)",
+                              padding: "2px 8px", borderRadius: 6
+                            }}>
+                              🔴 Dette {d.finSummary.previousDebtYear || "précédente"}: {d.finSummary.previousDebtRemaining.toLocaleString()} DA
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
                           <Phone size={11} /> {d.phone}

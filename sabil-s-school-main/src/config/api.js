@@ -1,30 +1,40 @@
-// Centralized API configuration
-// Supports REACT_APP_API_URL, VITE_API_URL, and auto-detects current domain origin in production
-const getBaseUrl = () => {
-  // 1. Injected via process.env.REACT_APP_API_URL
-  if (typeof process !== "undefined" && process.env && process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
+/**
+ * Centralized API Configuration
+ * Supports Local Development, LAN Multi-PC Deployment (SERVER_IP:5000), and Cloud/Railway Hosting.
+ */
+
+export function getApiBaseUrl() {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, "");
   }
-  // 2. Vite environment variable import.meta.env.VITE_API_URL
-  if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  // 3. If in browser: use current domain origin (so deployed app calls itself, not localhost:5000!)
-  if (typeof window !== "undefined" && window.location && window.location.origin) {
-    const port = window.location.port;
-    if (port !== "5173" && port !== "5174") {
+  
+  if (typeof window !== "undefined" && window.location) {
+    const hostname = window.location.hostname || "localhost";
+    const protocol = window.location.protocol || "http:";
+    // If port is 5173 / 5174 (Vite dev server), target port 5000 on the same host
+    if (window.location.port === "5173" || window.location.port === "5174" || window.location.port === "3000") {
+      return `${protocol}//${hostname}:5000`;
+    }
+    // If running in production bundle served directly by backend or reverse proxy
+    if (!window.location.port || window.location.port === "80" || window.location.port === "443") {
       return window.location.origin;
     }
+    return `${protocol}//${hostname}:5000`;
   }
-  // 4. Local Vite dev fallback
+
   return "http://localhost:5000";
-};
+}
 
-export const API_BASE_URL = getBaseUrl().replace(/\/+$/, "");
+export function getApiUrl(path = "") {
+  const base = getApiBaseUrl();
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
+}
 
-export const API_ENDPOINTS = {
-  data: `${API_BASE_URL}/api/data`,
-  login: `${API_BASE_URL}/api/auth/login`,
-  reset: `${API_BASE_URL}/api/reset`,
-  nfc: `${API_BASE_URL}/api/nfc`,
-};
+export function getAuthHeaders() {
+  const token = localStorage.getItem("auth_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}

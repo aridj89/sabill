@@ -55,15 +55,13 @@ export default function GroupFormModal({
   })();
 
   const handleSave = () => {
-    if (form.days.length === 0) return;
-    const displayLevel = levelLabel || levelId;
-    const autoNom = displayLevel ? `${displayLevel} - ${groupType || cat?.label}` : (cat?.label || "Groupe");
+    if (!form.nom.trim() || form.days.length === 0) return;
     const sg = {
       id: initial?.id || uid(),
-      nom: initial?.nom || autoNom,
+      nom: form.nom.trim(),
       categoryId: catId,
       levelId,
-      groupType: groupType || null,
+      groupType: initial?.groupType || null,
       days: form.days,
       time: form.time,
       startDate: form.startDate,
@@ -76,7 +74,7 @@ export default function GroupFormModal({
     onSave(sg, newSessions);
   };
 
-  const isValid = form.days.length > 0 && form.startDate && form.endDate;
+  const isValid = form.nom.trim().length > 0 && form.days.length > 0 && form.startDate && form.endDate;
 
   const catColor = cat?.color || C.accent;
   const title = initial
@@ -89,11 +87,20 @@ export default function GroupFormModal({
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, padding: "8px 12px", borderRadius: 10, background: cat?.bg || C.accentSoft, border: `1px solid ${cat?.border || C.border}` }}>
         {cat && <cat.icon size={14} color={catColor} />}
         <span style={{ fontSize: 12.5, fontWeight: 700, color: catColor }}>
-          {cat?.label} {levelId && `— ${levelId}`} {groupType && `— ${groupType}`}
+          {cat?.label} {levelLabel ? `— ${levelLabel}` : (levelId && `— ${levelId}`)}
         </span>
       </div>
 
-      {/* Nom is auto-generated, no input needed */}
+      {/* Nom du groupe */}
+      <Field label={lang === "ar" ? "اسم المجموعة *" : "Nom du groupe *"}>
+        <input
+          autoFocus
+          value={form.nom}
+          onChange={e => set("nom", e.target.value)}
+          placeholder={lang === "ar" ? "مثال: Groupe A, Groupe B, Groupe 1…" : "Ex: Groupe A, Groupe B, Groupe 1…"}
+          style={inputStyle}
+        />
+      </Field>
 
       {/* Jours */}
       <Field label={lang === "ar" ? "أيام الدراسة" : "Jours d'étude"}>

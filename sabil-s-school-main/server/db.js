@@ -7,23 +7,22 @@ import { hashPasswordSync } from "./utils/password.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const defaultPath = fs.existsSync(path.join(__dirname, "school.db"))
-  ? path.join(__dirname, "school.db")
-  : (process.env.DATABASE_PATH || "./database.sqlite");
-const dbPath = process.env.DATABASE_PATH || defaultPath;
+export const DB_PATH = process.env.DB_PATH || path.join(__dirname, "school.db");
+export const JSON_PATH = path.join(__dirname, "database.json");
 
-// Ensure directory exists if path contains subdirectories (e.g. /data/database.sqlite on Railway)
-const dbDir = path.dirname(dbPath);
-if (dbDir && dbDir !== "." && !fs.existsSync(dbDir)) {
-  try {
-    fs.mkdirSync(dbDir, { recursive: true });
-  } catch (err) {
-    console.warn("Could not create db directory:", err.message);
-  }
+// Production safety warning for Railway Persistent Volume
+if (process.env.NODE_ENV === "production" && (!process.env.DB_PATH || !process.env.DB_PATH.startsWith("/data"))) {
+  console.warn("⚠️ ATTENTION: NODE_ENV est 'production' mais DB_PATH n'est pas configuré sur /data/school.db ! Assurez-vous d'avoir un Persistent Volume Railway monté sur /data.");
 }
 
-export const db = new Database(dbPath);
-export const DB_PATH = dbPath;
+// Ensure parent directory exists for DB_PATH (e.g. /data)
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+// ─── Open / Create the SQLite database ───────────────────────
+export const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
@@ -192,19 +191,157 @@ db.exec(`
 
 // ─── Schema Migration ────────────
 try {
-  // If subgroups exist and groups doesn't, we can try to migrate them over, 
-  // but it's safe to just ignore since we are restructuring.
-} catch (e) {
-  console.warn("Migration warning:", e.message);
-}
+  db.exec("ALTER TABLE sessions ADD COLUMN groupId TEXT");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE sessions ADD COLUMN academicYearId TEXT");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE students ADD COLUMN groupId TEXT");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE groups ADD COLUMN academicYearId TEXT");
+} catch (e) {}
 
-// ─── Ensure default admin & initial settings if empty database ──────
-// Only runs if the admin table is completely empty (no fake/seed data, no reset on startup)
+// ─── Auto-migrate from database.json if SQLite is empty ──────
 const adminExists = db.prepare("SELECT COUNT(*) as c FROM admin").get().c;
-if (adminExists === 0) {
+
+if (adminExists === 0 && fs.existsSync(JSON_PATH)) {
+  console.log("📦 Migration depuis database.json vers SQLite...");
+  try {
+    const raw = fs.readFileSync(JSON_PATH, "utf-8");
+    const d = JSON.parse(raw);
+    migrateFromJSON(d);
+    console.log("✅ Migration réussie !");
+  } catch (err) {
+    console.error("❌ Erreur de migration:", err);
+    seedDefaults();
+  }
+} else if (adminExists === 0) {
   seedDefaults();
 }
 
+// ─── Migration helper ─────────────────────────────────────────
+function migrateFromJSON(d) {
+  const run = db.transaction(() => {
+    // Admin
+    if (d.admin) {
+      const pw = d.admin.password || hashPasswordSync("admin1234");
+      db.prepare(`INSERT OR REPLACE INTO admin (id, nom, prenom, username, password, avatar)
+                  VALUES (1, ?, ?, ?, ?, ?)`)
+        .run(d.admin.nom || "Admin", d.admin.prenom || "Admin",
+             d.admin.username || "admin", pw, d.admin.avatar || "🧑‍🏫");
+    }
+
+    // Settings
+    if (d.settings) {
+      for (const [k, v] of Object.entries(d.settings)) {
+        db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
+          .run(k, String(v));
+      }
+    }
+
+    // Lang levels
+    for (const ll of (d.langLevels || [])) {
+      db.prepare("INSERT OR IGNORE INTO lang_levels (id, nom) VALUES (?, ?)").run(ll.id, ll.nom);
+    }
+
+    // Groups
+    for (const sg of (d.groups || [])) {
+      db.prepare(`INSERT OR REPLACE INTO groups (id, nom, categoryId, levelId, groupType, days, time, startDate, endDate, sessionsPerCycle, academicYearId)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(sg.id, sg.nom, sg.categoryId || null, sg.levelId || null,
+             sg.groupType || "Normal", JSON.stringify(sg.days || []),
+             sg.time || null, sg.startDate || null, sg.endDate || null,
+             sg.sessionsPerCycle || 4, sg.academicYearId || null);
+    }
+
+    // Students
+    for (const st of (d.students || [])) {
+      const pw = st.password || hashPasswordSync("admin1234");
+      const code = st.studentCode || `STU-${String(d.students.indexOf(st) + 1).padStart(3, '0')}`;
+      db.prepare(`INSERT OR REPLACE INTO students (id, nom, prenom, phone, password, nfcCardId, enrollmentPaid, enrollmentDate, lastModified, createdAt, accountStatus, studentCode)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(st.id, st.nom, st.prenom, st.phone || null, pw,
+             st.nfcCardId || "",
+             st.enrollmentPaid ? 1 : 0, st.enrollmentDate || null,
+             st.lastModified || null, st.createdAt || null,
+             st.accountStatus || 'active', code);
+    }
+
+    // Enrollments
+    for (const en of (d.enrollments || [])) {
+      db.prepare(`INSERT OR REPLACE INTO enrollments (id, studentId, academicYearId, groupId, monthlyPrice)
+                  VALUES (?, ?, ?, ?, ?)`)
+        .run(en.id, en.studentId, en.academicYearId || null, en.groupId || null, en.monthlyPrice || 0);
+    }
+
+    // Sessions
+    for (const s of (d.sessions || [])) {
+      db.prepare(`INSERT OR REPLACE INTO sessions (id, groupId, academicYearId, date, time, status, note)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .run(s.id, s.groupId, s.academicYearId || null, s.date, s.time || "00:00", s.status || "planned", s.note || "");
+    }
+
+    // Attendances
+    for (const a of (d.attendances || [])) {
+      db.prepare(`INSERT OR REPLACE INTO attendances (id, sessionId, studentId, present, date, time, nfcVerified)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .run(a.id, a.sessionId || null, a.studentId, a.present ? 1 : 0,
+             a.date || null, a.time || null, a.nfcVerified ? 1 : 0);
+    }
+
+    // Payments (stored as JSON blobs)
+    for (const p of (d.payments || [])) {
+      db.prepare("INSERT OR REPLACE INTO payments (id, data_json) VALUES (?, ?)").run(p.id, JSON.stringify(p));
+    }
+
+    // Parents
+    for (const p of (d.parents || [])) {
+      const pw = p.password || hashPasswordSync("000000");
+      db.prepare(`INSERT OR REPLACE INTO parents (id, nom, telephone, password, data_json)
+                  VALUES (?, ?, ?, ?, ?)`)
+        .run(p.id, p.nom || "", p.telephone || null, pw, JSON.stringify({ ...p, password: undefined }));
+    }
+
+    // Extra sessions
+    for (const es of (d.extraSessions || [])) {
+      db.prepare("INSERT OR REPLACE INTO extra_sessions (id, data_json) VALUES (?, ?)").run(es.id, JSON.stringify(es));
+    }
+
+    // User notifications
+    for (const n of (d.userNotifications || [])) {
+      db.prepare(`INSERT OR REPLACE INTO user_notifications (id, userId, type, title, message, meta, date, time, read)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(n.id, n.userId, n.type || "info", n.title || "", n.message || "",
+             JSON.stringify(n.meta || {}), n.date || null, n.time || null, n.read ? 1 : 0);
+    }
+
+    // Generic JSON blob tables
+    const blobTables = [
+      ["private_messages",  d.privateMessages],
+      ["messages",          d.messages],
+      ["notifications",     d.notifications],
+      ["comm_groups",       d.commGroups],
+      ["comm_messages",     d.commMessages],
+      ["groups_table",      d.groups],
+    ];
+    for (const [table, arr] of blobTables) {
+      for (const item of (arr || [])) {
+        db.prepare(`INSERT OR REPLACE INTO ${table} (id, data_json) VALUES (?, ?)`)
+          .run(item.id, JSON.stringify(item));
+      }
+    }
+
+    // Comm categories
+    for (const cat of (d.commCategories || [])) {
+      db.prepare("INSERT OR IGNORE INTO comm_categories (id, nom) VALUES (?, ?)").run(cat.id, cat.nom);
+    }
+  });
+  run();
+}
+
+// ─── Seed defaults if no JSON exists either ───────────────────
 function seedDefaults() {
   const pw = hashPasswordSync("admin");
   db.transaction(() => {

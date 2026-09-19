@@ -1,13 +1,13 @@
-import { API_ENDPOINTS } from "../../config/api";
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Radio, CheckCircle2, Usb, AlertTriangle } from "lucide-react";
 import { C, inputStyle, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
 import PrimaryBtn from "../../components/ui/PrimaryBtn";
+import { getApiUrl } from "../../config/api";
 
-const API_BASE_URL = API_ENDPOINTS.nfc;
+const getApiBaseUrl = () => getApiUrl("/api/nfc");
 
 function playScanTone() {
   try {
@@ -53,7 +53,9 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
     studyClass: initial.studyClass || "",
     nfcCardId: initial.nfcCardId || "",
     enrollmentPaid: initial.enrollmentPaid,
-    enrollmentFeeExempt: initial.enrollmentFeeExempt || false,
+    registrationFeeAmount: initial.registrationFeeAmount !== undefined ? initial.registrationFeeAmount : (enrollmentFee || 500),
+    registrationFeePaid: initial.registrationFeePaid !== undefined ? initial.registrationFeePaid : (initial.enrollmentPaid ? (enrollmentFee || 500) : 0),
+    registrationFeeStatus: initial.registrationFeeStatus || (initial.enrollmentPaid ? "PAYÉ" : "NON PAYÉ"),
     enrollmentDate: initial.enrollmentDate || new Date().toISOString().slice(0, 10),
     monthlyPrice: initial.monthlyPrice || initial.montant || 0,
     groupId: initial.groupId || groupId || "",
@@ -66,7 +68,9 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
     password: uid().slice(0, 6),
     nfcCardId: "",
     enrollmentPaid: false,
-    enrollmentFeeExempt: false,
+    registrationFeeAmount: enrollmentFee || 500,
+    registrationFeePaid: 0,
+    registrationFeeStatus: "NON PAYÉ",
     enrollmentDate: new Date().toISOString().slice(0, 10),
     monthlyPrice: 0,
     groupId: groupId || "",
@@ -80,16 +84,6 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
   const justScannedTimer = useRef(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  // Auto-fill studyClass when group changes
-  useEffect(() => {
-    if (form.groupId) {
-      const selectedGroup = (allGroups || []).find(g => g.id === form.groupId);
-      if (selectedGroup && selectedGroup.levelId) {
-        setForm(f => ({ ...f, studyClass: selectedGroup.levelId }));
-      }
-    }
-  }, [form.groupId]);
 
   // ── Live 5YOA NFC Reader Stream Connection ──
   useEffect(() => {
@@ -169,6 +163,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
   const handleSave = () => {
     if (!form.nom.trim() || !form.prenom.trim() || !form.phone.trim()) return;
     if (nfcDuplicate) return;
+    const isPaid = form.registrationFeeStatus === "PAYÉ" || form.enrollmentPaid;
     const student = {
       id: initial?.id || uid(),
       nom: form.nom.trim(),
@@ -181,8 +176,10 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
       groupId: form.groupId || groupId,
       monthlyPrice: Number(form.monthlyPrice) || 0,
       montant: Number(form.monthlyPrice) || 0,
-      enrollmentPaid: form.enrollmentFeeExempt ? true : form.enrollmentPaid,
-      enrollmentFeeExempt: form.enrollmentFeeExempt,
+      enrollmentPaid: isPaid,
+      registrationFeeAmount: Number(form.registrationFeeAmount) || 500,
+      registrationFeePaid: isPaid ? (Number(form.registrationFeeAmount) || 500) : Number(form.registrationFeePaid) || 0,
+      registrationFeeStatus: form.registrationFeeStatus || (isPaid ? "PAYÉ" : "NON PAYÉ"),
       enrollmentDate: form.enrollmentDate,
       studentCode: form.studentCode,
       accountStatus: form.accountStatus,
@@ -234,40 +231,21 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
         )}
       </div>
 
-      {/* Classe auto from group */}
-      {form.groupId && (allGroups || []).find(g => g.id === form.groupId)?.levelId && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase" }}>
-            {lang === "ar" ? "القسم" : "Classe"}
-          </span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "#818cf8" }}>
-            {(allGroups || []).find(g => g.id === form.groupId)?.levelId}
-          </span>
-          <span style={{ marginLeft: "auto", fontSize: 10.5, color: C.inkSoft }}>
-            {lang === "ar" ? "محدد تلقائياً من المجموعة" : "Défini automatiquement depuis le groupe"}
-          </span>
-        </div>
-      )}
-
-
-      {/* Nom & Prénom */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label={lang === "ar" ? "اللقب" : "Nom"}>
-          <input
-            autoFocus
-            style={inputStyle}
-            placeholder={lang === "ar" ? "اللقب (مثال: قاسي)" : "Nom (ex: Kaci)"}
-            value={form.nom}
-            onChange={e => set("nom", e.target.value)}
-          />
+          <input autoFocus style={inputStyle} placeholder="Kaci" value={form.nom} onChange={e => set("nom", e.target.value)} />
         </Field>
         <Field label={lang === "ar" ? "الاسم" : "Prénom"}>
-          <input
-            style={inputStyle}
-            placeholder={lang === "ar" ? "الاسم (مثال: ياسمين)" : "Prénom (ex: Yasmine)"}
-            value={form.prenom}
-            onChange={e => set("prenom", e.target.value)}
-          />
+          <input style={inputStyle} placeholder="Yasmine" value={form.prenom} onChange={e => set("prenom", e.target.value)} />
+        </Field>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label={lang === "ar" ? "المدرسة (اختياري)" : "École (Optionnel)"}>
+          <input style={inputStyle} placeholder={lang === "ar" ? "ثانوية الأمير عبد القادر" : "Lycée Emir Abdelkader"} value={form.school || ""} onChange={e => set("school", e.target.value)} />
+        </Field>
+        <Field label={lang === "ar" ? "الصف (اختياري)" : "Classe (Optionnel)"}>
+          <input style={inputStyle} placeholder={lang === "ar" ? "1 AS" : "1 AS"} value={form.studyClass || ""} onChange={e => set("studyClass", e.target.value)} />
         </Field>
       </div>
 
@@ -306,7 +284,58 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
         </Field>
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label={lang === "ar" ? "المجموعة" : "Groupe"}>
+          <select
+            style={selectStyle}
+            value={form.groupId}
+            onChange={e => set("groupId", e.target.value)}
+          >
+            <option value="">{lang === "ar" ? "-- اختر مجموعة --" : "-- Sélectionner --"}</option>
+            {groups.map(sg => (
+              <option key={sg.id} value={sg.id}>
+                {sg.nom} ({sg.groupType || "Normal"})
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={lang === "ar" ? "السعر الشهري (DA)" : "Prix mensuel (DA)"}>
+          <input
+            type="number"
+            min={0}
+            style={inputStyle}
+            placeholder="2500"
+            value={form.monthlyPrice}
+            onChange={e => set("monthlyPrice", e.target.value)}
+          />
+        </Field>
+      </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label={lang === "ar" ? "تاريخ التسجيل" : "Date d'inscription"}>
+          <input type="date" style={inputStyle} value={form.enrollmentDate} onChange={e => set("enrollmentDate", e.target.value)} />
+        </Field>
+        <Field label={lang === "ar" ? "حالة الحساب" : "Statut du compte"}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {["active", "inactive"].map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => set("accountStatus", s)}
+                style={{
+                  flex: 1, padding: "9px 8px", borderRadius: 10, fontSize: 12.5, fontWeight: 700,
+                  border: `1.5px solid ${form.accountStatus === s ? (s === "active" ? "rgba(74,222,128,0.5)" : "rgba(248,113,113,0.5)") : "rgba(255,255,255,0.15)"}`,
+                  background: form.accountStatus === s ? (s === "active" ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.15)") : "rgba(255,255,255,0.04)",
+                  color: form.accountStatus === s ? (s === "active" ? "#4ade80" : "#f87171") : "rgba(255,255,255,0.5)",
+                  cursor: "pointer", transition: "all 0.15s",
+                }}
+              >
+                {s === "active" ? (lang === "ar" ? "نشط ✓" : "Actif ✓") : (lang === "ar" ? "معطل ✗" : "Inactif ✗")}
+              </button>
+            ))}
+          </div>
+        </Field>
+      </div>
 
       {/* ── NFC Card Field with live scan support ── */}
       <Field
@@ -379,77 +408,38 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
         </div>
       </Field>
 
-
-
       {/* Frais d'inscription */}
-      {!isEdit && (
-        <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${form.enrollmentFeeExempt ? "rgba(148,163,184,0.2)" : form.enrollmentPaid ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}`, marginTop: 4, transition: "border-color 0.2s" }}>
-
-          {/* Checkbox: Gratuit */}
-          <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", background: form.enrollmentFeeExempt ? "rgba(148,163,184,0.06)" : "transparent" }}>
-            <div
-              onClick={() => set("enrollmentFeeExempt", !form.enrollmentFeeExempt)}
-              style={{
-                width: 18, height: 18, borderRadius: 5, flexShrink: 0,
-                border: `2px solid ${form.enrollmentFeeExempt ? "#94a3b8" : "rgba(255,255,255,0.3)"}`,
-                background: form.enrollmentFeeExempt ? "#94a3b8" : "transparent",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", cursor: "pointer"
-              }}
-            >
-              {form.enrollmentFeeExempt && (
-                <span style={{ fontSize: 11, fontWeight: 900, color: "#1e293b", lineHeight: 1 }}>✓</span>
-              )}
-            </div>
-            <span
-              onClick={() => set("enrollmentFeeExempt", !form.enrollmentFeeExempt)}
-              style={{ fontSize: 13, fontWeight: 600, color: form.enrollmentFeeExempt ? "rgba(255,255,255,0.45)" : C.ink, userSelect: "none" }}
-            >
-              {lang === "ar" ? "معفى من حقوق التسجيل" : "Exempté des frais d'inscription (Gratuit)"}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 12, background: form.enrollmentPaid ? "rgba(74,222,128,0.1)" : "rgba(251,191,36,0.1)", border: `1px solid ${form.enrollmentPaid ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}`, marginTop: 4 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
+            {lang === "ar" ? "رسوم التسجيل" : "Frais d'inscription"}
+            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 800, color: C.accent }}>
+              {enrollmentFee || 500} DA
             </span>
-            {form.enrollmentFeeExempt && (
-              <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#94a3b8", background: "rgba(148,163,184,0.15)", padding: "2px 8px", borderRadius: 999 }}>
-                Gratuit
-              </span>
-            )}
-          </label>
-
-          {/* Paid/Unpaid row — hidden when gratuit */}
-          {!form.enrollmentFeeExempt && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderTop: "1px solid rgba(255,255,255,0.07)", background: form.enrollmentPaid ? "rgba(74,222,128,0.07)" : "rgba(251,191,36,0.07)" }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
-                  {lang === "ar" ? "حقوق التسجيل" : "Frais d'inscription"}
-                  <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 800, color: C.accent }}>
-                    {enrollmentFee || 500} DA
-                  </span>
-                </div>
-                <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>
-                  {form.enrollmentPaid
-                    ? (lang === "ar" ? "مدفوعة ✓" : "Payés ✓")
-                    : (lang === "ar" ? "غير مدفوعة" : "Non payés")
-                  }
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => set("enrollmentPaid", !form.enrollmentPaid)}
-                style={{
-                  padding: "7px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, border: "none",
-                  background: form.enrollmentPaid ? "rgba(74,222,128,0.25)" : "rgba(251,191,36,0.25)",
-                  color: form.enrollmentPaid ? "#4ade80" : "#fbbf24",
-                  cursor: "pointer", transition: "all 0.15s",
-                }}
-              >
-                {form.enrollmentPaid
-                  ? (lang === "ar" ? "تعيين غير مدفوعة" : "Marquer impayé")
-                  : (lang === "ar" ? "تعيين مدفوعة" : "Marquer payé")
-                }
-              </button>
-            </div>
-          )}
+          </div>
+          <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>
+            {form.enrollmentPaid
+              ? (lang === "ar" ? "مدفوعة ✓" : "Payés ✓")
+              : (lang === "ar" ? "غير مدفوعة" : "Non payés")
+            }
+          </div>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => set("enrollmentPaid", !form.enrollmentPaid)}
+          style={{
+            padding: "7px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, border: "none",
+            background: form.enrollmentPaid ? "rgba(74,222,128,0.25)" : "rgba(251,191,36,0.25)",
+            color: form.enrollmentPaid ? "#4ade80" : "#fbbf24",
+            cursor: "pointer", transition: "all 0.15s",
+          }}
+        >
+          {form.enrollmentPaid
+            ? (lang === "ar" ? "تحديد كغير مدفوع" : "Marquer impayé")
+            : (lang === "ar" ? "تحديد كمدفوع" : "Marquer payé")
+          }
+        </button>
+      </div>
 
       <div style={{ marginTop: 16 }}>
         <PrimaryBtn full onClick={handleSave} disabled={!isValid}>
@@ -461,4 +451,3 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
     </Modal>
   );
 }
-
