@@ -50,18 +50,15 @@ router.post("/assign", (req, res) => {
  * Body: { cardUid: string }
  */
 router.post("/scan", (req, res) => {
-  const { cardUid } = req.body;
+  const cardUid = req.body.uid || req.body.cardUid;
   if (!cardUid) {
     return res.status(400).json({
       success: false,
-      message: "cardUid est requis.",
+      message: "uid ou cardUid est requis.",
     });
   }
 
-  const result = processCardScan(cardUid);
-  // Also notify any connected SSE clients
-  nfcReaderService.emit("card_scanned", result);
-
+  const result = nfcReaderService.handleCardScan(cardUid);
   res.json(result);
 });
 
@@ -91,9 +88,12 @@ router.post("/clear-history", (req, res) => {
  */
 router.get("/stream", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
+  if (typeof res.flushHeaders === "function") {
+    res.flushHeaders();
+  }
 
   const sendEvent = (event, data) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);

@@ -8,6 +8,7 @@ import Pill from "../../components/ui/Pill";
 import AttendanceDots from "../../components/ui/AttendanceDots";
 import StudentFormModal from "./StudentFormModal";
 import GroupFormModal from "./GroupFormModal";
+import { deleteGroupApi, createGroupApi } from "../../utils/groupApi";
 
 export default function GroupsDashboard({ data, setData, filter, setFilter, toastFn }) {
   const { t, isRTL } = useLanguage();
@@ -31,13 +32,11 @@ export default function GroupsDashboard({ data, setData, filter, setFilter, toas
 
   useEffect(() => {
     if (filter && filter.type === "Individuel") {
-      const existing = data.groups.find(g => g.niveau === filter.niveau && g.annee === filter.annee && g.type === "Individuel");
+      const existing = (data.groups || []).find(g => g.niveau === filter.niveau && g.annee === filter.annee && g.type === "Individuel");
       if (existing) {
         setOpenGroupId(existing.id);
       } else {
-        const newGrp = { id: uid(), niveau: filter.niveau, annee: filter.annee, type: "Individuel", nom: t("typeIndividuel") };
-        setData(d => ({ ...d, groups: [...d.groups, newGrp] }));
-        setOpenGroupId(newGrp.id);
+        setOpenGroupId(null);
       }
     } else {
       setOpenGroupId(null);
@@ -76,15 +75,21 @@ export default function GroupsDashboard({ data, setData, filter, setFilter, toas
     setData(d => ({ ...d, students: d.students.filter(s => s.id !== id) }));
   };
 
-  const removeGroup = (id, e) => {
+  const removeGroup = async (id, e) => {
     e.stopPropagation();
     if (window.confirm(t("deleteGroupConfirm"))) {
-      setData(d => ({
-        ...d,
-        groups: d.groups.filter(g => g.id !== id),
-        students: d.students.filter(s => s.groupId !== id)
-      }));
-      toastFn(t("groupDeleted"));
+      try {
+        await deleteGroupApi(id);
+        setData(d => ({
+          ...d,
+          groups: d.groups.filter(g => g.id !== id),
+          students: d.students.filter(s => s.groupId !== id)
+        }));
+        toastFn(t("groupDeleted"));
+      } catch (err) {
+        console.error("Erreur suppression groupe:", err);
+        alert(err.message || t("groupDeletedError") || "Échec de la suppression du groupe.");
+      }
     }
   };
 
@@ -262,7 +267,12 @@ export default function GroupsDashboard({ data, setData, filter, setFilter, toas
       </div>
 
       {showAddGroup && filter && (
-        <GroupFormModal filter={filter} onClose={() => setShowAddGroup(false)} onSave={(g) => {
+        <GroupFormModal filter={filter} onClose={() => setShowAddGroup(false)} onSave={async (g) => {
+          try {
+            await createGroupApi(g);
+          } catch (err) {
+            console.warn("Backend group create notice:", err.message);
+          }
           setData(d => ({ ...d, groups: [...d.groups, g] }));
           setShowAddGroup(false);
           toastFn(t("groupCreated"));
