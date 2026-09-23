@@ -32,8 +32,19 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
 
   const currentYear = (data.academicYears || []).find(y => y.isCurrent) || (data.academicYears || [])[0];
 
+  // Auto-calculate next year
+  let autoNextYearName = "";
+  if (currentYear && currentYear.name) {
+    const parts = currentYear.name.split("_");
+    if (parts.length === 2) {
+      const y1 = parseInt(parts[0], 10);
+      const y2 = parseInt(parts[1], 10);
+      autoNextYearName = `${y1 + 1}_${y2 + 1}`;
+    }
+  }
+
   const handlePreviewRollover = () => {
-    if (!newYearName.trim()) return;
+    if (!autoNextYearName) return;
     if (!currentYear) return toastFn("No current year found.");
     
     const previewDebts = [];
@@ -47,7 +58,7 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
       }
     });
     
-    setRolloverPreview({ newYearName, debts: previewDebts, totalDebt });
+    setRolloverPreview({ newYearName: autoNextYearName, debts: previewDebts, totalDebt });
   };
 
   const handleConfirmRollover = () => {
@@ -102,8 +113,7 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
     }));
 
     setRolloverPreview(null);
-    setNewYearName("");
-    toastFn(lang === "ar" ? "تم إنشاء السنة ونقل الديون والمجموعات بنجاح!" : "Nouvelle année créée, dettes et groupes transférés!");
+    toastFn(lang === "ar" ? "تم الانتقال للسنة ونقل الديون بنجاح!" : "Nouvelle année activée, dettes et groupes transférés!");
   };
 
   return (
@@ -197,33 +207,60 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
 
           <div style={{ padding: 16, borderRadius: 14, background: "rgba(99,102,241,0.06)", border: "1px dashed rgba(99,102,241,0.3)" }}>
             <h4 style={{ margin: "0 0 12px", fontSize: 14, color: "#818cf8", fontWeight: 700 }}>
-              {lang === "ar" ? "إضافة سنة جديدة" : "Ajouter une année"}
+              {lang === "ar" ? "الانتقال للسنة الدراسية القادمة" : "Passer à l'année suivante"}
             </h4>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input 
-                style={{ ...inputStyle, flex: 1 }} 
-                placeholder={lang === "ar" ? "مثال: 2028_2029" : "Ex: 2028_2029"} 
-                value={newYearName} 
-                onChange={e => setNewYearName(e.target.value)} 
-              />
-              <button 
-                onClick={handleConfirmRollover}
-                disabled={!newYearName.trim()}
-                style={{
-                  background: newYearName.trim() ? "#818cf8" : "rgba(129,140,248,0.5)",
-                  color: "#fff", border: "none", borderRadius: 10, padding: "0 16px",
-                  fontWeight: 700, cursor: newYearName.trim() ? "pointer" : "not-allowed",
-                  transition: "0.2s"
-                }}
-              >
-                {lang === "ar" ? "إضافة" : "Ajouter"}
-              </button>
-            </div>
-            <p style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 10, lineHeight: 1.5 }}>
-              {lang === "ar" 
-                ? "عند إضافة سنة جديدة سيتم نقل الأفواج والديون غير المدفوعة آلياً إليها." 
-                : "L'ajout d'une nouvelle année transfèrera automatiquement les groupes et les dettes impayées."}
-            </p>
+            
+            {!rolloverPreview ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, color: C.ink }}>
+                    {lang === "ar" ? "السنة القادمة:" : "Prochaine année :"} <strong style={{ fontSize: 15, color: C.accent }}>{autoNextYearName}</strong>
+                  </div>
+                  <button 
+                    onClick={handlePreviewRollover}
+                    style={{
+                      background: "#818cf8", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px",
+                      fontWeight: 700, cursor: "pointer", transition: "0.2s"
+                    }}
+                  >
+                    {lang === "ar" ? "معاينة نقل الديون" : "Aperçu du report des dettes"}
+                  </button>
+                </div>
+                <p style={{ fontSize: 11.5, color: C.inkSoft, margin: 0, lineHeight: 1.5 }}>
+                  {lang === "ar" 
+                    ? "الانتقال سينقل الأفواج والديون غير المدفوعة تلقائياً إلى السنة القادمة." 
+                    : "Le passage transfèrera automatiquement les groupes et les dettes impayées."}
+                </p>
+              </>
+            ) : (
+              <div style={{ background: "rgba(0,0,0,0.2)", padding: 12, borderRadius: 10 }}>
+                <div style={{ fontSize: 13, color: C.ink, marginBottom: 10 }}>
+                  {lang === "ar" ? "سيتم نقل ديون لـ " : "Dettes à transférer : "} 
+                  <strong>{rolloverPreview.debts.length}</strong> {lang === "ar" ? "تلاميذ" : "élèves"} 
+                  (Total: <strong>{rolloverPreview.totalDebt} DA</strong>)
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button 
+                    onClick={handleConfirmRollover}
+                    style={{
+                      flex: 1, background: "#4ade80", color: "#111", border: "none", borderRadius: 10, padding: "8px",
+                      fontWeight: 700, cursor: "pointer"
+                    }}
+                  >
+                    {lang === "ar" ? "تأكيد والانتقال" : "Confirmer le passage"}
+                  </button>
+                  <button 
+                    onClick={() => setRolloverPreview(null)}
+                    style={{
+                      background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "8px 12px",
+                      fontWeight: 700, cursor: "pointer"
+                    }}
+                  >
+                    {lang === "ar" ? "إلغاء" : "Annuler"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
