@@ -192,6 +192,15 @@ db.exec(`
 
 // ─── Schema Migration ────────────
 try {
+  // Auto-seed academic years if empty
+  const yearCount = db.prepare("SELECT COUNT(*) as count FROM academic_years").get().count;
+  if (yearCount === 0) {
+    const insertYear = db.prepare("INSERT INTO academic_years (id, name, isCurrent) VALUES (?, ?, ?)");
+    insertYear.run("ay_2526", "2025_2026", 1);
+    insertYear.run("ay_2627", "2026_2027", 0);
+    insertYear.run("ay_2728", "2027_2028", 0);
+  }
+
   const sessionCols = db.prepare("PRAGMA table_info(sessions)").all().map(c => c.name);
   if (!sessionCols.includes("groupId")) {
     db.exec("ALTER TABLE sessions ADD COLUMN groupId TEXT;");

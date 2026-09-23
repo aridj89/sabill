@@ -177,8 +177,58 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
           <PrimaryBtn onClick={() => { onSave(form); toastFn(t("settingsSavedToast")); }}>{t("saveSettingsBtn")}</PrimaryBtn>
         </div>
 
+        {/* Right Column: Academic Years */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: 22 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <Globe size={18} color={C.accent} />
+            <h3 className="f-display" style={{ fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>
+              {lang === "ar" ? "السنوات الدراسية" : "Années Scolaires"}
+            </h3>
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+            {(data.academicYears || []).map(y => (
+              <div key={y.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, background: y.isCurrent ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${y.isCurrent ? "rgba(74,222,128,0.3)" : C.border}` }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: y.isCurrent ? "#4ade80" : C.ink }}>{y.name}</span>
+                {y.isCurrent && <span style={{ fontSize: 11, background: "#4ade80", color: "#111", padding: "2px 8px", borderRadius: 999, fontWeight: 800 }}>{lang === "ar" ? "السنة الحالية" : "Actuelle"}</span>}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding: 16, borderRadius: 14, background: "rgba(99,102,241,0.06)", border: "1px dashed rgba(99,102,241,0.3)" }}>
+            <h4 style={{ margin: "0 0 12px", fontSize: 14, color: "#818cf8", fontWeight: 700 }}>
+              {lang === "ar" ? "إضافة سنة جديدة" : "Ajouter une année"}
+            </h4>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input 
+                style={{ ...inputStyle, flex: 1 }} 
+                placeholder={lang === "ar" ? "مثال: 2028_2029" : "Ex: 2028_2029"} 
+                value={newYearName} 
+                onChange={e => setNewYearName(e.target.value)} 
+              />
+              <button 
+                onClick={handleConfirmRollover}
+                disabled={!newYearName.trim()}
+                style={{
+                  background: newYearName.trim() ? "#818cf8" : "rgba(129,140,248,0.5)",
+                  color: "#fff", border: "none", borderRadius: 10, padding: "0 16px",
+                  fontWeight: 700, cursor: newYearName.trim() ? "pointer" : "not-allowed",
+                  transition: "0.2s"
+                }}
+              >
+                {lang === "ar" ? "إضافة" : "Ajouter"}
+              </button>
+            </div>
+            <p style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 10, lineHeight: 1.5 }}>
+              {lang === "ar" 
+                ? "عند إضافة سنة جديدة سيتم نقل الأفواج والديون غير المدفوعة آلياً إليها." 
+                : "L'ajout d'une nouvelle année transfèrera automatiquement les groupes et les dettes impayées."}
+            </p>
+          </div>
+        </div>
 
       </div>
     </div>
   );
 }
+
