@@ -164,21 +164,7 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
           <GlobalSearch data={data} onNav={handleNav} />
           
           <div style={{ display: "flex", gap: 8, marginLeft: isRTL ? 0 : "auto", marginRight: isRTL ? "auto" : 0, alignItems: "center" }}>
-            {data.academicYears && data.academicYears.length > 0 && (
-              <select
-                value={activeYearId || ""}
-                onChange={e => setActiveYearId(e.target.value)}
-                style={{
-                  background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.ink,
-                  borderRadius: 10, padding: "6px 10px", fontSize: 13, outline: "none", cursor: "pointer",
-                  fontWeight: 600
-                }}
-              >
-                {data.academicYears.map(y => (
-                  <option key={y.id} value={y.id} style={{ color: "#000" }}>{y.name}</option>
-                ))}
-              </select>
-            )}
+
             <LanguageToggle />
             
             {/* Notifications Dropdown */}

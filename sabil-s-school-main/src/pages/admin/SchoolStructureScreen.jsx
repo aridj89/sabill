@@ -306,9 +306,25 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
               />
             );
           })}
-          {groups.length === 0 && (
-            <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px 0", color: C.inkSoft }}>
-              {lang === "ar" ? "لا توجد مجموعات — أنشئ مجموعة جديدة" : "Aucun sous-groupe — Créez le premier"}
+          {!isReadOnlyYear && (
+            <div
+              onClick={() => setShowAdd(true)}
+              style={{
+                background: "rgba(255,255,255,0.02)", border: `2px dashed ${C.border}`,
+                borderRadius: 20, padding: "20px 18px", cursor: "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14,
+                transition: "all 0.2s ease", minHeight: 180,
+                color: C.inkSoft
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; e.currentTarget.style.background = "rgba(226,150,58,0.05)" }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.inkSoft; e.currentTarget.style.background = "rgba(255,255,255,0.02)" }}
+            >
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${C.border}` }}>
+                <Plus size={24} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>
+                {lang === "ar" ? "إضافة فوج جديد" : "Créer un groupe"}
+              </div>
             </div>
           )}
         </div>
