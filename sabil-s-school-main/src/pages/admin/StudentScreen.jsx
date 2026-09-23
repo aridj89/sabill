@@ -176,126 +176,115 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
         </div>
       </div>
 
-      {/* ── Status badges ──────────────────────────────────────── */}
+      {/* ── Table de Profil Structuré ──────────────────────────── */}
       {(() => {
-        const fin = getStudentFinancialSummary(data, st.id, data.activeYearId); // Note: AdminApp passes activeYearId
+        const fin = getStudentFinancialSummary(data, st.id, data.activeYearId);
         return (
-          <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
-            {/* Monthly Price */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: "rgba(226,150,58,0.12)", border: "1px solid rgba(226,150,58,0.3)" }}>
-              <CreditCard size={18} color={C.accent} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: C.accent, textTransform: "uppercase" }}>
-                  {lang === "ar" ? "السعر الشهري" : "Prix mensuel"}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: C.accent }}>
-                  {studentPrice.toLocaleString()} DA
-                </div>
-              </div>
-            </div>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, overflow: "hidden", marginBottom: 24, boxShadow: "0 12px 32px rgba(0,0,0,0.15)" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 13.5 }}>
+              <tbody>
+                {/* Numéro */}
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, width: "30%", background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "رقم التلميذ (Numéro)" : "Numéro Élève"}</td>
+                  <td style={{ padding: "14px 20px", color: C.ink, fontWeight: 800 }}>{st.studentCode || (lang === "ar" ? "غير محدد" : "Non défini")}</td>
+                </tr>
 
-            {/* Enrollment */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: st.enrollmentPaid ? "rgba(74,222,128,0.12)" : "rgba(251,191,36,0.12)", border: `1px solid ${st.enrollmentPaid ? "rgba(74,222,128,0.3)" : "rgba(251,191,36,0.3)"}` }}>
-              {st.enrollmentPaid ? <CheckCircle2 size={18} color="#4ade80" /> : <AlertTriangle size={18} color="#fbbf24" />}
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: st.enrollmentPaid ? "#4ade80" : "#fbbf24", textTransform: "uppercase" }}>
-                  {lang === "ar" ? "التسجيل" : "Inscription"}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>
-                  {st.enrollmentPaid ? (lang === "ar" ? "مدفوع ✓" : "Payé ✓") : (lang === "ar" ? "غير مدفوع ⚠" : "Impayé ⚠")}
-                </div>
-              </div>
-            </div>
+                {/* Nom & Prénom */}
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "الاسم واللقب" : "Nom & Prénom"}</td>
+                  <td style={{ padding: "14px 20px", color: C.ink, fontWeight: 800 }}>{st.prenom} {st.nom}</td>
+                </tr>
 
-            {/* Previous Debt (only if > 0) */}
-            {fin.previousDebtRemaining > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.3)" }}>
-                <AlertTriangle size={18} color="#f87171" />
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#f87171", textTransform: "uppercase" }}>
-                    {lang === "ar" ? "دين سابق" : "Dette Précédente"}
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#f87171" }}>
-                    {fin.previousDebtRemaining.toLocaleString()} DA
-                  </div>
-                </div>
-              </div>
-            )}
+                {/* Mot de passe */}
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "كلمة المرور (Password)" : "Mot de passe"}</td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ color: C.ink, fontWeight: 700, letterSpacing: 2 }}>••••••••</span>
+                      <button
+                        onClick={resetPassword}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 700, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.07)", color: C.inkSoft, cursor: "pointer", transition: "all 0.15s" }}
+                      >
+                        <Key size={12} /> {lang === "ar" ? "إعادة التعيين" : "Réinitialiser"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
 
-            {/* Total Paid */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)" }}>
-              <CheckCircle2 size={18} color="#4ade80" />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#4ade80", textTransform: "uppercase" }}>
-                  {lang === "ar" ? "إجمالي المسدد" : "Total payé (Année)"}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#4ade80" }}>
-                  {fin.totalPaid.toLocaleString()} DA
-                </div>
-              </div>
-            </div>
+                {/* Inscription */}
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "التسجيل (Inscription)" : "Inscription"}</td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: st.enrollmentPaid ? "rgba(74,222,128,0.15)" : "rgba(251,191,36,0.15)", color: st.enrollmentPaid ? "#4ade80" : "#fbbf24" }}>
+                      {st.enrollmentPaid ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                      {st.enrollmentPaid ? (lang === "ar" ? "مدفوع ✓" : "Payé ✓") : (lang === "ar" ? "غير مدفوع ⚠" : "Impayé ⚠")}
+                    </span>
+                  </td>
+                </tr>
 
-            {/* Total Unpaid */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: fin.totalUnpaid > 0 ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.12)", border: `1px solid ${fin.totalUnpaid > 0 ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)"}` }}>
-              {fin.totalUnpaid > 0 ? <AlertTriangle size={18} color="#f87171" /> : <CheckCircle2 size={18} color="#4ade80" />}
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>
-                  {lang === "ar" ? "إجمالي المتبقي" : "Reste à payer (Total)"}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80" }}>
-                  {fin.totalUnpaid > 0 ? `${fin.totalUnpaid.toLocaleString()} DA` : (lang === "ar" ? "مستوفى ✓" : "À jour ✓")}
-                </div>
-              </div>
-            </div>
+                {/* Paiement */}
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "المدفوعات (Paiement)" : "Paiements"}</td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <div>
+                        <span style={{ color: C.inkSoft, fontSize: 12, marginRight: 6 }}>{lang === "ar" ? "إجمالي المسدد:" : "Total Payé:"}</span>
+                        <span style={{ color: "#4ade80", fontWeight: 800 }}>{fin.totalPaid.toLocaleString()} DA</span>
+                      </div>
+                      {fin.totalUnpaid > 0 && (
+                        <div>
+                          <span style={{ color: C.inkSoft, fontSize: 12, marginRight: 6 }}>{lang === "ar" ? "المتبقي:" : "Reste à payer:"}</span>
+                          <span style={{ color: "#f87171", fontWeight: 800 }}>{fin.totalUnpaid.toLocaleString()} DA</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
 
-            {/* NFC Status */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: st.nfcCardId ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)", border: `1px solid ${st.nfcCardId ? "rgba(74,222,128,0.3)" : C.border}` }}>
-              <Radio size={18} color={st.nfcCardId ? "#4ade80" : C.inkSoft} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: st.nfcCardId ? "#4ade80" : C.inkSoft, textTransform: "uppercase" }}>NFC</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: st.nfcCardId ? "#4ade80" : C.inkSoft }}>
-                  {st.nfcCardId ? (lang === "ar" ? "متصل ✓" : "Connected ✓") : (lang === "ar" ? "غير متصل" : "Not connected")}
-                </div>
-              </div>
-            </div>
+                {/* NFC */}
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "بطاقة NFC" : "Carte NFC"}</td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: st.nfcCardId ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.06)", color: st.nfcCardId ? "#4ade80" : C.inkSoft }}>
+                        <Radio size={14} />
+                        {st.nfcCardId ? (lang === "ar" ? "متصل ✓" : "Connectée ✓") : (lang === "ar" ? "غير متصل" : "Non connectée")}
+                      </span>
+                      {!st.nfcCardId && (
+                        <button
+                          onClick={() => setShowEdit(true)}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 700, border: `1px solid rgba(226,150,58,0.4)`, background: "rgba(226,150,58,0.15)", color: C.accent, cursor: "pointer", transition: "all 0.15s" }}
+                        >
+                          <Radio size={12} /> {lang === "ar" ? "إضافة بطاقة" : "Ajouter une carte"}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
 
-            {/* Account Status */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 12, background: st.accountStatus === "active" ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.12)", border: `1px solid ${st.accountStatus === "active" ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}` }}>
-              <Shield size={18} color={st.accountStatus === "active" ? "#4ade80" : "#f87171"} />
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: st.accountStatus === "active" ? "#4ade80" : "#f87171", textTransform: "uppercase" }}>
-                  {lang === "ar" ? "الحساب" : "Compte"}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: st.accountStatus === "active" ? "#4ade80" : "#f87171" }}>
-                  {st.accountStatus === "active" ? (lang === "ar" ? "نشط ✓" : "Actif ✓") : (lang === "ar" ? "معطل ✗" : "Inactif ✗")}
-                </div>
-              </div>
-            </div>
+                {/* Statut du compte (Optionnel pour admin) */}
+                <tr>
+                  <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "حالة الحساب" : "Statut du compte"}</td>
+                  <td style={{ padding: "14px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontWeight: 800, color: st.accountStatus === "active" ? "#4ade80" : "#f87171" }}>
+                        {st.accountStatus === "active" ? (lang === "ar" ? "نشط ✓" : "Actif ✓") : (lang === "ar" ? "معطل ✗" : "Inactif ✗")}
+                      </span>
+                      <button
+                        onClick={toggleAccountStatus}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 700, border: `1px solid ${st.accountStatus === "active" ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)"}`, background: st.accountStatus === "active" ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.1)", color: st.accountStatus === "active" ? "#f87171" : "#4ade80", cursor: "pointer" }}
+                      >
+                        <Shield size={12} /> {st.accountStatus === "active" ? (lang === "ar" ? "تعطيل" : "Désactiver") : (lang === "ar" ? "تفعيل" : "Activer")}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
           </div>
         );
       })()}
-
-      {/* ── Admin Actions ─────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        <button
-          onClick={resetPassword}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 12.5, fontWeight: 700, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.07)", color: C.inkSoft, cursor: "pointer", transition: "all 0.15s" }}
-        >
-          <Key size={14} /> {lang === "ar" ? "إعادة تعيين كلمة المرور" : "Reset Password"}
-        </button>
-        <button
-          onClick={toggleAccountStatus}
-          style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 12.5, fontWeight: 700,
-            border: `1px solid ${st.accountStatus === "active" ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)"}`,
-            background: st.accountStatus === "active" ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.1)",
-            color: st.accountStatus === "active" ? "#f87171" : "#4ade80",
-            cursor: "pointer", transition: "all 0.15s"
-          }}
-        >
-          <Shield size={14} /> {st.accountStatus === "active" ? (lang === "ar" ? "تعطيل الحساب" : "Désactiver") : (lang === "ar" ? "تفعيل الحساب" : "Activer")}
-        </button>
-      </div>
 
       <div className="student-screen-cols" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {/* ── Left col: Stats & Attendance ────────────────────── */}
@@ -319,21 +308,35 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
               <div style={{ textAlign: "center", color: C.inkSoft, fontSize: 13 }}>{lang === "ar" ? "لا يوجد سجل حضور" : "Aucun historique"}</div>
             ) : (
               <div style={{ display: "grid", gap: 8 }}>
-                {[...attendances].reverse().map(att => {
-                  const sess = data.sessions.find(s => s.id === att.sessionId);
-                  if (!sess) return null;
-                  return (
-                    <div key={att.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                      <div>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: C.ink }}>
-                          {new Date(sess.date + "T12:00").toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { weekday: "short", day: "numeric", month: "short" })}
+                {(() => {
+                  const sortedAtt = [...attendances].sort((a, b) => {
+                    const sa = data.sessions.find(s => s.id === a.sessionId);
+                    const sb = data.sessions.find(s => s.id === b.sessionId);
+                    if (!sa || !sb) return 0;
+                    return (sa.date + sa.time).localeCompare(sb.date + sb.time);
+                  });
+                  return sortedAtt.reverse().map((att, reversedIndex) => {
+                    const sess = data.sessions.find(s => s.id === att.sessionId);
+                    if (!sess) return null;
+                    const sessionNumber = sortedAtt.length - reversedIndex;
+                    return (
+                      <div key={att.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>
+                            {lang === "ar" ? `الحصة ${sessionNumber}` : `Séance ${sessionNumber}`}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: C.inkSoft }}>
+                            {new Date(sess.date + "T12:00").toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { weekday: "short", day: "numeric", month: "short" })} · {sess.time}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11.5, color: C.inkSoft }}>{sess.time}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: att.present ? "#4ade80" : "#f87171", background: att.present ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", padding: "4px 10px", borderRadius: 8 }}>
+                          {att.present ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                          {att.present ? (lang === "ar" ? "حاضر (Présent)" : "Présent") : (lang === "ar" ? "غائب (Absent)" : "Absent")}
+                        </div>
                       </div>
-                      {att.present ? <CheckCircle2 size={18} color="#4ade80" /> : <XCircle size={18} color="#f87171" />}
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             )}
           </div>

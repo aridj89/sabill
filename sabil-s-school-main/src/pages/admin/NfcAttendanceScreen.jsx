@@ -827,28 +827,52 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.06)", padding: "4px 10px", borderRadius: 10, border: `1px solid ${C.border}` }}>
-            <Search size={14} color={C.inkSoft} />
-            <input
-              type="text"
-              value={quickSearch}
-              onChange={e => setQuickSearch(e.target.value)}
-              placeholder={lang === "ar" ? "بحث عن تلميذ..." : "Rechercher..."}
-              style={{ background: "transparent", border: "none", color: C.ink, fontSize: 12.5, outline: "none", width: 140 }}
-            />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {/* Group Filter */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.06)", padding: "4px 10px", borderRadius: 10, border: `1px solid ${C.border}` }}>
+              <Users size={14} color={C.inkSoft} />
+              <select
+                value={selectedSubgroupId === "auto" ? "" : selectedSubgroupId}
+                onChange={e => setSelectedSubgroupId(e.target.value || "auto")}
+                style={{ background: "transparent", border: "none", color: C.ink, fontSize: 12.5, outline: "none", maxWidth: 160 }}
+              >
+                <option value="">{lang === "ar" ? "جميع الأفواج" : "Tous les groupes"}</option>
+                {subgroups.map(sg => (
+                  <option key={sg.id} value={sg.id}>{sg.nom}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.06)", padding: "4px 10px", borderRadius: 10, border: `1px solid ${C.border}` }}>
+              <Search size={14} color={C.inkSoft} />
+              <input
+                type="text"
+                value={quickSearch}
+                onChange={e => setQuickSearch(e.target.value)}
+                placeholder={lang === "ar" ? "بحث عن تلميذ..." : "Rechercher..."}
+                style={{ background: "transparent", border: "none", color: C.ink, fontSize: 12.5, outline: "none", width: 140 }}
+              />
+            </div>
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10, maxHeight: 360, overflowY: "auto" }}>
           {(data.students || [])
             .filter(s => {
+              // Group filtering (check enrollments too just in case)
+              if (selectedSubgroupId !== "auto") {
+                const sGroupId = s.subgroupId || s.groupId;
+                const hasEnrollment = (data.enrollments || []).some(e => e.studentId === s.id && e.groupId === selectedSubgroupId);
+                if (sGroupId !== selectedSubgroupId && !hasEnrollment) return false;
+              }
               if (!quickSearch.trim()) return true;
               const q = quickSearch.toLowerCase().trim();
               return `${s.prenom} ${s.nom}`.toLowerCase().includes(q) || (s.phone || "").includes(q);
             })
             .slice(0, 30)
             .map(st => {
-              const sg = subgroups.find(g => g.id === st.subgroupId);
+              const stGroupId = st.subgroupId || st.groupId || (data.enrollments || []).find(e => e.studentId === st.id)?.groupId;
+              const sg = subgroups.find(g => g.id === stGroupId);
               const hasCard = !!st.nfcCardId;
 
               return (
@@ -910,7 +934,17 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
                   color: C.ink, fontSize: 13.5, fontWeight: 700, outline: "none"
                 }}
               >
-                {(data.students || []).map(s => (
+                {(data.students || [])
+                  .filter(s => {
+                     // Inside the modal, only show students from the same selected group to prevent mixing
+                     if (selectedSubgroupId !== "auto") {
+                       const sGroupId = s.subgroupId || s.groupId;
+                       const hasEnrollment = (data.enrollments || []).some(e => e.studentId === s.id && e.groupId === selectedSubgroupId);
+                       if (sGroupId !== selectedSubgroupId && !hasEnrollment) return false;
+                     }
+                     return true;
+                  })
+                  .map(s => (
                   <option key={s.id} value={s.id}>
                     {s.prenom} {s.nom} ({s.phone || "—"})
                   </option>

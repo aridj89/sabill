@@ -312,6 +312,7 @@ export default function FinancialScreen({ data, setData, toastFn, onNav, activeY
     let extraIncome = 0;
     let totalDebtExpected = 0;
     let totalDebtPaid = 0;
+    let totalDebtUnpaid = 0;
 
     data.students.forEach(st => {
       const fin = getStudentFinancialSummary(data, st.id, activeYearId);

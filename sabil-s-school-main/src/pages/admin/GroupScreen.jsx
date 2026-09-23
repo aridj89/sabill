@@ -225,7 +225,7 @@ function PayEditModal({ student, subgroup, payment, month, onClose, onSave }) {
     onSave({
       id: payment?.id || uid(),
       studentId: student.id,
-      subgroupId: subgroup.id,
+      groupId: subgroup.id,
       month,
       expectedAmount: price,
       paidAmount: finalPaid,
@@ -421,7 +421,7 @@ function PaymentsTab({ subgroup, students, data, setData }) {
 import NfcAttendanceScreen from "./NfcAttendanceScreen";
 
 /* ── Presences tab ───────────────────────────────────────────── */
-function PresencesTab({ subgroup, students, data, setData, toastFn, onNav }) {
+function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdit, onDelete }) {
   const { lang } = useLanguage();
   const currentMonthStr = new Date().toISOString().slice(0, 7);
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -481,6 +481,9 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav }) {
               <th style={{ textAlign: "center", padding: "8px 10px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
                 %
               </th>
+              <th style={{ textAlign: "center", padding: "8px 10px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
+                {lang === "ar" ? "إجراء" : "Action"}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -496,12 +499,18 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav }) {
                 <tr key={st.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.06)`, transition: "background 0.12s" }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "10px 12px", fontWeight: 600, color: C.ink, whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "10px 12px", color: C.ink, whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, color: C.accent, flexShrink: 0 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, color: C.accent, flexShrink: 0 }}>
                         {st.prenom?.[0]}{st.nom?.[0]}
                       </div>
-                      <div>{st.prenom} {st.nom}</div>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{st.prenom} {st.nom}</div>
+                        <div style={{ fontSize: 10.5, color: C.inkSoft, display: "flex", gap: 6, marginTop: 2 }}>
+                          {st.phone && <span>{st.phone}</span>}
+                          {st.nfcCardId && <span style={{ color: "#4ade80" }}>NFC ✓</span>}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   {[0, 1, 2, 3].map(idx => {
@@ -524,12 +533,18 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav }) {
                   <td style={{ textAlign: "center", padding: "8px 10px", fontWeight: 700, color: presentCount >= 3 ? "#4ade80" : (presentCount > 0 ? "#fbbf24" : "#f87171"), fontSize: 13 }}>
                     {Math.round((presentCount / 4) * 100)}%
                   </td>
+                  <td style={{ textAlign: "center", padding: "8px 10px" }}>
+                    <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
+                      <button onClick={() => onEdit(st)} title={lang === "ar" ? "تعديل" : "Modifier"} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 6px", color: C.inkSoft, cursor: "pointer" }}><Edit2 size={12} /></button>
+                      <button onClick={() => onDelete(st.id)} title={lang === "ar" ? "حذف" : "Supprimer"} style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 6, padding: "4px 6px", color: "#f87171", cursor: "pointer" }}><Trash2 size={12} /></button>
+                    </div>
+                  </td>
                 </tr>
               );
             })}
             {students.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", color: C.inkSoft, padding: "30px 0" }}>
+                <td colSpan={7} style={{ textAlign: "center", color: C.inkSoft, padding: "30px 0" }}>
                   {lang === "ar" ? "لا يوجد تلاميذ" : "Aucun élève"}
                 </td>
               </tr>
@@ -630,11 +645,34 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
   const unpaidEnroll = students.filter(s => !s.enrollmentPaid).length;
   const catColor = cat?.color || C.accent;
 
-  // Default to students tab to allow immediate student registration
-  const [tab, setTab] = useState(openSessionId ? "sessions" : "students");
+  // Default to presences tab to allow immediate student registration
+  const [tab, setTab] = useState("presences");
   const [showAddStudent, setShowAddStudent] = useState(Boolean(openAddStudent || students.length === 0));
   const [editingStudent, setEditingStudent] = useState(null);
   const [showEditSg, setShowEditSg] = useState(false);
+  const [showExtraModal, setShowExtraModal] = useState(false);
+
+  const saveExtraSession = (es) => {
+    setData(d => {
+      const extraSessions = [...(d.extraSessions || []), es];
+      const sessionEntry = {
+        id: es.id,
+        subgroupId: es.subgroupId,
+        date: es.date,
+        time: es.time,
+        isExtra: true,
+        price: es.price,
+        isGroupPrice: es.isGroupPrice,
+        note: es.note,
+        status: "planned",
+      };
+      const sessions = [...(d.sessions || []), sessionEntry];
+      const userNotifications = notifyExtraSessionAdded(d, sg.id, es, lang);
+      return { ...d, extraSessions, sessions, userNotifications };
+    });
+    setShowExtraModal(false);
+    if (toastFn) toastFn(lang === "ar" ? "تمت إضافة الحصة الإضافية وإشعار جميع التلاميذ بنجاح ✓" : "Séance suppl. ajoutée et élèves notifiés ✓");
+  };
 
   // Get current year obj for GroupFormModal
   const currentYearObj = (data.academicYears || []).find(y => y.id === activeYearId);
@@ -745,9 +783,20 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {!isReadOnlyYear && (
-            <PrimaryBtn onClick={() => setShowAddStudent(true)}>
-              <Plus size={16} /> {lang === "ar" ? "+ تسجيل تلميذ" : "+ Inscrire un élève"}
-            </PrimaryBtn>
+            <>
+              <PrimaryBtn onClick={() => setShowAddStudent(true)}>
+                <Plus size={16} /> {lang === "ar" ? "+ تسجيل تلميذ" : "+ Inscrire un élève"}
+              </PrimaryBtn>
+              <button
+                onClick={() => setShowExtraModal(true)}
+                style={{
+                  background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 10,
+                  padding: "7px 12px", color: "#818cf8", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600
+                }}
+              >
+                <Plus size={14} /> {lang === "ar" ? "+ حصة إضافية" : "+ Séance"}
+              </button>
+            </>
           )}
           <button onClick={() => setShowEditSg(true)} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600 }}>
             <Edit2 size={14} /> {lang === "ar" ? "تعديل الفوج" : "Modifier"}
@@ -792,29 +841,29 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
       </div>
 
       {/* ── Summary Stats Bar ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 20 }}>
-        <div style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8, marginBottom: 20 }}>
+        <div style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, textTransform: "uppercase" }}>{lang === "ar" ? "إجمالي التلاميذ" : "Total élèves"}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 2 }}>{students.length}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: C.inkSoft, textTransform: "uppercase" }}>{lang === "ar" ? "إجمالي التلاميذ" : "Total élèves"}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.ink, marginTop: 2 }}>{students.length}</div>
           </div>
-          <Users size={20} color="#818cf8" />
+          <Users size={16} color="#818cf8" />
         </div>
 
-        <div onClick={() => setTab("payments")} style={{ background: unpaidEnroll > 0 ? "rgba(251,191,36,0.1)" : "rgba(74,222,128,0.05)", border: `1px solid ${unpaidEnroll > 0 ? "rgba(251,191,36,0.3)" : "rgba(74,222,128,0.2)"}`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+        <div onClick={() => setTab("payments")} style={{ background: unpaidEnroll > 0 ? "rgba(251,191,36,0.1)" : "rgba(74,222,128,0.05)", border: `1px solid ${unpaidEnroll > 0 ? "rgba(251,191,36,0.3)" : "rgba(74,222,128,0.2)"}`, borderRadius: 10, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: unpaidEnroll > 0 ? "#fbbf24" : "#4ade80", textTransform: "uppercase" }}>{lang === "ar" ? "تسجيل غير مدفوع" : "Inscriptions non payées"}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: unpaidEnroll > 0 ? "#fbbf24" : "#4ade80", marginTop: 2 }}>{unpaidEnroll} {lang === "ar" ? "تلميذ" : "élèves"}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: unpaidEnroll > 0 ? "#fbbf24" : "#4ade80", textTransform: "uppercase" }}>{lang === "ar" ? "تسجيل غير مدفوع" : "Inscriptions impayées"}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: unpaidEnroll > 0 ? "#fbbf24" : "#4ade80", marginTop: 2 }}>{unpaidEnroll} {lang === "ar" ? "تلميذ" : "élèves"}</div>
           </div>
-          <AlertTriangle size={20} color={unpaidEnroll > 0 ? "#fbbf24" : "#4ade80"} />
+          <AlertTriangle size={16} color={unpaidEnroll > 0 ? "#fbbf24" : "#4ade80"} />
         </div>
 
-        <div onClick={() => setTab("payments")} style={{ background: unpaidPmt > 0 ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.05)", border: `1px solid ${unpaidPmt > 0 ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.2)"}`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+        <div onClick={() => setTab("payments")} style={{ background: unpaidPmt > 0 ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.05)", border: `1px solid ${unpaidPmt > 0 ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.2)"}`, borderRadius: 10, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>{lang === "ar" ? "دفعات معلقة" : "Paiements en attente"}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", marginTop: 2 }}>{unpaidPmt} {lang === "ar" ? "دفعات" : "impayés"}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", textTransform: "uppercase" }}>{lang === "ar" ? "دفعات معلقة" : "Paiements en attente"}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: unpaidPmt > 0 ? "#f87171" : "#4ade80", marginTop: 2 }}>{unpaidPmt} {lang === "ar" ? "دفعات" : "impayés"}</div>
           </div>
-          <CreditCard size={20} color={unpaidPmt > 0 ? "#f87171" : "#4ade80"} />
+          <CreditCard size={16} color={unpaidPmt > 0 ? "#f87171" : "#4ade80"} />
         </div>
       </div>
 
@@ -864,171 +913,13 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
 
       {/* ── Tabs ───────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 22, borderBottom: `1px solid ${C.border}`, paddingBottom: 6 }}>
-        <Tab label={lang === "ar" ? "الحصص" : "Séances"}   icon={Calendar} active={tab === "sessions"} onClick={() => setTab("sessions")} />
-        <Tab label={lang === "ar" ? "التلاميذ" : "Élèves"} icon={Users}    active={tab === "students"} onClick={() => setTab("students")} />
-        <Tab label={lang === "ar" ? "الحضور" : "Présences"} icon={CheckCircle2} active={tab === "presences"} onClick={() => setTab("presences")} />
+        <Tab label={lang === "ar" ? "التلاميذ والحضور" : "Élèves & Présences"} icon={Users} active={tab === "presences"} onClick={() => setTab("presences")} />
         <Tab label={lang === "ar" ? "المدفوعات" : "Paiements"} icon={CreditCard} active={tab === "payments"} onClick={() => setTab("payments")} badge={unpaidPmt + unpaidEnroll} />
       </div>
 
       {/* ── Tab content ────────────────────────────────────── */}
-      {tab === "sessions" && (
-        <>
-          <SessionsList sessions={[...sessions, ...(data.extraSessions || []).filter(es => es.groupId === sg.id || es.subgroupId === sg.id).map(es => ({ ...es, isExtra: true, status: 'planned', time: es.time || '00:00' }))]} subgroup={sg} students={students} data={data} setData={setData} toastFn={toastFn} />
-        </>
-      )}
-
-      {tab === "students" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-            <PrimaryBtn onClick={() => setShowAddStudent(true)}><Plus size={16} /> {lang === "ar" ? "+ تلميذ" : "+ Élève"}</PrimaryBtn>
-          </div>
-          <div style={{ display: "grid", gap: 9 }}>
-            {students.map(st => (
-              <div key={st.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                {/* Avatar */}
-                <div style={{ width: 40, height: 40, borderRadius: 11, background: st.enrollmentPaid ? C.accentSoft : "rgba(251,191,36,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: st.enrollmentPaid ? C.accent : "#fbbf24", flexShrink: 0 }}>
-                  {st.prenom[0]}{st.nom[0]}
-                </div>
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14.5, color: C.ink }}>{st.prenom} {st.nom}</div>
-                  <div className="f-mono" style={{ fontSize: 12, color: C.inkSoft, display: "flex", alignItems: "center", gap: 8 }}>
-                    {st.studentCode && <span style={{ color: "#818cf8", fontWeight: 700 }}>{st.studentCode}</span>}
-                    {st.phone || "—"}
-                  </div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.accent }}>{st.monthlyPrice || st.montant || 0} DA/{lang === "ar" ? "شهر" : "mois"}</span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: st.nfcCardId ? "#4ade80" : "rgba(255,255,255,0.35)", background: st.nfcCardId ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.06)", padding: "1px 6px", borderRadius: 4 }}>
-                      NFC: {st.nfcCardId ? "✓" : "✗"}
-                    </span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: st.accountStatus === "active" ? "#4ade80" : "#f87171", background: st.accountStatus === "active" ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.12)", padding: "1px 6px", borderRadius: 4 }}>
-                      {st.accountStatus === "active" ? (lang === "ar" ? "نشط" : "Actif") : (lang === "ar" ? "معطل" : "Inactif")}
-                    </span>
-                  </div>
-                </div>
-                {/* Enrollment status */}
-                <button
-                  onClick={() => toggleEnrollment(st.id)}
-                  style={{
-                    padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer",
-                    background: st.enrollmentPaid ? "rgba(74,222,128,0.15)" : "rgba(251,191,36,0.15)",
-                    color: st.enrollmentPaid ? "#4ade80" : "#fbbf24",
-                  }}
-                  title={lang === "ar" ? "حقوق التسجيل" : "Frais d'inscription"}
-                >
-                  {st.enrollmentPaid ? "✓ " + (lang === "ar" ? "تسجيل" : "Inscr.") : "⚠ " + (lang === "ar" ? "تسجيل" : "Inscr.")}
-                </button>
-
-                {/* Quick Manual Attendance (Today) */}
-                {(() => {
-                  const todayStr = new Date().toISOString().slice(0, 10);
-                  const att = (data.attendances || []).find(a => a.studentId === st.id && a.date === todayStr);
-                  const isPresent = att ? att.present : false;
-                  return (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 8, marginRight: 8 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft }}>{lang === "ar" ? "حضور اليوم:" : "Présence (Auj):"}</span>
-                      <input 
-                        type="checkbox" 
-                        className="theme-checkbox" 
-                        checked={isPresent} 
-                        onChange={() => {
-                          setData(d => {
-                            let newAtt;
-                            if (att) {
-                              newAtt = d.attendances.map(a => a.id === att.id ? { ...a, present: !a.present } : a);
-                            } else {
-                              newAtt = [...(d.attendances || []), { id: uid(), studentId: st.id, date: todayStr, present: true }];
-                            }
-                            return { ...d, attendances: newAtt };
-                          });
-                        }} 
-                      />
-                    </div>
-                  );
-                })()}
-
-                {/* Financial status pill: شحال سلك / شحال ماسلكش */}
-                {(() => {
-                  const fin = getStudentFinancialSummary(data, st.id, activeYearId);
-                  return (
-                    <div style={{
-                      fontSize: 11.5, fontWeight: 700, padding: "4px 10px", borderRadius: 8,
-                      background: fin.totalUnpaid > 0 ? "rgba(248,113,113,0.1)" : "rgba(74,222,128,0.1)",
-                      border: `1px solid ${fin.totalUnpaid > 0 ? "rgba(248,113,113,0.28)" : "rgba(74,222,128,0.28)"}`,
-                      color: fin.totalUnpaid > 0 ? "#f87171" : "#4ade80", display: "flex", alignItems: "center", gap: 6
-                    }}>
-                      <span style={{ color: "#4ade80" }}>{lang === "ar" ? "سلك:" : "Payé:"} {fin.totalPaid.toLocaleString()} DA</span>
-                      {fin.totalUnpaid > 0 ? (
-                        <span style={{ color: "#f87171" }}>· {lang === "ar" ? "باقي:" : "Reste:"} {fin.totalUnpaid.toLocaleString()} DA</span>
-                      ) : (
-                        <span style={{ color: "#4ade80" }}>· {lang === "ar" ? "مستوفى ✓" : "À jour ✓"}</span>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Actions */}
-                <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={() => onNav({ screen: "student", studentId: st.id })} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, cursor: "pointer" }}><ChevronRight size={14} /></button>
-                  <button onClick={() => setEditingStudent(st)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, cursor: "pointer" }}><Edit2 size={13} /></button>
-                  <button onClick={() => deleteStudent(st.id)} style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#f87171", cursor: "pointer" }}><Trash2 size={13} /></button>
-                </div>
-              </div>
-            ))}
-            {students.length === 0 && (
-              <div style={{
-                textAlign: "center", color: C.inkSoft, padding: "48px 24px",
-                background: "linear-gradient(160deg, rgba(22,18,71,0.6) 0%, rgba(71,48,18,0.5) 55%, rgba(18,68,71,0.6) 100%)",
-                border: "1.5px dashed rgba(226,150,58,0.45)",
-                borderRadius: 22, marginTop: 10,
-                boxShadow: "0 12px 36px rgba(0,0,0,0.25)"
-              }}>
-                <div style={{ width: 64, height: 64, borderRadius: 20, background: "rgba(226,150,58,0.18)", border: "1px solid rgba(226,150,58,0.35)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <Users size={32} color="#E2963A" />
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 8 }}>
-                  {lang === "ar" ? `هذا الفوج (${sg.nom}) فارغ حالياً` : `Ce groupe (${sg.nom}) est actuellement vide`}
-                </div>
-                <p style={{ fontSize: 14, color: C.inkSoft, maxWidth: 480, margin: "0 auto 24px", lineHeight: 1.6 }}>
-                  {lang === "ar"
-                    ? "لا يوجد أي تلاميذ مسجلين في هذا الفوج بعد. اضغط على الزر أدناه لتسجيل أول تلميذ أو ارجع لقائمة الأفواج."
-                    : "Aucun élève n'est encore inscrit dans ce groupe. Cliquez sur le bouton ci-dessous pour inscrire le premier élève ou retournez à la liste des groupes."}
-                </p>
-                <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                  {!isReadOnlyYear && (
-                    <button
-                      onClick={() => setShowAddStudent(true)}
-                      style={{
-                        padding: "12px 28px", borderRadius: 14, fontSize: 14.5, fontWeight: 800,
-                        background: "linear-gradient(135deg, #E2963A, #f59e0b)", border: "none",
-                        color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
-                        boxShadow: "0 6px 20px rgba(226,150,58,0.45)"
-                      }}
-                    >
-                      <Plus size={18} />
-                      {lang === "ar" ? "+ تسجيل أول تلميذ في الفوج" : "+ Inscrire un élève dans ce groupe"}
-                    </button>
-                  )}
-                  <button
-                    onClick={onBack}
-                    style={{
-                      padding: "12px 24px", borderRadius: 14, fontSize: 14, fontWeight: 700,
-                      background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`,
-                      color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8
-                    }}
-                  >
-                    <ArrowLeft size={16} />
-                    {lang === "ar" ? "← العودة إلى قائمة الأفواج" : "← Retour aux groupes"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {tab === "presences" && (
-        <PresencesTab subgroup={sg} students={students} data={data} setData={setData} toastFn={toastFn} onNav={onNav} />
+        <PresencesTab subgroup={sg} students={students} data={data} setData={setData} toastFn={toastFn} onNav={onNav} onEdit={(st) => setEditingStudent(st)} onDelete={(id) => deleteStudent(id)} />
       )}
 
       {tab === "payments" && (
@@ -1036,6 +927,13 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
       )}
 
       {/* Modals */}
+      {showExtraModal && (
+        <ExtraSessionModal
+          subgroupId={sg.id}
+          onClose={() => setShowExtraModal(false)}
+          onSave={saveExtraSession}
+        />
+      )}
       {(showAddStudent || editingStudent) && (
         <StudentFormModal
           groupId={sg.id}

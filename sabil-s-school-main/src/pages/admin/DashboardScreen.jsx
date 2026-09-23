@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   Users, CalendarCheck, AlertCircle, TrendingUp,
   CheckCircle2, XCircle, Clock, ChevronRight, CreditCard,
-  MessageCircle, Phone, X
+  MessageCircle, Phone, X, Radio
 } from "lucide-react";
 import { C, CAT_BY_ID, computeCycles } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -88,6 +88,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav, activeY
   const { lang } = useLanguage();
   const today = new Date().toISOString().slice(0, 10);
   const [unpaidModal, setUnpaidModal] = useState(null); // 'debts' | null
+  const [nfcModal, setNfcModal] = useState(false);
 
   const handleSendReminder = (studentId, amount, typeLabel) => {
     const student = data.students.find(s => s.id === studentId);
@@ -122,6 +123,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav, activeY
     });
 
     const totalStudents = activeStudents.length;
+    const studentsWithoutNfc = activeStudents.filter(s => !s.nfcCardId);
     const todaySessions = sessions.filter(s => s.date === today && (!activeYearId || s.academicYearId === activeYearId || !s.academicYearId)).sort((a, b) => a.time.localeCompare(b.time));
 
     const weekStart = new Date();
@@ -157,6 +159,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav, activeY
 
     return {
       totalStudents,
+      studentsWithoutNfc,
       todaySessions,
       weekSessions,
       unpaidStudentsList,
@@ -193,6 +196,13 @@ export default function DashboardScreen({ data, setData, toastFn, onNav, activeY
           value={stats.totalStudents}
           color="#818cf8" bg="rgba(99,102,241,0.2)" border="rgba(99,102,241,0.35)"
           onClick={() => onNav && onNav({ screen: "parents" })}
+        />
+        <StatCard
+          icon={Radio}
+          label={lang === "ar" ? "بدون بطاقة NFC" : "Sans carte NFC"}
+          value={stats.studentsWithoutNfc.length}
+          color="#f59e0b" bg="rgba(245,158,11,0.18)" border="rgba(245,158,11,0.35)"
+          onClick={() => setNfcModal(true)}
         />
         <StatCard
           icon={CalendarCheck}
@@ -344,6 +354,48 @@ export default function DashboardScreen({ data, setData, toastFn, onNav, activeY
                     >
                       <MessageCircle size={13} />
                       {lang === "ar" ? "تذكير" : "Rappel"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
+      {/* ── MODAL SANS CARTE NFC ── */}
+      {nfcModal && (
+        <Modal
+          title={lang === "ar" ? "تلاميذ بدون بطاقة NFC" : "Élèves sans carte NFC"}
+          onClose={() => setNfcModal(false)}
+          wide
+        >
+          {stats.studentsWithoutNfc.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#4ade80", padding: "20px 0", fontWeight: 700 }}>
+              {lang === "ar" ? "جميع التلاميذ لديهم بطاقات! ✓" : "Tous les élèves ont une carte NFC ! ✓"}
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 10, maxHeight: 400, overflowY: "auto" }}>
+              {stats.studentsWithoutNfc.map((st, idx) => (
+                <div key={idx} style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{st.prenom} {st.nom}</div>
+                    <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 4 }}>
+                      <span className="f-mono">{st.phone || "—"}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => { setNfcModal(false); onNav({ screen: "student", studentId: st.id }); }}
+                      style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.1)", border: `1px solid ${C.border}`, color: C.ink, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      {lang === "ar" ? "الملف" : "Fiche"}
+                    </button>
+                    <button
+                      onClick={() => { setNfcModal(false); onNav({ screen: "nfc" }); }}
+                      style={{ padding: "6px 12px", borderRadius: 8, background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accent, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      <Radio size={13} />
+                      {lang === "ar" ? "إضافة بطاقة" : "Ajouter Carte"}
                     </button>
                   </div>
                 </div>

@@ -65,7 +65,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
 
   // ── 1. Calculate All Debts & Financials ──
   const debtsList = useMemo(() => {
-    const carryOvers = data.debtCarryOvers || [];
+    const carryOvers = (data.debtCarryOvers || []).filter(debt => !activeYearId || debt.toYearId === activeYearId || debt.toYearId === "manual" || debt.academicYearId === activeYearId);
     const students = data.students || [];
     const payments = data.payments || [];
 
@@ -482,20 +482,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
           ))}
         </div>
 
-        {/* Level filter */}
-        <select
-          value={filterLevel}
-          onChange={e => setFilterLevel(e.target.value)}
-          style={{
-            padding: "9px 14px", borderRadius: 12, background: "rgba(255,255,255,0.06)",
-            border: `1px solid ${C.border}`, color: C.ink, fontSize: 12.5, fontWeight: 700, cursor: "pointer", outline: "none"
-          }}
-        >
-          <option value="all">{lang === "ar" ? "كل المستويات" : "Tous les niveaux"}</option>
-          {STUDY_LEVELS.map(lvl => (
-            <option key={lvl} value={lvl}>{lvl}</option>
-          ))}
-        </select>
+
       </div>
 
       {/* ── Debts Table / List ── */}
@@ -755,20 +742,17 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                 <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
                   {lang === "ar" ? "المستوى الدراسي (Année d'étude)" : "Niveau / Année d'étude"}
                 </label>
-                <input
-                  type="text"
+                <select
                   style={inputStyle}
                   value={addForm.level}
                   onChange={e => setAddForm({ ...addForm, level: e.target.value })}
-                  list="debt-levels-presets"
-                  placeholder="ex: 2ème AS"
                   required
-                />
-                <datalist id="debt-levels-presets">
+                >
+                  <option value="" disabled style={{ color: "#000" }}>{lang === "ar" ? "اختر المستوى" : "Sélectionner un niveau"}</option>
                   {STUDY_LEVELS.map(lvl => (
-                    <option key={lvl} value={lvl} />
+                    <option key={lvl} value={lvl} style={{ color: "#000" }}>{lvl}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
 
@@ -793,39 +777,22 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
                 <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
                   {lang === "ar" ? "سنة الدين (Année de dette)" : "Année de la dette"}
                 </label>
-                <input
-                  type="text"
+                <select
                   style={inputStyle}
                   value={addForm.debtYear}
                   onChange={e => setAddForm({ ...addForm, debtYear: e.target.value })}
-                  list="debt-years-presets"
-                  placeholder="2024/2025"
                   required
-                />
-                <datalist id="debt-years-presets">
-                  {DEBT_YEARS.map(yr => (
-                    <option key={yr} value={yr} />
+                >
+                  <option value="" disabled style={{ color: "#000" }}>{lang === "ar" ? "اختر السنة" : "Sélectionner l'année"}</option>
+                  {(data.academicYears || []).map(yr => (
+                    <option key={yr.id} value={yr.name} style={{ color: "#000" }}>{yr.name}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
 
-            {/* Enseignant & Versement Initial */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div>
-                <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
-                  {lang === "ar" ? "الأستاذ / المادة (اختياري)" : "Professeur / Matière"}
-                </label>
-                <input
-                  type="text"
-                  style={inputStyle}
-                  value={addForm.teacher}
-                  onChange={e => setAddForm({ ...addForm, teacher: e.target.value })}
-                  placeholder="ex: Prof Maths"
-                />
-              </div>
-
-              <div>
+            {/* Versement Initial */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>              <div>
                 <label style={{ display: "block", color: C.inkSoft, fontSize: 12.5, marginBottom: 4, fontWeight: 600 }}>
                   {lang === "ar" ? "دفعة فورية مسددة (Versement)" : "Versement initial (DA)"}
                 </label>

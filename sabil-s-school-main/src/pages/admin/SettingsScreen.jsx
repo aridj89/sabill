@@ -32,19 +32,20 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
 
   const currentYear = (data.academicYears || []).find(y => y.isCurrent) || (data.academicYears || [])[0];
 
-  // Auto-calculate next year
-  let autoNextYearName = "";
-  if (currentYear && currentYear.name) {
-    const parts = currentYear.name.split("_");
-    if (parts.length === 2) {
-      const y1 = parseInt(parts[0], 10);
-      const y2 = parseInt(parts[1], 10);
-      autoNextYearName = `${y1 + 1}_${y2 + 1}`;
+  // Auto-calculate next year once on mount (as default value)
+  React.useEffect(() => {
+    if (currentYear && currentYear.name && !newYearName) {
+      const parts = currentYear.name.split("_");
+      if (parts.length === 2) {
+        const y1 = parseInt(parts[0], 10);
+        const y2 = parseInt(parts[1], 10);
+        setNewYearName(`${y1 + 1}_${y2 + 1}`);
+      }
     }
-  }
+  }, [currentYear]);
 
   const handlePreviewRollover = () => {
-    if (!autoNextYearName) return;
+    if (!newYearName.trim()) return;
     if (!currentYear) return toastFn("No current year found.");
     
     const previewDebts = [];
@@ -58,7 +59,7 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
       }
     });
     
-    setRolloverPreview({ newYearName: autoNextYearName, debts: previewDebts, totalDebt });
+    setRolloverPreview({ newYearName, debts: previewDebts, totalDebt });
   };
 
   const handleConfirmRollover = () => {
@@ -113,7 +114,18 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
     }));
 
     setRolloverPreview(null);
+    setNewYearName("");
     toastFn(lang === "ar" ? "تم الانتقال للسنة ونقل الديون بنجاح!" : "Nouvelle année activée, dettes et groupes transférés!");
+  };
+
+  const handleDeleteYear = (yearId) => {
+    if (window.confirm(lang === "ar" ? "هل أنت متأكد من حذف هذه السنة الدراسية؟" : "Voulez-vous vraiment supprimer cette année scolaire ?")) {
+      setData(d => ({
+        ...d,
+        academicYears: (d.academicYears || []).filter(y => y.id !== yearId)
+      }));
+      toastFn(lang === "ar" ? "تم حذف السنة" : "Année supprimée");
+    }
   };
 
   return (
@@ -200,7 +212,18 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
             {(data.academicYears || []).map(y => (
               <div key={y.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, background: y.isCurrent ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${y.isCurrent ? "rgba(74,222,128,0.3)" : C.border}` }}>
                 <span style={{ fontSize: 14, fontWeight: 700, color: y.isCurrent ? "#4ade80" : C.ink }}>{y.name}</span>
-                {y.isCurrent && <span style={{ fontSize: 11, background: "#4ade80", color: "#111", padding: "2px 8px", borderRadius: 999, fontWeight: 800 }}>{lang === "ar" ? "السنة الحالية" : "Actuelle"}</span>}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {y.isCurrent && <span style={{ fontSize: 11, background: "#4ade80", color: "#111", padding: "2px 8px", borderRadius: 999, fontWeight: 800 }}>{lang === "ar" ? "السنة الحالية" : "Actuelle"}</span>}
+                  {!y.isCurrent && (
+                    <button 
+                      onClick={() => handleDeleteYear(y.id)}
+                      style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: 4 }}
+                      title={lang === "ar" ? "حذف" : "Supprimer"}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -212,15 +235,19 @@ export default function SettingsScreen({ admin, data, setData, onSave, toastFn, 
             
             {!rolloverPreview ? (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, color: C.ink }}>
-                    {lang === "ar" ? "السنة القادمة:" : "Prochaine année :"} <strong style={{ fontSize: 15, color: C.accent }}>{autoNextYearName}</strong>
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <input 
+                    style={{ ...inputStyle, flex: 1, minWidth: 120 }} 
+                    placeholder={lang === "ar" ? "مثال: 2028_2029" : "Ex: 2028_2029"} 
+                    value={newYearName} 
+                    onChange={e => setNewYearName(e.target.value)} 
+                  />
                   <button 
                     onClick={handlePreviewRollover}
+                    disabled={!newYearName.trim()}
                     style={{
-                      background: "#818cf8", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px",
-                      fontWeight: 700, cursor: "pointer", transition: "0.2s"
+                      background: newYearName.trim() ? "#818cf8" : "rgba(129,140,248,0.5)", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px",
+                      fontWeight: 700, cursor: newYearName.trim() ? "pointer" : "not-allowed", transition: "0.2s", whiteSpace: "nowrap"
                     }}
                   >
                     {lang === "ar" ? "معاينة نقل الديون" : "Aperçu du report des dettes"}

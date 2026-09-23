@@ -65,6 +65,42 @@ export default function StudentDashboard({ student, group, data }) {
         
         {/* Col 1 */}
         <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
+
+          {/* Card: Mon Groupe & Horaires */}
+          <div style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.05))", border: `1px solid rgba(99,102,241,0.3)`, borderRadius: 20, padding: 20, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: -20, right: -20, opacity: 0.1 }}>
+              <Users size={120} color="#818cf8" />
+            </div>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: C.ink, margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+              <Users size={18} color="#818cf8" />
+              {lang === "ar" ? "فوجي والتوقيت" : "Mon Groupe & Horaires"}
+            </h3>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, color: C.inkSoft, textTransform: "uppercase", fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{lang === "ar" ? "اسم الفوج" : "Groupe"}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.ink }}>{group.nom} {cat ? `(${cat.label})` : ""}</div>
+              </div>
+              
+              <div style={{ display: "flex", gap: 24, marginTop: 4 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: C.inkSoft, textTransform: "uppercase", fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{lang === "ar" ? "أيام الدراسة" : "Jours"}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#818cf8", display: "flex", alignItems: "center", gap: 6 }}>
+                    <CalendarClock size={15} />
+                    {group.days && group.days.length > 0 ? group.days.join(" - ") : (lang === "ar" ? "غير محدد" : "Non défini")}
+                  </div>
+                </div>
+                
+                <div>
+                  <div style={{ fontSize: 12, color: C.inkSoft, textTransform: "uppercase", fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{lang === "ar" ? "التوقيت" : "Heure"}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#4ade80", display: "flex", alignItems: "center", gap: 6 }}>
+                    <Clock size={15} />
+                    {group.time || (lang === "ar" ? "غير محدد" : "Non définie")}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           
           {/* Card: Ma progression / Présences */}
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: 20 }}>

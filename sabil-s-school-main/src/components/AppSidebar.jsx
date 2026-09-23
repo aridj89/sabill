@@ -35,7 +35,7 @@ export default function AppSidebar({ open, onClose, nav, onNav, data }) {
 
   const langLevels = data?.langLevels || [];
 
-  const toggleCat   = id => setOpenCats(p   => ({ ...p, [id]: !p[id] }));
+  const toggleCat   = id => setOpenCats(p => p[id] ? {} : { [id]: true });
   const toggleLevel = key => setOpenLevels(p => ({ ...p, [key]: !p[key] }));
 
   const go = (navState) => { onNav(navState); onClose(); };

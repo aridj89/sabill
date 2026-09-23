@@ -12,11 +12,12 @@ import { createGroupApi, updateGroupApi, deleteGroupApi } from "../../utils/grou
 /* ── Sub-group card ──────────────────────────────────────────── */
 function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent, onEdit, onDelete, isReadOnlyYear }) {
   const { lang } = useLanguage();
-  const students  = (data.students || []).filter(s => s.groupId === sg.id || s.groupId === sg.id);
-  const sessions  = (data.sessions || []).filter(s => s.groupId === sg.id || s.groupId === sg.id);
+  const enrolledStudentIds = (data.enrollments || []).filter(e => e.groupId === sg.id || e.subgroupId === sg.id).map(e => e.studentId);
+  const students  = (data.students || []).filter(s => s.groupId === sg.id || s.subgroupId === sg.id || enrolledStudentIds.includes(s.id));
+  const sessions  = (data.sessions || []).filter(s => s.groupId === sg.id || s.subgroupId === sg.id);
   const done      = sessions.filter(s => s.status === "done").length;
   const planned   = sessions.filter(s => s.status === "planned").length;
-  const unpaidCount = (data.payments || []).filter(p => (p.groupId === sg.id || p.groupId === sg.id) && !p.paid).length;
+  const unpaidCount = (data.payments || []).filter(p => (p.groupId === sg.id || p.subgroupId === sg.id) && !p.paid).length;
   const enrollUnpaid = students.filter(s => !s.enrollmentPaid).length;
 
   return (
