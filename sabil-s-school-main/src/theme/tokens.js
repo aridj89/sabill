@@ -191,7 +191,8 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
   const sg = (data.groups || []).find(s => s.id === groupId);
   const enrollmentFee = data.settings?.enrollmentFee || 500;
 
-  if (!st.enrollmentPaid) {
+  // Only charge the enrollment fee if they are actually enrolled in this year
+  if (enrollment && !st.enrollmentPaid) {
     currentFeesExpected += enrollmentFee;
   }
 
@@ -202,7 +203,8 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
       s.status === "done" && 
       (!yearId || s.academicYearId === yearId || !s.academicYearId)
     ).length;
-    const cycles = Math.max(1, Math.floor(doneSessions / (sg.sessionsPerCycle || 4)));
+    // Enforce 4 sessions per month rule
+    const cycles = Math.max(1, Math.floor(doneSessions / 4));
     currentFeesExpected += (cycles * price);
   }
 

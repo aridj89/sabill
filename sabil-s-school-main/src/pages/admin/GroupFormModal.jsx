@@ -17,7 +17,7 @@ const INITIAL = {
 export default function GroupFormModal({
   catId, levelId, levelLabel, groupType, activeYearId,    // context (where we are in hierarchy)
   initial,                       // null → create, object → edit
-  onClose, onSave,
+  onClose, onSave, currentYearObj
 }) {
   const { t, lang } = useLanguage();
   const cat = CAT_BY_ID[catId];
@@ -31,6 +31,14 @@ export default function GroupFormModal({
   } : { ...INITIAL });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  let minDate = undefined;
+  let maxDate = undefined;
+  if (currentYearObj && currentYearObj.name && currentYearObj.name.includes("_")) {
+    const [y1, y2] = currentYearObj.name.split("_");
+    minDate = `${y1}-08-01`;
+    maxDate = `${y2}-07-31`;
+  }
 
   const toggleDay = (d) => {
     set("days", form.days.includes(d)
@@ -69,7 +77,7 @@ export default function GroupFormModal({
       time: form.time,
       startDate: form.startDate,
       endDate: form.endDate,
-      sessionsPerCycle: Number(form.sessionsPerCycle) || 4,
+      sessionsPerCycle: 4,
       price: 0,
     };
     // Generate sessions only if new creation
@@ -77,7 +85,12 @@ export default function GroupFormModal({
     onSave(sg, newSessions);
   };
 
-  const isValid = form.days.length > 0 && form.startDate && form.endDate;
+  let isValid = form.days.length > 0 && form.startDate && form.endDate;
+  if (minDate && maxDate) {
+    if (form.startDate < minDate || form.startDate > maxDate || form.endDate < minDate || form.endDate > maxDate || form.startDate > form.endDate) {
+      isValid = false;
+    }
+  }
 
   const catColor = cat?.color || C.accent;
   const title = initial
@@ -122,23 +135,20 @@ export default function GroupFormModal({
         </div>
       </Field>
 
-      {/* Heure + Séances */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      {/* Heure */}
+      <div style={{ marginBottom: 12 }}>
         <Field label={lang === "ar" ? "التوقيت" : "Heure"}>
           <input type="time" style={inputStyle} value={form.time} onChange={e => set("time", e.target.value)} />
-        </Field>
-        <Field label={lang === "ar" ? "عدد الحصص" : "Nb de séances"}>
-          <input type="number" min={1} max={20} style={inputStyle} value={form.sessionsPerCycle} onChange={e => set("sessionsPerCycle", e.target.value)} />
         </Field>
       </div>
 
       {/* Dates */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label={lang === "ar" ? "تاريخ البداية" : "Date de début"}>
-          <input type="date" style={inputStyle} value={form.startDate} onChange={e => set("startDate", e.target.value)} />
+          <input type="date" min={minDate} max={maxDate} style={inputStyle} value={form.startDate} onChange={e => set("startDate", e.target.value)} />
         </Field>
         <Field label={lang === "ar" ? "تاريخ النهاية" : "Date de fin"}>
-          <input type="date" style={inputStyle} value={form.endDate} onChange={e => set("endDate", e.target.value)} />
+          <input type="date" min={minDate} max={maxDate} style={inputStyle} value={form.endDate} onChange={e => set("endDate", e.target.value)} />
         </Field>
       </div>
 

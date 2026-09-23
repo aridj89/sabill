@@ -79,7 +79,7 @@ router.post("/", (req, res, next) => {
         time || "10:00",
         startDate || null,
         endDate || null,
-        sessionsPerCycle || 4,
+        4, // Force sessionsPerCycle to 4
         academicYearId || null
       );
 
@@ -153,7 +153,7 @@ router.put("/:id", (req, res, next) => {
     const updatedTime = time !== undefined ? time : existing.time;
     const updatedStart = startDate !== undefined ? startDate : existing.startDate;
     const updatedEnd = endDate !== undefined ? endDate : existing.endDate;
-    const updatedCycle = sessionsPerCycle !== undefined ? Number(sessionsPerCycle) : existing.sessionsPerCycle;
+    const updatedCycle = 4; // Force sessionsPerCycle to 4
     const updatedYear = academicYearId !== undefined ? academicYearId : existing.academicYearId;
 
     const result = db.prepare(`

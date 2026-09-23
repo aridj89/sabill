@@ -32,6 +32,9 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
   const currentYear = (data.academicYears || []).find(y => y.isCurrent) || (data.academicYears || [])[0];
   const [activeYearId, setActiveYearId] = useState(currentYear ? currentYear.id : null);
   
+  const currentYearObj = (data.academicYears || []).find(y => y.id === activeYearId);
+  const isReadOnlyYear = currentYearObj?.name === "2025_2026";
+  
   // Profile & Notif dropdowns
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -329,8 +332,8 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
       {/* ── Main content area ── */}
       <div className="main-content-layout" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 80px" }}>
         {nav.screen === "dashboard" && <DashboardScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
-        {nav.screen === "groups_dashboard" && <SchoolStructureScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
-        {nav.screen === "structure" && <SchoolStructureScreen catId={nav.catId} levelId={nav.levelId} groupType={nav.groupType} data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "groups_dashboard" && <SchoolStructureScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} isReadOnlyYear={isReadOnlyYear} />}
+        {nav.screen === "structure" && <SchoolStructureScreen catId={nav.catId} levelId={nav.levelId} groupType={nav.groupType} data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} isReadOnlyYear={isReadOnlyYear} />}
         {nav.screen === "group" && (
           <GroupScreen
             groupId={nav.groupId}
@@ -345,16 +348,17 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
             onBack={goBack}
             onNav={handleNav}
             activeYearId={activeYearId}
+            isReadOnlyYear={isReadOnlyYear}
           />
         )}
-        {nav.screen === "student" && <StudentScreen studentId={nav.studentId} data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} activeYearId={activeYearId} />}
-        {nav.screen === "calendar" && <CalendarScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
+        {nav.screen === "student" && <StudentScreen studentId={nav.studentId} data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} activeYearId={activeYearId} isReadOnlyYear={isReadOnlyYear} />}
+        {nav.screen === "calendar" && <CalendarScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} isReadOnlyYear={isReadOnlyYear} />}
         {nav.screen === "chat" && <CommunicationScreen data={data} setData={setData} toastFn={toastFn} initialTarget={nav} onBack={goBack} activeYearId={activeYearId} />}
         {nav.screen === "finance" && <FinancialScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
         {nav.screen === "debts" && <DebtsScreen data={data} setData={setData} toastFn={toastFn} onNav={handleNav} activeYearId={activeYearId} />}
         {nav.screen === "nfc" && <NfcAttendanceScreen data={data} setData={setData} toastFn={toastFn} onBack={goBack} onNav={handleNav} />}
 
-        {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} activeYearId={activeYearId} />}
+        {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} activeYearId={activeYearId} isReadOnlyYear={isReadOnlyYear} />}
         {nav.screen === "settings" && <SettingsScreen admin={data.admin} data={data} setData={setData} toastFn={toastFn} onSave={(a) => setData(d => ({ ...d, admin: a }))} onBack={goBack} />}
       </div>
     </div>

@@ -10,7 +10,7 @@ import GroupFormModal from "./GroupFormModal";
 import { createGroupApi, updateGroupApi, deleteGroupApi } from "../../utils/groupApi";
 
 /* ── Sub-group card ──────────────────────────────────────────── */
-function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent, onEdit, onDelete }) {
+function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent, onEdit, onDelete, isReadOnlyYear }) {
   const { lang } = useLanguage();
   const students  = (data.students || []).filter(s => s.groupId === sg.id || s.groupId === sg.id);
   const sessions  = (data.sessions || []).filter(s => s.groupId === sg.id || s.groupId === sg.id);
@@ -81,8 +81,9 @@ function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent,
 
       {/* Quick Add Student Button */}
       <div style={{ marginTop: "auto", paddingTop: 6, display: "flex", gap: 8 }} onClick={e => e.stopPropagation()}>
-        <button
-          onClick={onAddStudent}
+        {!isReadOnlyYear && (
+          <button
+            onClick={onAddStudent}
           style={{
             flex: 1, padding: "8px 12px", borderRadius: 10,
             background: "linear-gradient(135deg, rgba(226,150,58,0.25), rgba(226,150,58,0.15))",
@@ -96,6 +97,7 @@ function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent,
           <Plus size={14} color="#E2963A" />
           {lang === "ar" ? "+ تسجيل تلميذ" : "+ Inscrire un élève"}
         </button>
+        )}
         <button
           onClick={onOpen}
           style={{
@@ -112,7 +114,7 @@ function GroupCard({ sg, data, catColor, catBg, catBorder, onOpen, onAddStudent,
 }
 
 /* ── Main screen ─────────────────────────────────────────────── */
-export default function SchoolStructureScreen({ catId, levelId, groupType, data, setData, toastFn, onNav, activeYearId }) {
+export default function SchoolStructureScreen({ catId, levelId, groupType, data, setData, toastFn, onNav, activeYearId, isReadOnlyYear }) {
   const { lang } = useLanguage();
   const cat = CAT_BY_ID[catId];
   const [showAdd, setShowAdd]   = useState(false);
@@ -124,6 +126,9 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
   const levelLabel = isLangues
     ? (data.langLevels?.find(l => l.id === levelId)?.nom || "")
     : levelId;
+
+  // Get current year object for GroupFormModal limits
+  const currentYearObj = (data.academicYears || []).find(y => y.id === activeYearId);
 
   // Filter groups
   const allGroups = [...(data.groups || [])];
@@ -222,7 +227,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          {isLangues && !levelId && (
+          {isLangues && !levelId && !isReadOnlyYear && (
             <>
               {showAddLevel ? (
                 <div style={{ display: "flex", gap: 8 }}>
@@ -243,7 +248,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
               )}
             </>
           )}
-          {(levelId || isLangues) && (
+          {(levelId || isLangues) && !isReadOnlyYear && (
             <PrimaryBtn onClick={() => setShowAdd(true)}>
               <Plus size={16} /> {lang === "ar" ? "+ مجموعة" : "+ Groupe"}
             </PrimaryBtn>
@@ -296,6 +301,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
                 onAddStudent={() => onNav({ screen: "group", groupId: sg.id, catId: sg.categoryId, levelId: sg.levelId, groupType: sg.groupType, openAddStudent: true })}
                 onEdit={() => setEditing(sg)}
                 onDelete={() => handleDelete(sg.id)}
+                isReadOnlyYear={isReadOnlyYear}
               />
             );
           })}
@@ -312,6 +318,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
         <GroupFormModal
           catId={catId} levelId={levelId} levelLabel={levelLabel} groupType={groupType}
           activeYearId={activeYearId}
+          currentYearObj={currentYearObj}
           onClose={() => setShowAdd(false)}
           onSave={handleCreate}
         />
@@ -321,6 +328,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
           catId={editing.categoryId || editing.catId || catId}
           levelId={editing.levelId} levelLabel={isLangues ? (data.langLevels?.find(l => l.id === editing.levelId)?.nom || editing.levelId) : editing.levelId} groupType={editing.groupType}
           activeYearId={activeYearId}
+          currentYearObj={currentYearObj}
           initial={editing}
           onClose={() => setEditing(null)}
           onSave={handleEdit}

@@ -114,7 +114,14 @@ export default function DashboardScreen({ data, setData, toastFn, onNav, activeY
   const stats = useMemo(() => {
     const { students, sessions } = data;
 
-    const totalStudents = students.length;
+    // Filter students active in this year (enrolled or with carryover debt)
+    const activeStudents = students.filter(st => {
+      const isEnrolled = (data.enrollments || []).some(e => e.studentId === st.id && (!activeYearId || e.academicYearId === activeYearId));
+      const hasDebt = (data.debtCarryOvers || []).some(c => c.studentId === st.id && (!activeYearId || c.toYearId === activeYearId || c.toYearId === "manual"));
+      return isEnrolled || hasDebt;
+    });
+
+    const totalStudents = activeStudents.length;
     const todaySessions = sessions.filter(s => s.date === today && (!activeYearId || s.academicYearId === activeYearId || !s.academicYearId)).sort((a, b) => a.time.localeCompare(b.time));
 
     const weekStart = new Date();
@@ -130,7 +137,7 @@ export default function DashboardScreen({ data, setData, toastFn, onNav, activeY
     let totalPaid = 0;
     const unpaidStudentsList = [];
     
-    students.forEach(st => {
+    activeStudents.forEach(st => {
       const fin = getStudentFinancialSummary(data, st.id, activeYearId);
       totalPreviousDebt += fin.previousDebtRemaining;
       totalCurrentFees += fin.currentFeesRemaining;

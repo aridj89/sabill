@@ -542,7 +542,7 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav }) {
 }
 
 /* ── MAIN SubgroupScreen ─────────────────────────────────────── */
-export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, groupType, openAddStudent, openSessionId, data, setData, toastFn, onBack, onNav, activeYearId }) {
+export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, groupType, openAddStudent, openSessionId, data, setData, toastFn, onBack, onNav, activeYearId, isReadOnlyYear }) {
   const { lang } = useLanguage();
 
   const effectiveGroupId = groupId || subgroupId;
@@ -635,6 +635,9 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
   const [showAddStudent, setShowAddStudent] = useState(Boolean(openAddStudent || students.length === 0));
   const [editingStudent, setEditingStudent] = useState(null);
   const [showEditSg, setShowEditSg] = useState(false);
+
+  // Get current year obj for GroupFormModal
+  const currentYearObj = (data.academicYears || []).find(y => y.id === activeYearId);
 
   useEffect(() => {
     if (openAddStudent || students.length === 0) {
@@ -741,9 +744,11 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
         </button>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <PrimaryBtn onClick={() => setShowAddStudent(true)}>
-            <Plus size={16} /> {lang === "ar" ? "+ تسجيل تلميذ" : "+ Inscrire un élève"}
-          </PrimaryBtn>
+          {!isReadOnlyYear && (
+            <PrimaryBtn onClick={() => setShowAddStudent(true)}>
+              <Plus size={16} /> {lang === "ar" ? "+ تسجيل تلميذ" : "+ Inscrire un élève"}
+            </PrimaryBtn>
+          )}
           <button onClick={() => setShowEditSg(true)} style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "7px 12px", color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, fontWeight: 600 }}>
             <Edit2 size={14} /> {lang === "ar" ? "تعديل الفوج" : "Modifier"}
           </button>
@@ -990,18 +995,20 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
                     : "Aucun élève n'est encore inscrit dans ce groupe. Cliquez sur le bouton ci-dessous pour inscrire le premier élève ou retournez à la liste des groupes."}
                 </p>
                 <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => setShowAddStudent(true)}
-                    style={{
-                      padding: "12px 28px", borderRadius: 14, fontSize: 14.5, fontWeight: 800,
-                      background: "linear-gradient(135deg, #E2963A, #f59e0b)", border: "none",
-                      color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
-                      boxShadow: "0 6px 20px rgba(226,150,58,0.45)"
-                    }}
-                  >
-                    <Plus size={18} />
-                    {lang === "ar" ? "+ تسجيل أول تلميذ في الفوج" : "+ Inscrire un élève dans ce groupe"}
-                  </button>
+                  {!isReadOnlyYear && (
+                    <button
+                      onClick={() => setShowAddStudent(true)}
+                      style={{
+                        padding: "12px 28px", borderRadius: 14, fontSize: 14.5, fontWeight: 800,
+                        background: "linear-gradient(135deg, #E2963A, #f59e0b)", border: "none",
+                        color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
+                        boxShadow: "0 6px 20px rgba(226,150,58,0.45)"
+                      }}
+                    >
+                      <Plus size={18} />
+                      {lang === "ar" ? "+ تسجيل أول تلميذ في الفوج" : "+ Inscrire un élève dans ce groupe"}
+                    </button>
+                  )}
                   <button
                     onClick={onBack}
                     style={{
@@ -1043,6 +1050,8 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
       {showEditSg && (
         <GroupFormModal
           catId={sg.categoryId} levelId={sg.levelId} groupType={sg.groupType}
+          activeYearId={activeYearId}
+          currentYearObj={currentYearObj}
           initial={sg}
           onClose={() => setShowEditSg(false)}
           onSave={saveSubgroup}
