@@ -228,7 +228,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          {isLangues && !levelId && !isReadOnlyYear && (
+          {isLangues && !levelId && (
             <>
               {showAddLevel ? (
                 <div style={{ display: "flex", gap: 8 }}>
@@ -249,7 +249,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
               )}
             </>
           )}
-          {(levelId || isLangues) && !isReadOnlyYear && (
+          {(levelId || isLangues) && (
             <PrimaryBtn onClick={() => setShowAdd(true)}>
               <Plus size={16} /> {lang === "ar" ? "+ مجموعة" : "+ Groupe"}
             </PrimaryBtn>
@@ -306,7 +306,7 @@ export default function SchoolStructureScreen({ catId, levelId, groupType, data,
               />
             );
           })}
-          {!isReadOnlyYear && (
+          {(
             <div
               onClick={() => setShowAdd(true)}
               style={{
