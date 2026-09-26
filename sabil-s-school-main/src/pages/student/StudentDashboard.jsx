@@ -1,11 +1,14 @@
-import React, { useMemo } from "react";
-import { CheckCircle2, XCircle, AlertTriangle, CalendarClock, Clock, CreditCard, Users, TrendingUp } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { CheckCircle2, XCircle, AlertTriangle, CalendarClock, Clock, CreditCard, Users, TrendingUp, X } from "lucide-react";
 import { C, CAT_BY_ID, computeCycles, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function StudentDashboard({ student, group, data }) {
   const { lang } = useLanguage();
   const cat = group ? CAT_BY_ID[group.categoryId] : null;
+
+  const [dismissedReminders, setDismissedReminders] = useState([]);
+  const [dismissedGeneral, setDismissedGeneral] = useState(false);
 
   const stats = useMemo(() => {
     if (!group) return { total: 0, done: 0, presenceRate: 0, payments: [] };
@@ -47,6 +50,21 @@ export default function StudentDashboard({ student, group, data }) {
     return (data.userNotifications || []).filter(n => n.userId === student.id && n.type === "payment");
   }, [data.userNotifications, student.id]);
 
+  const activeReminders = paymentReminders.filter(rem => !dismissedReminders.includes(rem.id));
+
+  // Helper to dynamically format reminder message based on current language
+  const formatReminderMsg = (msg) => {
+    if (!msg) return "";
+    const matchAmt = msg.match(/([0-9\s]+)\s*(DA|دج)/i);
+    const amt = matchAmt ? matchAmt[1].trim() : (fin.totalUnpaid || 2500);
+
+    if (lang === "ar") {
+      return `مرحباً ${student.prenom || ""}، نود تذكيركم بأن المستحقات المالية البالغة ${amt} دج ما زالت قيد الانتظار. يرجى تسوية وضعيتكم في أقرب وقت ممكن.`;
+    } else {
+      return `Bonjour ${student.prenom || ""}, nous vous rappelons que vos frais d'un montant de ${amt} DA sont en attente. Merci de régler votre situation au plus vite.`;
+    }
+  };
+
   return (
     <div>
       <h2 className="f-display" style={{ fontSize: 26, fontWeight: 700, color: C.ink, margin: "0 0 24px" }}>
@@ -54,8 +72,8 @@ export default function StudentDashboard({ student, group, data }) {
       </h2>
 
       {/* ── RED FRAME: Payment Reminder Alert (Cadre Rouge du Rappel de Paiement) ── */}
-      {paymentReminders.length > 0 ? (
-        paymentReminders.map(rem => (
+      {activeReminders.length > 0 ? (
+        activeReminders.map(rem => (
           <div
             key={rem.id}
             style={{
@@ -68,6 +86,7 @@ export default function StudentDashboard({ student, group, data }) {
               border: "2.5px solid #f87171",
               boxShadow: "0 8px 24px rgba(248, 113, 113, 0.3)",
               marginBottom: 24,
+              position: "relative",
             }}
           >
             <div style={{
@@ -82,22 +101,49 @@ export default function StudentDashboard({ student, group, data }) {
             }}>
               <AlertTriangle size={26} color="#ffffff" />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ flex: 1, paddingRight: lang === "ar" ? 0 : 36, paddingLeft: lang === "ar" ? 36 : 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: "#f87171", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                  🚨 {lang === "ar" ? "تذكير هام بالدفع (Rappel de Paiement)" : "🚨 RAPPEL DE PAIEMENT INCOMPLET"}
+                  🚨 {lang === "ar" ? "تذكير هام بالدفع" : "RAPPEL DE PAIEMENT INCOMPLET"}
                 </div>
                 <span style={{ fontSize: 11, color: C.inkSoft, fontWeight: 600 }}>
                   {rem.date || ""} {rem.time || ""}
                 </span>
               </div>
               <div style={{ fontSize: 13.5, color: C.ink, marginTop: 4, fontWeight: 600, lineHeight: 1.5 }}>
-                {rem.message}
+                {formatReminderMsg(rem.message)}
               </div>
             </div>
+            
+            {/* Dismiss Close Button */}
+            <button
+              onClick={() => setDismissedReminders(prev => [...prev, rem.id])}
+              title={lang === "ar" ? "إغلاق التذكير" : "Masquer l'alerte"}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: lang === "ar" ? "auto" : 12,
+                left: lang === "ar" ? 12 : "auto",
+                background: "rgba(248,113,113,0.25)",
+                border: "1px solid rgba(248,113,113,0.5)",
+                borderRadius: "50%",
+                width: 28,
+                height: 28,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "#f87171",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.4)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(248,113,113,0.25)"}
+            >
+              <X size={16} />
+            </button>
           </div>
         ))
-      ) : fin.totalUnpaid > 0 ? (
+      ) : (fin.totalUnpaid > 0 && !dismissedGeneral) ? (
         <div
           style={{
             display: "flex",
@@ -109,6 +155,7 @@ export default function StudentDashboard({ student, group, data }) {
             border: "2.5px solid #f87171",
             boxShadow: "0 8px 24px rgba(248, 113, 113, 0.3)",
             marginBottom: 24,
+            position: "relative",
           }}
         >
           <div style={{
@@ -123,16 +170,43 @@ export default function StudentDashboard({ student, group, data }) {
           }}>
             <AlertTriangle size={26} color="#ffffff" />
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, paddingRight: lang === "ar" ? 0 : 36, paddingLeft: lang === "ar" ? 36 : 0 }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: "#f87171", textTransform: "uppercase", letterSpacing: 0.5 }}>
-              🚨 {lang === "ar" ? "تذكير بالدفع - مستحقات غير مسددة" : "🚨 RAPPEL DE PAIEMENT - IMPAYÉ"}
+              🚨 {lang === "ar" ? "تذكير بالدفع - مستحقات غير مسددة" : "RAPPEL DE PAIEMENT - IMPAYÉ"}
             </div>
             <div style={{ fontSize: 13.5, color: C.ink, marginTop: 4, fontWeight: 600 }}>
               {lang === "ar"
-                ? `يرجى تسوية المبلغ المتبقي قدره ${fin.totalUnpaid.toLocaleString()} دج في أقرب وقت ممكن.`
-                : `Veuillez régler votre montant restant de ${fin.totalUnpaid.toLocaleString()} DA dès que possible.`}
+                ? `مرحباً ${student.prenom || ""}، نود تذكيركم بأن المستحقات المالية البالغة ${fin.totalUnpaid.toLocaleString()} دج ما زالت قيد الانتظار. يرجى تسوية وضعيتكم في أقرب وقت ممكن.`
+                : `Bonjour ${student.prenom || ""}, nous vous rappelons que vos frais d'un montant de ${fin.totalUnpaid.toLocaleString()} DA sont en attente. Merci de régler votre situation au plus vite.`}
             </div>
           </div>
+
+          {/* Dismiss Close Button */}
+          <button
+            onClick={() => setDismissedGeneral(true)}
+            title={lang === "ar" ? "إغلاق التذكير" : "Masquer l'alerte"}
+            style={{
+              position: "absolute",
+              top: 12,
+              right: lang === "ar" ? "auto" : 12,
+              left: lang === "ar" ? 12 : "auto",
+              background: "rgba(248,113,113,0.25)",
+              border: "1px solid rgba(248,113,113,0.5)",
+              borderRadius: "50%",
+              width: 28,
+              height: 28,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: "#f87171",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.4)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(248,113,113,0.25)"}
+          >
+            <X size={16} />
+          </button>
         </div>
       ) : null}
 

@@ -149,19 +149,33 @@ export function notifyAccountUpdated(data, studentId, summary = "", lang = "ar")
 /**
  * Notifie un élève d'un paiement en attente.
  */
-export function notifyPaymentRequired(data, studentId, amount, reason, customMessage = "") {
+export function notifyPaymentRequired(data, studentId, amount, reason, customMessage = "", lang = "fr") {
   const student = (data.students || []).find(s => s.id === studentId);
-  const studentName = student ? (student.nom || student.prenom) : "";
-  const title = "Rappel de paiement";
+  const studentName = student ? (student.prenom || student.nom) : "";
+  const title = lang === "ar" ? "تذكير بالدفع" : "Rappel de paiement";
   let message = customMessage;
 
   if (!message) {
-    let feeLabel = "d'inscription";
-    if (reason && reason !== "enrollment" && reason !== "d'inscription") {
-      feeLabel = String(reason).startsWith("de ") || String(reason).startsWith("d'") ? reason : `de ${reason}`;
+    let feeLabelFr = "d'inscription";
+    let feeLabelAr = "حقوق التسجيل";
+
+    const reasonStr = String(reason || "").toLowerCase();
+    if (reasonStr.includes("dette") || reasonStr.includes("ديون")) {
+      feeLabelFr = "relatifs aux dettes";
+      feeLabelAr = "الخاصة بالديون";
+    } else if (reason && reason !== "enrollment" && reason !== "d'inscription") {
+      const cleanReason = String(reason).replace(/^de\s+des\s+|^de\s+|^d'/i, "");
+      feeLabelFr = cleanReason.startsWith("des ") ? cleanReason : `de ${cleanReason}`;
+      feeLabelAr = cleanReason;
     }
-    const greeting = studentName ? `Bonjour ${studentName}, ` : "Bonjour, ";
-    message = `${greeting}nous vous rappelons que vos frais ${feeLabel} d'un montant de ${amount} DA sont en attente. Merci de régler votre situation au plus vite.`;
+
+    if (lang === "ar") {
+      const greeting = studentName ? `مرحباً ${studentName}، ` : "مرحباً، ";
+      message = `${greeting}نود تذكيركم بأن المستحقات المالية (${feeLabelAr}) البالغة ${amount} دج ما زالت قيد الانتظار. يرجى تسوية وضعيتكم في أقرب وقت ممكن.`;
+    } else {
+      const greeting = studentName ? `Bonjour ${studentName}, ` : "Bonjour, ";
+      message = `${greeting}nous vous rappelons que vos frais ${feeLabelFr} d'un montant de ${amount} DA sont en attente. Merci de régler votre situation au plus vite.`;
+    }
   }
 
   const notif = createNotification(studentId, "payment", title, message, { screen: "payments" });
