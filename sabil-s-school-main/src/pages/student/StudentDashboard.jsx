@@ -41,11 +41,100 @@ export default function StudentDashboard({ student, group, data }) {
 
   if (!group) return <div style={{ color: C.inkSoft }}>{lang === "ar" ? "أنت غير مسجل في أي فوج" : "Vous n'êtes inscrit dans aucun groupe."}</div>;
 
+  // Compute student finance & reminders
+  const fin = useMemo(() => getStudentFinancialSummary(data, student.id), [data, student.id]);
+  const paymentReminders = useMemo(() => {
+    return (data.userNotifications || []).filter(n => n.userId === student.id && n.type === "payment");
+  }, [data.userNotifications, student.id]);
+
   return (
     <div>
       <h2 className="f-display" style={{ fontSize: 26, fontWeight: 700, color: C.ink, margin: "0 0 24px" }}>
         {lang === "ar" ? "مرحباً" : "Bonjour"}, {student.prenom}
       </h2>
+
+      {/* ── RED FRAME: Payment Reminder Alert (Cadre Rouge du Rappel de Paiement) ── */}
+      {paymentReminders.length > 0 ? (
+        paymentReminders.map(rem => (
+          <div
+            key={rem.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              padding: "16px 20px",
+              borderRadius: 16,
+              background: "rgba(248, 113, 113, 0.15)",
+              border: "2.5px solid #f87171",
+              boxShadow: "0 8px 24px rgba(248, 113, 113, 0.3)",
+              marginBottom: 24,
+            }}
+          >
+            <div style={{
+              width: 46,
+              height: 46,
+              borderRadius: 12,
+              background: "#f87171",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={26} color="#ffffff" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#f87171", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  🚨 {lang === "ar" ? "تذكير هام بالدفع (Rappel de Paiement)" : "🚨 RAPPEL DE PAIEMENT INCOMPLET"}
+                </div>
+                <span style={{ fontSize: 11, color: C.inkSoft, fontWeight: 600 }}>
+                  {rem.date || ""} {rem.time || ""}
+                </span>
+              </div>
+              <div style={{ fontSize: 13.5, color: C.ink, marginTop: 4, fontWeight: 600, lineHeight: 1.5 }}>
+                {rem.message}
+              </div>
+            </div>
+          </div>
+        ))
+      ) : fin.totalUnpaid > 0 ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            padding: "16px 20px",
+            borderRadius: 16,
+            background: "rgba(248, 113, 113, 0.15)",
+            border: "2.5px solid #f87171",
+            boxShadow: "0 8px 24px rgba(248, 113, 113, 0.3)",
+            marginBottom: 24,
+          }}
+        >
+          <div style={{
+            width: 46,
+            height: 46,
+            borderRadius: 12,
+            background: "#f87171",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0
+          }}>
+            <AlertTriangle size={26} color="#ffffff" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#f87171", textTransform: "uppercase", letterSpacing: 0.5 }}>
+              🚨 {lang === "ar" ? "تذكير بالدفع - مستحقات غير مسددة" : "🚨 RAPPEL DE PAIEMENT - IMPAYÉ"}
+            </div>
+            <div style={{ fontSize: 13.5, color: C.ink, marginTop: 4, fontWeight: 600 }}>
+              {lang === "ar"
+                ? `يرجى تسوية المبلغ المتبقي قدره ${fin.totalUnpaid.toLocaleString()} دج في أقرب وقت ممكن.`
+                : `Veuillez régler votre montant restant de ${fin.totalUnpaid.toLocaleString()} DA dès que possible.`}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Status Banner (Inscription) ── */}
       {!student.enrollmentPaid && (
