@@ -41,7 +41,6 @@ export const SCHOOL_CATS = [
     bg: "rgba(99,102,241,0.2)",
     border: "rgba(99,102,241,0.45)",
     levels: ["4ème", "5ème"],
-    groups: ["Normal", "Individuel", "Spécial"],
   },
   {
     id: "cem",
@@ -52,7 +51,6 @@ export const SCHOOL_CATS = [
     bg: "rgba(34,197,94,0.18)",
     border: "rgba(34,197,94,0.42)",
     levels: ["1ère", "2ème", "3ème", "4ème"],
-    groups: ["Normal", "Individuel", "Spécial"],
   },
   {
     id: "lycee",
@@ -63,7 +61,6 @@ export const SCHOOL_CATS = [
     bg: "rgba(236,72,153,0.18)",
     border: "rgba(236,72,153,0.42)",
     levels: ["1ère", "2ème", "3ème"],
-    groups: ["Normal", "Individuel", "Spécial"],
   },
   {
     id: "langues",
@@ -74,7 +71,6 @@ export const SCHOOL_CATS = [
     bg: "rgba(226,150,58,0.2)",
     border: "rgba(226,150,58,0.45)",
     levels: null,  // dynamique — stocké dans data.langLevels
-    groups: null,  // pas de groupe intermédiaire, directement sous-groupes
   },
   {
     id: "zoom",
@@ -85,7 +81,6 @@ export const SCHOOL_CATS = [
     bg: "rgba(59,130,246,0.18)",
     border: "rgba(59,130,246,0.42)",
     levels: ["En ligne"],
-    groups: ["Unique"],
   },
 ];
 
@@ -164,100 +159,190 @@ export function computeCycles(sessions, group) {
  * Performs waterfall allocation: Payments -> Previous Debt -> Current Fees
  */
 export function getStudentFinancialSummary(data, studentId, activeYearId) {
-  if (!data) return { totalPaid: 0, totalUnpaid: 0, isSettled: true, enrollmentPaid: false, previousDebt: 0, currentFees: 0 };
-  
-  // If activeYearId is not provided, try to find the current year
+  const defaultRes = {
+    study_fee: 0,
+    registration_fee: 500,
+    total_due: 500,
+    amount_paid: 0,
+    remaining_amount: 500,
+    payment_status: "NON PAYÉ",
+
+    previousDebt: 0,
+    previousDebtPaid: 0,
+    previousDebtRemaining: 0,
+    registrationFeeAmount: 500,
+    registrationFeePaid: 0,
+    registrationFeeRemaining: 500,
+    registrationFeeStatus: "NON PAYÉ",
+    currentFees: 0,
+    currentFeesPaid: 0,
+    currentFeesRemaining: 0,
+    totalExpected: 500,
+    totalPaid: 0,
+    totalUnpaid: 500,
+    credit: 0,
+    isSettled: false,
+    isEnrolled: false,
+    enrollment: null,
+    group: null,
+  };
+
+  if (!data || typeof data !== "object") return defaultRes;
+
+  const academicYears = Array.isArray(data.academicYears) ? data.academicYears : [];
+  const students = Array.isArray(data.students) ? data.students : [];
+  const enrollments = Array.isArray(data.enrollments) ? data.enrollments : [];
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+  const debtCarryOvers = Array.isArray(data.debtCarryOvers) ? data.debtCarryOvers : [];
+  const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+  const payments = Array.isArray(data.payments) ? data.payments : [];
+
   let yearId = activeYearId;
-  if (!yearId && data.academicYears) {
-    const currentYear = data.academicYears.find(y => y.isCurrent);
+  if (!yearId && academicYears.length > 0) {
+    const currentYear = academicYears.find(y => y && y.isCurrent);
     if (currentYear) yearId = currentYear.id;
   }
 
-  const st = (data.students || []).find(s => s.id === studentId);
-  if (!st) return { totalPaid: 0, totalUnpaid: 0, isSettled: true, enrollmentPaid: false, previousDebt: 0, currentFees: 0 };
+  const st = students.find(s => s && s.id === studentId);
+  if (!st) return defaultRes;
 
-  // Get active enrollment for the year
-  const enrollment = (data.enrollments || []).find(e => e.studentId === studentId && e.academicYearId === yearId);
+  // 1. Check enrollment for the selected academic year
+  const enrollment = enrollments.find(e => e && e.studentId === studentId && (e.academicYearId === yearId || !e.academicYearId || !yearId));
+  const isEnrolled = !!enrollment;
   const groupId = enrollment ? enrollment.groupId : null;
-  const price = enrollment ? (enrollment.monthlyPrice || 0) : 0;
+  const price = enrollment 
+    ? (enrollment.monthlyPrice ?? enrollment.courseFeeAmount ?? enrollment.agreedPrice ?? (st.monthlyPrice || st.montant || 0)) 
+    : (st.monthlyPrice || st.montant || 0);
+  const sg = groups.find(s => s && s.id === groupId);
 
-  // 1. Calculate Previous Debt (carried over to this year)
-  let previousDebtTotal = 0;
-  const carryOvers = (data.debtCarryOvers || []).filter(c => c.studentId === studentId && (!yearId || !c.toYearId || c.toYearId === yearId || c.toYearId === "manual"));
-  carryOvers.forEach(c => previousDebtTotal += (Number(c.amount) || 0));
+  // 2. Previous Debt (carried over to this year)
+  let previousDebt = 0;
+  const carryOvers = debtCarryOvers.filter(c => 
+    c && c.studentId === studentId && 
+    (c.targetAcademicYearId === yearId || c.toYearId === yearId || (!c.targetAcademicYearId && !c.toYearId))
+  );
+  carryOvers.forEach(c => previousDebt += (Number(c?.amount) || 0));
 
-  // 2. Calculate Current Year Expected Fees
-  let currentFeesExpected = 0;
-  const sg = (data.groups || []).find(s => s.id === groupId);
-  const enrollmentFee = data.settings?.enrollmentFee || 500;
+  // 3. Registration Fee (Frais d'Inscription)
+  const defaultFeeSetting = data.settings?.enrollmentFee || 500;
+  const registrationFeeAmount = enrollment 
+    ? (enrollment.registrationFeeAmount ?? defaultFeeSetting) 
+    : (st.enrollmentPaid ? defaultFeeSetting : defaultFeeSetting);
 
-  // Only charge the enrollment fee if they are actually enrolled in this year
-  if (enrollment && !st.enrollmentPaid) {
-    currentFeesExpected += enrollmentFee;
-  }
-
-  // Calculate fees from sessions in this year
-  if (sg) {
-    const doneSessions = (data.sessions || []).filter(s => 
-      (s.groupId === sg.id || s.groupId === sg.id) && 
+  // 4. Current Course Fees for this year (Frais d'études)
+  let currentFees = 0;
+  if (sg && isEnrolled) {
+    const doneSessions = sessions.filter(s => 
+      s && s.groupId === sg.id && 
       s.status === "done" && 
       (!yearId || s.academicYearId === yearId || !s.academicYearId)
     ).length;
-    // Enforce 4 sessions per month rule
-    const cycles = Math.max(1, Math.floor(doneSessions / 4));
-    currentFeesExpected += (cycles * price);
+    const cycles = Math.max(1, Math.floor(doneSessions / (sg.sessionsPerCycle || 4)));
+    currentFees = cycles * price;
+  } else if (isEnrolled) {
+    currentFees = price;
   }
 
-  // 3. Calculate Payments
-  let currentFeesPaid = 0;
-  let previousDebtPaid = 0;
+  // 5. Total Payments Recorded for this student in this academic year
+  let totalPaymentsFromRecords = 0;
+  let hasExplicitRegPmt = false;
 
-  // Fetch all payments for this student
-  const stPayments = (data.payments || []).filter(p => p.studentId === studentId);
-  
+  const stPayments = payments.filter(p => 
+    p && p.studentId === studentId && 
+    (!yearId || p.academicYearId === yearId || !p.academicYearId)
+  );
+
   stPayments.forEach(p => {
-    const expected = p.expectedAmount || p.amount || price;
-    const paid = (p.paid === true || p.status === "paid") ? expected : (p.paidAmount || 0);
-    
-    if (p.type === "debt") {
-      // This is a payment specifically towards a past debt
-      previousDebtPaid += paid;
-    } else if (!yearId || p.academicYearId === yearId || !p.academicYearId) {
-      // Normal current year fee payment
-      currentFeesPaid += paid;
-    }
+    const isReg = p?.type === "registration" || p?.type === "enrollment" || p?.feeType === "registration";
+    if (isReg) hasExplicitRegPmt = true;
+
+    const expected = p?.expectedAmount || p?.amount || price;
+    const paid = (p?.paid === true || p?.status === "paid") ? expected : (Number(p?.paidAmount) || 0);
+    totalPaymentsFromRecords += (Number(paid) || 0);
   });
 
-  if (st.enrollmentPaid) {
-    currentFeesExpected += enrollmentFee;
-    currentFeesPaid += enrollmentFee;
+  let totalPaid = totalPaymentsFromRecords;
+
+  // Add registration fee paid from student/enrollment status if NOT already recorded as a payment item in payments array
+  if (!hasExplicitRegPmt) {
+    if (enrollment?.registrationFeePaid !== undefined && enrollment?.registrationFeePaid !== null) {
+      totalPaid += Number(enrollment.registrationFeePaid) || 0;
+    } else if (enrollment?.registrationFeeStatus === "PAYÉ" || st.enrollmentPaid) {
+      totalPaid += registrationFeeAmount;
+    }
   }
 
-  // 4. Separate Balances (No Waterfall Allocation)
-  let previousDebtRemaining = previousDebtTotal - previousDebtPaid;
-  if (previousDebtRemaining < 0) previousDebtRemaining = 0;
+  // 6. Waterfall Payment Allocation (Previous Debt -> Registration Fee -> Course Fees -> Credit)
+  let unallocatedPaid = totalPaid;
 
-  let currentFeesRemaining = currentFeesExpected - currentFeesPaid;
-  if (currentFeesRemaining < 0) currentFeesRemaining = 0;
+  // Step A: Previous Debt
+  const previousDebtPaid = Math.min(unallocatedPaid, previousDebt);
+  const previousDebtRemaining = previousDebt - previousDebtPaid;
+  unallocatedPaid -= previousDebtPaid;
 
-  const totalUnpaid = previousDebtRemaining + currentFeesRemaining;
+  // Step B: Registration Fee
+  const registrationFeePaid = Math.min(unallocatedPaid, registrationFeeAmount);
+  const registrationFeeRemaining = Math.max(0, registrationFeeAmount - registrationFeePaid);
+  unallocatedPaid -= registrationFeePaid;
+
+  let registrationFeeStatus = "NON PAYÉ";
+  if (registrationFeePaid >= registrationFeeAmount && registrationFeeAmount > 0) {
+    registrationFeeStatus = "PAYÉ";
+  } else if (registrationFeePaid > 0) {
+    registrationFeeStatus = "PARTIELLEMENT PAYÉ";
+  }
+
+  // Step C: Current Course Fees
+  const currentFeesPaid = Math.min(unallocatedPaid, currentFees);
+  const currentFeesRemaining = Math.max(0, currentFees - currentFeesPaid);
+  unallocatedPaid -= currentFeesPaid;
+
+  // Step D: Credit (Excess payments after all obligations are cleared)
+  const credit = unallocatedPaid;
+
+  const totalExpected = previousDebt + registrationFeeAmount + currentFees;
+  const totalUnpaid = previousDebtRemaining + registrationFeeRemaining + currentFeesRemaining;
+
+  const study_fee = currentFees;
+  const registration_fee = registrationFeeAmount;
+  const total_due = totalExpected;
+  const amount_paid = totalPaid;
+  const remaining_amount = totalUnpaid;
+  const payment_status = totalUnpaid === 0 ? "PAYÉ" : (totalPaid > 0 ? "PARTIEL" : "NON PAYÉ");
 
   return {
-    previousDebt: previousDebtTotal, // Kept for backward compatibility
-    previousDebtTotal,
+    study_fee,
+    registration_fee,
+    total_due,
+    amount_paid,
+    remaining_amount,
+    payment_status,
+
+    previousDebt,
     previousDebtPaid,
     previousDebtRemaining,
-
-    currentFees: currentFeesExpected, // Kept for backward compatibility
-    currentFeesExpected,
+    registrationFeeAmount,
+    registrationFeePaid,
+    registrationFeeRemaining,
+    registrationFeeStatus,
+    currentFees,
     currentFeesPaid,
     currentFeesRemaining,
-
-    totalExpected: previousDebtTotal + currentFeesExpected,
-    totalPaid: previousDebtPaid + currentFeesPaid,
+    totalExpected,
+    totalPaid,
     totalUnpaid,
+    credit,
     isSettled: totalUnpaid === 0,
-    enrollmentPaid: !!st.enrollmentPaid,
+    isEnrolled,
+    isEnrolledThisYear: isEnrolled,
+    activeGroupName: isEnrolled ? (sg ? sg.nom : "Inscrit") : "Non inscrit cette année",
+    totalCourseFees: currentFees,
+    regFeePaid: registrationFeePaid,
+    regFeeStatus: registrationFeeStatus,
+    regFeeRemaining: registrationFeeRemaining,
+    courseFeesRemaining: currentFeesRemaining,
+    enrollment,
+    group: sg,
   };
 }
 

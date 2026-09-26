@@ -436,9 +436,36 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       if (isNowPaid) {
         nextNotifications = notifyPaymentReceived(d, student.id, feeAmount, { type: "enrollment" }, lang);
       }
+
+      let updatedPayments = [...(d.payments || [])];
+      if (isNowPaid) {
+        const existingRegPmt = updatedPayments.find(p => p.studentId === student.id && (p.type === "registration" || p.type === "enrollment"));
+        if (existingRegPmt) {
+          updatedPayments = updatedPayments.map(p => p.id === existingRegPmt.id ? { ...p, paid: true, status: "paid", paidAmount: feeAmount, amount: feeAmount, paidDate: todayStr } : p);
+        } else {
+          updatedPayments.push({
+            id: uid(),
+            studentId: student.id,
+            type: "registration",
+            academicYearId: activeYearId || "ay-2025-2026",
+            amount: feeAmount,
+            paidAmount: feeAmount,
+            paid: true,
+            status: "paid",
+            paidDate: todayStr,
+            date: todayStr,
+            label: lang === "ar" ? "حقوق التسجيل" : "Frais d'inscription",
+          });
+        }
+      } else {
+        updatedPayments = updatedPayments.filter(p => !(p.studentId === student.id && (p.type === "registration" || p.type === "enrollment")));
+      }
+
       return {
         ...d,
-        students: (d.students || []).map(s => s.id === student.id ? { ...s, enrollmentPaid: isNowPaid, enrollmentDate: isNowPaid ? todayStr : s.enrollmentDate } : s),
+        students: (d.students || []).map(s => s.id === student.id ? { ...s, enrollmentPaid: isNowPaid, registrationFeePaid: isNowPaid ? feeAmount : 0, registrationFeeStatus: isNowPaid ? "PAYÉ" : "NON PAYÉ", enrollmentDate: isNowPaid ? todayStr : s.enrollmentDate } : s),
+        enrollments: (d.enrollments || []).map(e => e.studentId === student.id ? { ...e, registrationFeePaid: isNowPaid ? feeAmount : 0, registrationFeeStatus: isNowPaid ? "PAYÉ" : "NON PAYÉ" } : e),
+        payments: updatedPayments,
         userNotifications: nextNotifications,
       };
     });
