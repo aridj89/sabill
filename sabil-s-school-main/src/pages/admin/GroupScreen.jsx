@@ -99,9 +99,11 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
   };
 
   const statusStyle = (s) => ({
-    planned:   { bg: "rgba(99,102,241,0.12)", border: "rgba(99,102,241,0.3)", color: "#818cf8" },
-    done:      { bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.3)", color: "#4ade80" },
-    cancelled: { bg: "rgba(248,113,113,0.12)", border: "rgba(248,113,113,0.3)", color: "#f87171" },
+    planned:     { bg: "rgba(99,102,241,0.12)",  border: "rgba(99,102,241,0.3)",  color: "#818cf8" },
+    done:        { bg: "rgba(74,222,128,0.12)",  border: "rgba(74,222,128,0.3)",  color: "#4ade80" },
+    cancelled:   { bg: "rgba(248,113,113,0.12)", border: "rgba(248,113,113,0.3)", color: "#f87171" },
+    prof_absent: { bg: "rgba(251,191,36,0.12)",  border: "rgba(251,191,36,0.3)",  color: "#fbbf24" },
+    rescheduled: { bg: "rgba(168,85,247,0.12)",  border: "rgba(168,85,247,0.3)",  color: "#a855f7" },
   }[s] || {});
 
   const saveExtraSession = (es) => {
@@ -145,12 +147,14 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
           const att = data.attendances.filter(a => a.sessionId === sess.id);
           const presentCnt = att.filter(a => a.present).length;
           const sgStudents = students.length;
-          const isExtra = sess.isExtra; // Note: extra sessions logic
-          
+          const isExtra = sess.isExtra;
+          const isProfAbsent = sess.status === "prof_absent";
+          const isRescheduled = sess.isRescheduled;
+
           return (
             <div
               key={sess.id}
-              onClick={() => !isExtra ? setOpenSession(sess) : null} // TODO: Extra session detail
+              onClick={() => !isExtra ? setOpenSession(sess) : null}
               style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
                 borderRadius: 13, cursor: isExtra ? "default" : "pointer",
@@ -166,11 +170,18 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
                 <span style={{ fontSize: 11, fontWeight: 800, color: isExtra ? C.accent : ss.color, marginTop: 1 }}>{sess.time}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   {new Date(sess.date + "T12:00").toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { weekday: "short", day: "numeric", month: "short" })}
                   {isExtra && <span style={{ background: C.accentSoft, color: C.accent, fontSize: 10, padding: "2px 6px", borderRadius: 4 }}>{lang === "ar" ? "إضافية" : "Extra"}</span>}
+                  {isProfAbsent && <span style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid rgba(251,191,36,0.3)" }}>{lang === "ar" ? "غياب أستاذ" : "Prof absent(e)"}</span>}
+                  {isRescheduled && <span style={{ background: "rgba(168,85,247,0.15)", color: "#a855f7", fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid rgba(168,85,247,0.3)" }}>{lang === "ar" ? "تاريخ استثنائي" : "Reportée"}</span>}
                 </div>
                 {sess.note && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sess.note}</div>}
+                {isRescheduled && sess.originalDate && (
+                  <div style={{ fontSize: 11, color: "rgba(168,85,247,0.7)", marginTop: 2 }}>
+                    {lang === "ar" ? `الأصلي: ${sess.originalDate}` : `Original : ${sess.originalDate}`}
+                  </div>
+                )}
               </div>
               {sess.status === "done" && !isExtra && (
                 <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>

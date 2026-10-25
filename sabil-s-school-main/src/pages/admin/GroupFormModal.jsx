@@ -47,20 +47,25 @@ export default function GroupFormModal({
     );
   };
 
-  // Preview session count
-  const previewCount = (() => {
-    if (!form.startDate || !form.endDate || form.days.length === 0) return 0;
+  // Preview session count and dates
+  const getSessionDates = () => {
+    if (!form.startDate || !form.endDate || form.days.length === 0) return [];
     const DAY_JS = { dimanche: 0, lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6 };
     const dayNums = form.days.map(d => DAY_JS[d]);
     const start = new Date(form.startDate + "T00:00:00");
     const end = new Date(form.endDate + "T00:00:00");
-    let count = 0, cur = new Date(start);
-    while (cur <= end && count < 500) {
-      if (dayNums.includes(cur.getDay())) count++;
+    const dates = [];
+    let cur = new Date(start);
+    while (cur <= end && dates.length < 500) {
+      if (dayNums.includes(cur.getDay())) {
+        dates.push(cur.toISOString().slice(0, 10));
+      }
       cur.setDate(cur.getDate() + 1);
     }
-    return count;
-  })();
+    return dates;
+  };
+  const previewDates = getSessionDates();
+  const previewCount = previewDates.length;
 
   const handleSave = () => {
     if (form.days.length === 0) return;
@@ -156,10 +161,22 @@ export default function GroupFormModal({
 
       {/* Preview */}
       {previewCount > 0 && (
-        <div style={{ background: "rgba(226,150,58,0.1)", border: "1px solid rgba(226,150,58,0.3)", borderRadius: 10, padding: "10px 14px", marginTop: 4, fontSize: 13, color: C.inkSoft }}>
-          <span style={{ color: C.accent, fontWeight: 700 }}>{previewCount}</span>
-          {" "}{lang === "ar" ? "حصة ستُنشأ تلقائياً في البرنامج" : "séances seront générées automatiquement"}
-        </div>
+        <>
+          {/* Session count */}
+          <div style={{ background: "rgba(226,150,58,0.1)", border: "1px solid rgba(226,150,58,0.3)", borderRadius: 10, padding: "10px 14px", marginTop: 4, fontSize: 13, color: C.inkSoft }}>
+            <span style={{ color: C.accent, fontWeight: 700 }}>{previewCount}</span>
+            {" "}{lang === "ar" ? "حصة ستُنشأ تلقائياً في البرنامج" : "séances seront générées automatiquement"}
+          </div>
+          {/* Dates preview list */}
+          <div style={{ marginTop: 8, maxHeight: 120, overflowY: "auto", fontSize: 12, color: C.inkSoft }}>
+            {previewDates.slice(0, 10).map(date => (
+              <div key={date}>📅 {date}</div>
+            ))}
+            {previewDates.length > 10 && (
+              <div>…and {previewDates.length - 10} more dates</div>
+            )}
+          </div>
+        </>
       )}
 
       <div style={{ marginTop: 16 }}>

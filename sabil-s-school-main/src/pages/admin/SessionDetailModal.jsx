@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CheckCircle2, XCircle, Clock, Calendar, Edit2, X, Save } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Calendar, Edit2, X, Save, AlertTriangle, RotateCcw } from "lucide-react";
 import { C, inputStyle, uid, CAT_BY_ID } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
@@ -27,6 +27,10 @@ export default function SessionDetailModal({ session, group, students, attendanc
   const [time, setTime]     = useState(session.time);
   const [dirty, setDirty]   = useState(false);
 
+  // Track if the date was exceptionally rescheduled
+  const originalDate = session.originalDate || session.date;
+  const isRescheduled = date !== originalDate;
+
   const toggle = (sid) => {
     setAttMap(p => ({ ...p, [sid]: !p[sid] }));
     setDirty(true);
@@ -47,14 +51,30 @@ export default function SessionDetailModal({ session, group, students, attendanc
       };
     });
 
-    const updatedSession = { ...session, status, note, date, time };
+    const updatedSession = {
+      ...session,
+      status,
+      note,
+      date,
+      time,
+      // Preserve original date so we always know it was changed
+      originalDate: originalDate,
+      isRescheduled: date !== originalDate,
+    };
     onSave(updatedSession, newAttendances);
   };
 
+  const resetDate = () => {
+    setDate(originalDate);
+    setDirty(true);
+  };
+
   const statusColors = {
-    planned:   { bg: "rgba(99,102,241,0.15)", border: "rgba(99,102,241,0.4)", color: "#818cf8", label: lang === "ar" ? "مقررة" : "Planifiée" },
-    done:      { bg: "rgba(74,222,128,0.15)", border: "rgba(74,222,128,0.4)", color: "#4ade80", label: lang === "ar" ? "منجزة" : "Effectuée" },
-    cancelled: { bg: "rgba(248,113,113,0.15)", border: "rgba(248,113,113,0.4)", color: "#f87171", label: lang === "ar" ? "ملغاة" : "Annulée" },
+    planned:       { bg: "rgba(99,102,241,0.15)",  border: "rgba(99,102,241,0.4)",  color: "#818cf8", label: lang === "ar" ? "مقررة"           : "Planifiée" },
+    done:          { bg: "rgba(74,222,128,0.15)",  border: "rgba(74,222,128,0.4)",  color: "#4ade80", label: lang === "ar" ? "منجزة"           : "Effectuée" },
+    cancelled:     { bg: "rgba(248,113,113,0.15)", border: "rgba(248,113,113,0.4)", color: "#f87171", label: lang === "ar" ? "ملغاة"           : "Annulée" },
+    prof_absent:   { bg: "rgba(251,191,36,0.15)",  border: "rgba(251,191,36,0.4)",  color: "#fbbf24", label: lang === "ar" ? "الأستاذ غائب"    : "Prof absent(e)" },
+    rescheduled:   { bg: "rgba(168,85,247,0.15)",  border: "rgba(168,85,247,0.4)",  color: "#a855f7", label: lang === "ar" ? "تم تأجيلها"      : "Reportée" },
   };
 
   const sc = statusColors[status];
@@ -94,10 +114,40 @@ export default function SessionDetailModal({ session, group, students, attendanc
               <span style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{time}</span>
             )}
           </div>
-          <button onClick={() => setEditDate(v => !v)} style={{ background: "none", border: "none", color: C.inkSoft, cursor: "pointer", padding: 4 }}>
+          {/* Edit / reset date buttons */}
+          <button
+            onClick={() => setEditDate(v => !v)}
+            title={lang === "ar" ? "تغيير التاريخ استثنائياً" : "Modifier la date (cas exceptionnel)"}
+            style={{ background: "none", border: "none", color: editDate ? "#a855f7" : C.inkSoft, cursor: "pointer", padding: 4 }}
+          >
             <Edit2 size={13} />
           </button>
+          {isRescheduled && (
+            <button
+              onClick={resetDate}
+              title={lang === "ar" ? "إلغاء تغيير التاريخ" : "Annuler le changement de date"}
+              style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", padding: 4 }}
+            >
+              <RotateCcw size={13} />
+            </button>
+          )}
         </div>
+
+        {/* Rescheduled badge */}
+        {isRescheduled && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6,
+            marginTop: 8, padding: "5px 10px", borderRadius: 8,
+            background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.35)",
+            fontSize: 12, color: "#a855f7", fontWeight: 600,
+          }}>
+            <AlertTriangle size={12} />
+            {lang === "ar"
+              ? `تاريخ استثنائي — الأصلي: ${originalDate}`
+              : `Date modifiée (cas exceptionnel) — Originale : ${originalDate}`
+            }
+          </div>
+        )}
       </div>
 
       {/* Status selector */}
