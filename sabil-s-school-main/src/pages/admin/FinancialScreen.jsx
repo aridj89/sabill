@@ -2,7 +2,7 @@ import React, { useState, useMemo, Component } from "react";
 import {
   Landmark, Calendar, Users, TrendingUp, AlertCircle,
   CheckCircle2, DollarSign, Clock, BarChart2,
-  Search, History, ShieldCheck, RefreshCw, AlertTriangle, BookOpen, CreditCard, ChevronRight,
+  Search, History, ShieldCheck, RefreshCw, AlertTriangle, BookOpen, CreditCard, ChevronRight, Check, X,
 } from "lucide-react";
 import { C, CAT_BY_ID, uid, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -47,84 +47,127 @@ class FinanceErrorBoundary extends Component {
   }
 }
 
-/* --- Stat Card ---------------------------------------------------------- */
-function StatCard({ icon: Icon, label, value, sub, color, bg, border, onClick, active }) {
+/* --- Interactive Main Category Case ------------------------------------ */
+function CategoryCase({
+  icon: Icon,
+  title,
+  subtitle,
+  badgeText,
+  color,
+  bg,
+  border,
+  active,
+  onClick,
+  stat1Label,
+  stat1Value,
+  stat2Label,
+  stat2Value,
+  stat2Alert,
+  hintText,
+}) {
   return (
     <div
       onClick={onClick}
       style={{
         background: active ? bg : C.surface,
-        border: `1.5px solid ${active ? color : (border || C.border)}`,
-        borderRadius: 18, padding: "18px 20px",
-        display: "flex", alignItems: "center", gap: 14,
-        boxShadow: active ? `0 4px 24px ${bg}` : "0 8px 24px rgba(0,0,0,0.2)",
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.18s ease",
+        border: `2px solid ${active ? color : (border || C.border)}`,
+        borderRadius: 20,
+        padding: "20px 22px",
+        cursor: "pointer",
+        transition: "all 0.22s ease",
+        position: "relative",
+        boxShadow: active ? `0 6px 28px ${bg}` : "0 6px 20px rgba(0,0,0,0.22)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
       }}
-      onMouseEnter={e => onClick && !active && (e.currentTarget.style.borderColor = color)}
-      onMouseLeave={e => onClick && !active && (e.currentTarget.style.borderColor = border || C.border)}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = color; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = border || C.border; }}
     >
-      <div style={{ width: 52, height: 52, borderRadius: 15, background: bg, border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Icon size={24} color={color} />
-      </div>
+      {/* Top row: Icon + Title + Active tag */}
       <div>
-        <div style={{ fontSize: 24, fontWeight: 800, color: C.ink, lineHeight: 1.1 }}>{value}</div>
-        {sub && <div style={{ fontSize: 11.5, color, fontWeight: 700, marginTop: 3 }}>{sub}</div>}
-        <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 4, fontWeight: 600 }}>{label}</div>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: 14,
+              background: bg, border: `1px solid ${border}`,
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+            }}>
+              <Icon size={24} color={color} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.ink }}>{title}</h3>
+                {badgeText && (
+                  <span style={{
+                    background: `${color}25`,
+                    color: color,
+                    border: `1px solid ${color}55`,
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    padding: "2px 8px"
+                  }}>
+                    {badgeText}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 3 }}>{subtitle}</div>
+            </div>
+          </div>
+          {active && (
+            <span style={{
+              background: color, color: "#111",
+              fontSize: 11, fontWeight: 900,
+              padding: "3px 10px", borderRadius: 999, flexShrink: 0
+            }}>
+              ✓ فلتر نشط
+            </span>
+          )}
+        </div>
+
+        {/* Numbers grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "12px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, color: C.inkSoft, fontWeight: 600 }}>{stat1Label}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.ink, marginTop: 2 }}>{stat1Value}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: C.inkSoft, fontWeight: 600 }}>{stat2Label}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: stat2Alert ? "#f87171" : "#4ade80", marginTop: 2 }}>
+              {stat2Value}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom action hint */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        fontSize: 12, fontWeight: 700, color: active ? color : C.inkSoft,
+        paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)"
+      }}>
+        <span>{active ? "اضغط لإلغاء التصفية وعرض الكل" : hintText}</span>
+        <ChevronRight size={15} color={active ? color : C.inkSoft} />
       </div>
     </div>
   );
 }
 
-/* --- Section Block ----------------------------------------------------- */
-function SectionBlock({ icon: Icon, color, bg, border, title, subtitle, count, countColor, totalLabel, totalValue, unpaidLabel, unpaidValue, btnLabel, active, onToggle }) {
+/* --- Mini Stat Card ---------------------------------------------------- */
+function MiniStatCard({ icon: Icon, label, value, color, bg }) {
   return (
     <div style={{
-      background: C.surface,
-      border: `1.5px solid ${active ? color : border}`,
-      borderRadius: 20, padding: 22, marginBottom: 20,
-      boxShadow: active ? `0 4px 24px ${bg}` : "0 4px 16px rgba(0,0,0,0.2)",
-      transition: "all 0.2s",
+      background: C.surface, border: `1px solid ${C.border}`,
+      borderRadius: 16, padding: "14px 18px",
+      display: "flex", alignItems: "center", gap: 12,
     }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
-        {/* Left: icon + title */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: bg, border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Icon size={21} color={color} />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: C.ink }}>{title}</h3>
-              {count !== undefined && (
-                <span style={{ background: `${countColor || color}25`, color: countColor || color, border: `1px solid ${countColor || color}55`, borderRadius: 999, fontSize: 11, fontWeight: 800, padding: "2px 8px" }}>
-                  {count}
-                </span>
-              )}
-            </div>
-            {subtitle && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{subtitle}</div>}
-          </div>
-        </div>
-
-        {/* Right: numbers + button */}
-        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: C.inkSoft, fontWeight: 700 }}>{totalLabel}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color }}>{totalValue}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: C.inkSoft, fontWeight: 700 }}>{unpaidLabel}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: Number(String(unpaidValue).replace(/[^\d]/g, "")) > 0 ? "#f87171" : "#4ade80" }}>{unpaidValue}</div>
-          </div>
-          <button onClick={onToggle} style={{
-            background: active ? `${color}30` : `${color}15`,
-            border: `1px solid ${color}80`,
-            borderRadius: 10, padding: "8px 16px", color, fontWeight: 700, fontSize: 13, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            {btnLabel}
-            <ChevronRight size={14} />
-          </button>
-        </div>
+      <div style={{ width: 42, height: 42, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={20} color={color} />
+      </div>
+      <div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: C.ink, lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 3 }}>{label}</div>
       </div>
     </div>
   );
@@ -164,6 +207,37 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
   const [filterGroup, setFilterGroup] = useState("all");
   const [detailModalStudent, setDetailModalStudent] = useState(null);
 
+  /* -- Quick Toggle Registration Fee Paid / Unpaid -- */
+  const handleToggleRegFee = (studentId, currentlyPaid) => {
+    if (!setData) return;
+    setData(prev => {
+      const updatedStudents = (prev?.students || []).map(s => {
+        if (s.id === studentId) {
+          return { ...s, enrollmentPaid: !currentlyPaid };
+        }
+        return s;
+      });
+      const updatedEnrollments = (prev?.enrollments || []).map(e => {
+        if (e.studentId === studentId && (e.academicYearId === selectedYearId || !e.academicYearId)) {
+          return {
+            ...e,
+            registrationFeeStatus: !currentlyPaid ? "PAYÉ" : "NON PAYÉ",
+            registrationFeePaid: !currentlyPaid ? 500 : 0,
+          };
+        }
+        return e;
+      });
+      return { ...prev, students: updatedStudents, enrollments: updatedEnrollments };
+    });
+    if (toastFn) {
+      toastFn(
+        !currentlyPaid
+          ? (lang === "ar" ? "✅ تم تسجيل تسديد حقوق التسجيل (500 DA) بنجاح" : "✅ Frais d'inscription (500 DA) marqués comme payés")
+          : (lang === "ar" ? "تم إلغاء تسديد حقوق التسجيل" : "Frais d'inscription annulés")
+      );
+    }
+  };
+
   /* -- Compute All -- */
   const yearFinancials = useMemo(() => {
     const students = Array.isArray(data?.students) ? data.students : [];
@@ -183,6 +257,7 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
     let totalCreditGenerated = 0;
     let totalExpectedAll = 0;
     let countRegUnpaid = 0;
+    let countRegPaid = 0;
     let countPrevDebt = 0;
 
     const studentSummaries = students.map(st => {
@@ -200,7 +275,12 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
         totalMoneyReceived += Number(summary.totalPaid) || 0;
         totalCreditGenerated += Number(summary.credit) || 0;
         totalExpectedAll += Number(summary.totalExpected) || 0;
-        if ((summary.registrationFeeRemaining || 0) > 0) countRegUnpaid++;
+
+        if ((summary.registrationFeeRemaining || 0) > 0) {
+          countRegUnpaid++;
+        } else {
+          countRegPaid++;
+        }
         if ((summary.previousDebtRemaining || 0) > 0) countPrevDebt++;
       }
       return { student: st, summary };
@@ -221,25 +301,29 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
       totalCurrentFees, totalCurrentFeesUnpaid,
       totalRegistrationFees, totalRegistrationPaid, totalRegistrationUnpaid,
       totalCreditGenerated, studentSummaries, monthlyStats,
-      countRegUnpaid, countPrevDebt,
+      countRegUnpaid, countRegPaid, countPrevDebt,
     };
   }, [data, selectedYearId, lang]);
 
-  /* -- Filter -- */
+  /* -- Filter Students -- */
   const filteredStudents = useMemo(() => {
     const list = Array.isArray(yearFinancials?.studentSummaries) ? yearFinancials.studentSummaries : [];
     return list.filter(item => {
       if (!item?.student || !item?.summary) return false;
       const { student: st, summary } = item;
       if (!summary.isEnrolled) return false;
+
+      // Filter by section
       if (activeSection === "prev_debt" && (summary.previousDebtRemaining || 0) === 0) return false;
       if (activeSection === "reg_unpaid" && (summary.registrationFeeRemaining || 0) === 0) return false;
-      if (activeSection === "courses" && (summary.currentFees || 0) === 0) return false;
+      if (activeSection === "courses" && (summary.currentFeesRemaining || 0) === 0) return false;
+
       if (filterGroup !== "all" && summary.group?.id !== filterGroup) return false;
       if (searchQ.trim()) {
         const q = searchQ.toLowerCase().trim();
         const name = `${st.prenom || ""} ${st.nom || ""}`.toLowerCase();
-        return name.includes(q) || String(summary.group?.nom || "").toLowerCase().includes(q);
+        const code = String(st.studentCode || "").toLowerCase();
+        return name.includes(q) || code.includes(q) || String(summary.group?.nom || "").toLowerCase().includes(q);
       }
       return true;
     });
@@ -260,23 +344,27 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 11, background: "rgba(226,150,58,0.2)", border: "1px solid rgba(226,150,58,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Landmark size={20} color={C.accent} />
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(226,150,58,0.2)", border: "1px solid rgba(226,150,58,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Landmark size={22} color={C.accent} />
             </div>
-            <h2 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: 0 }}>
-              {L("الإدارة المالية", "Gestion Financiere")}
-            </h2>
+            <div>
+              <h2 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: 0 }}>
+                {L("الإدارة المالية", "Gestion Financière")}
+              </h2>
+              <p style={{ color: C.inkSoft, fontSize: 13, margin: "3px 0 0" }}>
+                {L("ديون سابقة • رسوم التسجيل (500 DA) • رسوم الدراسة (السعر المتفق عليه) — كل خانة مستقلة", "Dettes antérieures • Frais d'inscription (500 DA) • Frais de cours — Chaque section indépendante")}
+              </p>
+            </div>
           </div>
-          <p style={{ color: C.inkSoft, fontSize: 13, margin: "4px 0 0" }}>
-            {L("ديون سابقة • رسوم تسجيل (500 DA) • رسوم دراسة — كل قسم مستقل", "Dettes anterieures · Frais inscription (500 DA) · Frais de cours — chaque section separee")}
-          </p>
         </div>
+
+        {/* Academic Year Selector */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.surface, border: `1.5px solid ${C.accent}`, borderRadius: 14, padding: "8px 16px" }}>
           <Calendar size={16} color={C.accent} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{L("السنة:", "Annee:")}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{L("السنة الدراسية:", "Année:")}</span>
           <select value={selectedYearId} onChange={e => setSelectedYearId(e.target.value)}
             style={{ background: "transparent", border: "none", color: "#fff", fontSize: 14, fontWeight: 800, outline: "none", cursor: "pointer", colorScheme: "dark" }}>
             {academicYears.map(y => (
@@ -286,141 +374,209 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 14, marginBottom: 28 }}>
-        <StatCard icon={Users}
-          label={L("تلاميذ مسجلون", "Eleves inscrits")}
-          value={yearFinancials.totalEnrolled}
-          sub={currentYearObj?.name || ""}
-          color="#818cf8" bg="rgba(129,140,248,0.15)" border="rgba(129,140,248,0.35)" />
-        <StatCard icon={TrendingUp}
-          label={L("إجمالي المحصّل", "Total encaisse")}
-          value={DA(yearFinancials.totalMoneyReceived)}
-          sub={L("مجموع المدفوعات الفعلية", "Paiements effectivement recus")}
-          color="#4ade80" bg="rgba(74,222,128,0.15)" border="rgba(74,222,128,0.35)" />
-        <StatCard icon={AlertTriangle}
-          label={L("إجمالي غير المدفوع", "Total restant a payer")}
-          value={DA((yearFinancials.totalPreviousDebtUnpaid || 0) + (yearFinancials.totalRegistrationUnpaid || 0) + (yearFinancials.totalCurrentFeesUnpaid || 0))}
-          sub={L("ديون + تسجيل + دراسة", "Dettes + Inscription + Cours")}
-          color="#f87171" bg="rgba(248,113,113,0.15)" border="rgba(248,113,113,0.35)" />
-        <StatCard icon={DollarSign}
-          label={L("رصيد فائض (Crédit)", "Credits (Surplus)")}
-          value={DA(yearFinancials.totalCreditGenerated)}
-          sub={L("دفعات زائدة محفوظة للتلميذ", "Surplus conserve")}
-          color="#c084fc" bg="rgba(192,132,252,0.15)" border="rgba(192,132,252,0.35)" />
+      {/* =================================================================
+          THE 3 MAIN DEDICATED CASES (CARDS)
+          1. 🔴 ديون سابقة
+          2. 🔵 رسوم التسجيل (500 DA)
+          3. 🟡 رسوم الدراسة
+      ================================================================= */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))", gap: 16, marginBottom: 20 }}>
+        
+        {/* CASE 1: 🔴 ديون سابقة */}
+        <CategoryCase
+          icon={AlertTriangle}
+          title={L("١. ديون سابقة", "1. Dettes Antérieures")}
+          subtitle={L("مبالغ محولة من السنة الماضية", "Dettes de l'année précédente")}
+          badgeText={yearFinancials.countPrevDebt > 0 ? `${yearFinancials.countPrevDebt} ${L("تلاميذ", "élèves")}` : undefined}
+          color="#f87171"
+          bg="rgba(248,113,113,0.12)"
+          border="rgba(248,113,113,0.3)"
+          active={activeSection === "prev_debt"}
+          onClick={() => toggle("prev_debt")}
+          stat1Label={L("إجمالي الديون السابقة", "Total dettes")}
+          stat1Value={DA(yearFinancials.totalPreviousDebt)}
+          stat2Label={L("المتبقي غير المسدد", "Restant impayé")}
+          stat2Value={DA(yearFinancials.totalPreviousDebtUnpaid)}
+          stat2Alert={yearFinancials.totalPreviousDebtUnpaid > 0}
+          hintText={L("👉 انقر لعرض التلاميذ أصحاب الديون السابقة", "👉 Cliquer pour afficher les élèves endettés")}
+        />
+
+        {/* CASE 2: 🔵 رسوم التسجيل (500 DA) — المفصولة في خانة وحدها */}
+        <CategoryCase
+          icon={ShieldCheck}
+          title={L("٢. رسوم التسجيل (500 DA)", "2. Frais d'Inscription (500 DA)")}
+          subtitle={L("حقوق التسجيل السنوية — خانة مستقلة تماماً", "Frais annuels — Section complètement séparée")}
+          badgeText={yearFinancials.countRegUnpaid > 0 ? `${yearFinancials.countRegUnpaid} ${L("لم يدفعوا", "non payés")}` : L("الكل مسدد ✓", "Tous payés ✓")}
+          color="#3b82f6"
+          bg="rgba(59,130,246,0.14)"
+          border="rgba(59,130,246,0.35)"
+          active={activeSection === "reg_unpaid"}
+          onClick={() => toggle("reg_unpaid")}
+          stat1Label={L("المحصل (مسددون)", "Total encaissé")}
+          stat1Value={`${DA(yearFinancials.totalRegistrationPaid)} (${yearFinancials.countRegPaid})`}
+          stat2Label={L("غير مسدد (المتبقي)", "Non payé")}
+          stat2Value={`${DA(yearFinancials.totalRegistrationUnpaid)} (${yearFinancials.countRegUnpaid})`}
+          stat2Alert={yearFinancials.countRegUnpaid > 0}
+          hintText={L("👉 انقر هنا لعرض التلاميذ الذين لم يدفعوا الـ 500 DA", "👉 Cliquer pour voir les élèves qui n'ont pas payé")}
+        />
+
+        {/* CASE 3: 🟡 رسوم الدراسة (السعر المتفق عليه) */}
+        <CategoryCase
+          icon={BookOpen}
+          title={L("٣. رسوم الدراسة", "3. Frais de Cours")}
+          subtitle={L("الحصص المنجزة × السعر المتفق عليه لكل تلميذ", "Cycles × Prix convenu par élève")}
+          color={C.accent}
+          bg="rgba(226,150,58,0.12)"
+          border="rgba(226,150,58,0.35)"
+          active={activeSection === "courses"}
+          onClick={() => toggle("courses")}
+          stat1Label={L("إجمالي المستحق", "Total dû")}
+          stat1Value={DA(yearFinancials.totalCurrentFees)}
+          stat2Label={L("المتبقي غير المدفوع", "Restant impayé")}
+          stat2Value={DA(yearFinancials.totalCurrentFeesUnpaid)}
+          stat2Alert={yearFinancials.totalCurrentFeesUnpaid > 0}
+          hintText={L("👉 انقر لعرض تلاميذ رسوم الدراسة غير المدفوعة", "👉 Cliquer pour filtrer les cours impayés")}
+        />
+
       </div>
 
-      {/* =================================================================
-          SECTION 1 — ديون سابقة
-      ================================================================= */}
-      <SectionBlock
-        icon={AlertTriangle}
-        color="#f87171" bg="rgba(248,113,113,0.15)" border="rgba(248,113,113,0.3)"
-        title={L("١.  الديون السابقة", "1.  Dettes Anterieures")}
-        subtitle={L("مبالغ محوّلة من سنوات دراسية سابقة", "Montants reportes des annees precedentes")}
-        count={yearFinancials.countPrevDebt > 0 ? `${yearFinancials.countPrevDebt} ${L("تلميذ", "eleves")}` : undefined}
-        countColor="#f87171"
-        totalLabel={L("إجمالي الديون السابقة", "Total dettes anterieures")}
-        totalValue={DA(yearFinancials.totalPreviousDebt)}
-        unpaidLabel={L("المتبقي غير المسدّد", "Restant a recouvrer")}
-        unpaidValue={DA(yearFinancials.totalPreviousDebtUnpaid)}
-        btnLabel={activeSection === "prev_debt" ? L("إلغاء الفلتر", "Annuler filtre") : L("عرض التلاميذ", "Voir les eleves")}
-        active={activeSection === "prev_debt"}
-        onToggle={() => toggle("prev_debt")}
-      />
+      {/* Global Summaries Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>
+        <MiniStatCard
+          icon={Users}
+          label={L("تلاميذ مسجلون في السنة", "Élèves inscrits")}
+          value={yearFinancials.totalEnrolled}
+          color="#818cf8"
+          bg="rgba(129,140,248,0.12)"
+        />
+        <MiniStatCard
+          icon={TrendingUp}
+          label={L("إجمالي المحصّل الفعلي", "Total encaissé réel")}
+          value={DA(yearFinancials.totalMoneyReceived)}
+          color="#4ade80"
+          bg="rgba(74,222,128,0.12)"
+        />
+        <MiniStatCard
+          icon={AlertCircle}
+          label={L("المتبقي العام (تسجيل + ديون + دراسة)", "Reste global")}
+          value={DA((yearFinancials.totalPreviousDebtUnpaid || 0) + (yearFinancials.totalRegistrationUnpaid || 0) + (yearFinancials.totalCurrentFeesUnpaid || 0))}
+          color="#f87171"
+          bg="rgba(248,113,113,0.12)"
+        />
+        <MiniStatCard
+          icon={DollarSign}
+          label={L("رصيد فائض للتلاميذ (Crédit)", "Crédit en surplus")}
+          value={DA(yearFinancials.totalCreditGenerated)}
+          color="#c084fc"
+          bg="rgba(192,132,252,0.12)"
+        />
+      </div>
 
-      {/* =================================================================
-          SECTION 2 — رسوم التسجيل 500 DA (مستقلة)
-      ================================================================= */}
-      <SectionBlock
-        icon={ShieldCheck}
-        color="#3b82f6" bg="rgba(59,130,246,0.15)" border="rgba(59,130,246,0.3)"
-        title={L("٢.  رسوم التسجيل (500 DA)", "2.  Frais d'Inscription (500 DA)")}
-        subtitle={L("حقوق التسجيل السنوية — مستقلة تماماً عن رسوم الدراسة", "Frais annuels d'inscription — independants des frais de cours")}
-        count={yearFinancials.countRegUnpaid > 0 ? `${yearFinancials.countRegUnpaid} ${L("لم يدفعوا", "non payes")}` : undefined}
-        countColor="#f87171"
-        totalLabel={L("المحصّل من التسجيل", "Inscription payee")}
-        totalValue={DA(yearFinancials.totalRegistrationPaid)}
-        unpaidLabel={L("لم يُسدَّد بعد", "Non paye")}
-        unpaidValue={DA(yearFinancials.totalRegistrationUnpaid)}
-        btnLabel={activeSection === "reg_unpaid" ? L("إلغاء الفلتر", "Annuler filtre") : L("التلاميذ اللي ما دفعوش", "Voir les non-payeurs")}
-        active={activeSection === "reg_unpaid"}
-        onToggle={() => toggle("reg_unpaid")}
-      />
-
-      {/* =================================================================
-          SECTION 3 — رسوم الدراسة (السعر المتفق عليه)
-      ================================================================= */}
-      <SectionBlock
-        icon={BookOpen}
-        color={C.accent} bg="rgba(226,150,58,0.15)" border="rgba(226,150,58,0.3)"
-        title={L("٣.  رسوم الدراسة (السعر المتفق عليه)", "3.  Frais de Cours (Prix convenu par eleve)")}
-        subtitle={L("محسوبة حسب الدورات المنجزة × السعر المتفق عليه لكل تلميذ", "Calcules selon les cycles effectues × le prix convenu par eleve")}
-        totalLabel={L("المستحق من رسوم الدراسة", "Total frais de cours dus")}
-        totalValue={DA(yearFinancials.totalCurrentFees)}
-        unpaidLabel={L("غير مدفوع", "Non paye")}
-        unpaidValue={DA(yearFinancials.totalCurrentFeesUnpaid)}
-        btnLabel={activeSection === "courses" ? L("إلغاء الفلتر", "Annuler filtre") : L("عرض التلاميذ", "Voir les eleves")}
-        active={activeSection === "courses"}
-        onToggle={() => toggle("courses")}
-      />
-
-      {/* Monthly chart */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: 22, marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      {/* Monthly Chart */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: 20, marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <BarChart2 size={18} color={C.accent} />
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: C.ink }}>
-            {L("التحصيل الشهري", "Recettes Mensuelles")} {currentYearObj?.name ? `— ${currentYearObj.name}` : ""}
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: C.ink }}>
+            {L("التحصيل المالي حسب الشهور", "Recettes Mensuelles")} {currentYearObj?.name ? `(${currentYearObj.name})` : ""}
           </h3>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(95px, 1fr))", gap: 8 }}>
           {yearFinancials.monthlyStats.map(m => {
             const maxVal = Math.max(...yearFinancials.monthlyStats.map(x => x.received), 1);
             const pct = Math.round((m.received / maxVal) * 100);
             return (
-              <div key={m.key} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${m.received > 0 ? "rgba(74,222,128,0.3)" : C.border}`, borderRadius: 12, padding: "10px 8px", textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: C.inkSoft, fontWeight: 700, marginBottom: 6 }}>{m.name}</div>
+              <div key={m.key} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${m.received > 0 ? "rgba(74,222,128,0.3)" : C.border}`, borderRadius: 12, padding: "8px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: C.inkSoft, fontWeight: 700, marginBottom: 4 }}>{m.name}</div>
                 <div style={{ height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)", marginBottom: 6, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${pct}%`, background: m.received > 0 ? "#4ade80" : "transparent", borderRadius: 999 }} />
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: m.received > 0 ? "#4ade80" : C.ink }}>{DA(m.received)}</div>
-                <div style={{ fontSize: 10, color: C.inkSoft }}>{m.count} pmt</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: m.received > 0 ? "#4ade80" : C.ink }}>{DA(m.received)}</div>
+                <div style={{ fontSize: 9.5, color: C.inkSoft }}>{m.count} pmt</div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Student Table */}
+      {/* Active Filter Notification Bar */}
+      {activeSection !== "all" && (
+        <div style={{
+          background: activeSection === "reg_unpaid" ? "rgba(59,130,246,0.15)" : activeSection === "prev_debt" ? "rgba(248,113,113,0.15)" : "rgba(226,150,58,0.15)",
+          border: `1.5px solid ${activeSection === "reg_unpaid" ? "#3b82f6" : activeSection === "prev_debt" ? "#f87171" : C.accent}`,
+          borderRadius: 14,
+          padding: "12px 18px",
+          marginBottom: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 10,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {activeSection === "reg_unpaid" && <ShieldCheck size={20} color="#3b82f6" />}
+            {activeSection === "prev_debt" && <AlertTriangle size={20} color="#f87171" />}
+            {activeSection === "courses" && <BookOpen size={20} color={C.accent} />}
+            <span style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>
+              {activeSection === "reg_unpaid" && L(`🔵 تصفية نشطة: عرض التلاميذ الذين لم يدفعوا حقوق التسجيل 500 DA (${filteredStudents.length} تلميذ)`, `🔵 Filtré : Élèves n'ayant pas payé les 500 DA (${filteredStudents.length})`)}
+              {activeSection === "prev_debt" && L(`🔴 تصفية نشطة: عرض التلاميذ أصحاب ديون السنة الماضية (${filteredStudents.length} تلميذ)`, `🔴 Filtré : Élèves avec dettes antérieures (${filteredStudents.length})`)}
+              {activeSection === "courses" && L(`🟡 تصفية نشطة: عرض التلاميذ أصحاب رسوم الدراسة غير المسددة (${filteredStudents.length} تلميذ)`, `🟡 Filtré : Élèves avec frais de cours impayés (${filteredStudents.length})`)}
+            </span>
+          </div>
+          <button
+            onClick={() => setActiveSection("all")}
+            style={{
+              background: "rgba(255,255,255,0.15)",
+              border: "1px solid rgba(255,255,255,0.25)",
+              borderRadius: 8,
+              padding: "6px 14px",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
+            <X size={14} />
+            {L("إلغاء التصفية (عرض كل التلاميذ)", "Annuler le filtre (Tous)")}
+          </button>
+        </div>
+      )}
+
+      {/* Student Financial Table */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: 22 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <h3 style={{ margin: 0, fontSize: 17, color: C.ink, fontWeight: 800 }}>
-              {activeSection === "prev_debt" && L("🔴 تلاميذ عليهم ديون سابقة", "🔴 Eleves avec dettes anterieures")}
-              {activeSection === "reg_unpaid" && L("🔵 تلاميذ لم يدفعوا حقوق التسجيل (500 DA)", "🔵 Eleves n'ayant pas paye les frais d'inscription")}
-              {activeSection === "courses" && L("🟡 رسوم الدراسة — تفصيل", "🟡 Frais de cours — detail")}
-              {activeSection === "all" && L("جدول المستحقات المالية", "Bilan financier des eleves")}
+              {activeSection === "reg_unpaid" ? L("التلاميذ الذين لم يدفعوا حقوق التسجيل (500 DA)", "Élèves non à jour — Inscription 500 DA")
+                : activeSection === "prev_debt" ? L("التلاميذ أصحاب ديون السنة السابقة", "Élèves avec dettes antérieures")
+                : activeSection === "courses" ? L("التلاميذ أصحاب رسوم دراسة غير مسددة", "Élèves avec cours impayés")
+                : L("جدول المستحقات المالية للتلاميذ", "Bilan financier des élèves")}
             </h3>
-            {activeSection !== "all" && (
-              <button onClick={() => setActiveSection("all")} style={{ background: "rgba(255,255,255,0.1)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 10px", color: C.inkSoft, fontSize: 12, cursor: "pointer" }}>
-                x {L("إلغاء", "Effacer")}
-              </button>
-            )}
-            <span style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, borderRadius: 999, fontSize: 12, fontWeight: 800, color: C.inkSoft, padding: "2px 10px" }}>
-              {filteredStudents.length}
+            <span style={{
+              background: activeSection === "reg_unpaid" ? "rgba(59,130,246,0.2)" : "rgba(255,255,255,0.08)",
+              border: `1px solid ${activeSection === "reg_unpaid" ? "#3b82f6" : C.border}`,
+              borderRadius: 999, fontSize: 12, fontWeight: 800,
+              color: activeSection === "reg_unpaid" ? "#3b82f6" : C.inkSoft,
+              padding: "2px 10px"
+            }}>
+              {filteredStudents.length} {L("تلميذ", "élèves")}
             </span>
           </div>
+
+          {/* Search & Group Filter */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
               style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "6px 12px", color: C.ink, fontSize: 13, outline: "none", colorScheme: "dark" }}>
               <option value="all">{L("كل الأفواج", "Tous les groupes")}</option>
-              {groupsList.map(g => <option key={g?.id} value={g?.id}>{g?.nom}</option>)}
+              {groupsList.map(g => <option key={g?.id} value={g?.id}>{g?.nom || g?.name}</option>)}
             </select>
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "6px 12px" }}>
               <Search size={14} color={C.inkSoft} />
               <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
-                placeholder={L("بحث…", "Rechercher...")}
-                style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", width: 130 }} />
+                placeholder={L("بحث بالتلميذ أو الكود…", "Rechercher...")}
+                style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", width: 150 }} />
             </div>
           </div>
         </div>
@@ -429,65 +585,96 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "rgba(255,255,255,0.04)", borderBottom: `1px solid ${C.border}`, textAlign: "left" }}>
-                <th style={{ padding: "12px 14px", color: C.inkSoft }}>{L("التلميذ", "Eleve")}</th>
-                <th style={{ padding: "12px 14px", color: C.inkSoft, textAlign: "center" }}>{L("الفوج", "Groupe")}</th>
-                <th style={{ padding: "12px 14px", color: "#f87171", textAlign: "center", borderLeft: "1px solid rgba(248,113,113,0.2)" }}>
+                <th style={{ padding: "12px 14px", color: C.inkSoft }}>{L("التلميذ", "Élève")}</th>
+                <th style={{ padding: "12px 14px", color: C.inkSoft, textAlign: "center" }}>{L("الفوج والسعر المتفق عليه", "Groupe & Tarif")}</th>
+                
+                {/* 🔴 ديون سابقة */}
+                <th style={{ padding: "12px 14px", color: "#f87171", textAlign: "center", borderLeft: "1px solid rgba(248,113,113,0.25)" }}>
                   🔴 {L("ديون سابقة", "Dettes ant.")}
                 </th>
-                <th style={{ padding: "12px 14px", color: "#3b82f6", textAlign: "center", borderLeft: "1px solid rgba(59,130,246,0.2)" }}>
-                  🔵 {L("تسجيل 500 DA", "Inscription 500 DA")}
+
+                {/* 🔵 رسوم التسجيل (500 DA) */}
+                <th style={{ padding: "12px 14px", color: "#3b82f6", textAlign: "center", borderLeft: "1.5px solid rgba(59,130,246,0.35)", background: activeSection === "reg_unpaid" ? "rgba(59,130,246,0.08)" : "transparent" }}>
+                  🔵 {L("رسوم التسجيل 500 DA", "Inscription 500 DA")}
                 </th>
-                <th style={{ padding: "12px 14px", color: C.accent, textAlign: "center", borderLeft: "1px solid rgba(226,150,58,0.2)" }}>
+
+                {/* 🟡 رسوم دراسة */}
+                <th style={{ padding: "12px 14px", color: C.accent, textAlign: "center", borderLeft: "1px solid rgba(226,150,58,0.25)" }}>
                   🟡 {L("رسوم دراسة", "Frais cours")}
                 </th>
+
                 <th style={{ padding: "12px 14px", color: "#4ade80", textAlign: "center", borderLeft: `1px solid ${C.border}` }}>
-                  {L("المدفوع", "Paye")}
+                  {L("المدفوع", "Payé")}
                 </th>
                 <th style={{ padding: "12px 14px", color: "#f87171", textAlign: "center" }}>
                   {L("المتبقي", "Restant")}
                 </th>
                 <th style={{ padding: "12px 14px", color: "#c084fc", textAlign: "center" }}>
-                  {L("رصيد", "Credit")}
+                  {L("رصيد", "Crédit")}
                 </th>
                 <th style={{ padding: "12px 14px", color: C.inkSoft, textAlign: "center" }}>
-                  {L("تفاصيل", "Details")}
+                  {L("تفاصيل", "Détails")}
                 </th>
               </tr>
             </thead>
             <tbody>
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: 30, textAlign: "center", color: C.inkSoft }}>
-                    {activeSection === "reg_unpaid"
-                      ? L("جميع التلاميذ دفعوا حقوق التسجيل", "Tous les eleves ont paye leur inscription")
-                      : L("لا توجد بيانات", "Aucune donnee disponible")}
+                  <td colSpan={9} style={{ padding: 36, textAlign: "center", color: C.inkSoft }}>
+                    {activeSection === "reg_unpaid" ? (
+                      <div>
+                        <CheckCircle2 size={36} color="#4ade80" style={{ marginBottom: 8 }} />
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "#4ade80" }}>
+                          {L("ممتاز! جميع التلاميذ دفعوا حقوق التسجيل 500 DA", "Tous les élèves ont réglé les frais d'inscription 500 DA !")}
+                        </div>
+                      </div>
+                    ) : (
+                      L("لا توجد بيانات مطابقة للبحث", "Aucune donnée trouvée")
+                    )}
                   </td>
                 </tr>
               ) : (
                 filteredStudents.map(({ student: st, summary }) => {
                   if (!st || !summary) return null;
-                  const regColor = summary.registrationFeeStatus === "PAYE" ? "#4ade80"
-                    : summary.registrationFeeStatus === "PARTIELLEMENT PAYE" ? "#fbbf24"
-                    : "#f87171";
-                  const regLabel = summary.registrationFeeStatus === "PAYE" ? L("مدفوع ✓", "Paye")
-                    : summary.registrationFeeStatus === "PARTIELLEMENT PAYE" ? L("جزئي", "Partiel")
-                    : L("لم يُدفع ✗", "Non paye");
+
+                  const isRegPaid = (summary.registrationFeeRemaining || 0) === 0;
+                  const regColor = isRegPaid ? "#4ade80" : "#f87171";
+                  const agreedPrice = summary.enrollment?.monthlyPrice 
+                    ?? summary.enrollment?.courseFeeAmount 
+                    ?? st.monthlyPrice 
+                    ?? summary.group?.price 
+                    ?? 0;
 
                   return (
-                    <tr key={st.id} onClick={() => setDetailModalStudent(st)}
-                      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", transition: "background 0.15s" }}
+                    <tr
+                      key={st.id}
+                      onClick={() => setDetailModalStudent(st)}
+                      style={{
+                        borderBottom: "1px solid rgba(255,255,255,0.06)",
+                        cursor: "pointer",
+                        transition: "background 0.15s",
+                      }}
                       onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    >
+                      {/* Nom + Code */}
                       <td style={{ padding: "12px 14px" }}>
                         <div style={{ fontWeight: 700, color: C.ink }}>{st.prenom} {st.nom}</div>
-                      </td>
-                      <td style={{ padding: "12px 14px", textAlign: "center", color: C.inkSoft }}>
-                        {summary.group?.nom || "—"}
+                        {st.studentCode && (
+                          <div style={{ fontSize: 10.5, color: C.inkSoft, fontFamily: "monospace" }}>{st.studentCode}</div>
+                        )}
                       </td>
 
-                      {/* 🔴 Dettes */}
-                      <td style={{ padding: "12px 14px", textAlign: "center", borderLeft: "1px solid rgba(248,113,113,0.1)" }}>
+                      {/* Groupe & Agreed Price */}
+                      <td style={{ padding: "12px 14px", textAlign: "center" }}>
+                        <div style={{ fontWeight: 600, color: C.ink }}>{summary.group?.nom || "—"}</div>
+                        <div style={{ fontSize: 11, color: C.accent, fontWeight: 700, marginTop: 2 }}>
+                          {agreedPrice > 0 ? `${DA(agreedPrice)} / ${L("دورة", "cycle")}` : "—"}
+                        </div>
+                      </td>
+
+                      {/* 🔴 Dettes antérieures */}
+                      <td style={{ padding: "12px 14px", textAlign: "center", borderLeft: "1px solid rgba(248,113,113,0.15)" }}>
                         {(summary.previousDebt || 0) > 0 ? (
                           <div>
                             <div style={{ fontWeight: 800, color: "#f87171" }}>{DA(summary.previousDebtRemaining)}</div>
@@ -496,42 +683,108 @@ function FinancialContent({ data, setData, toastFn, activeYearId, onNav }) {
                         ) : <span style={{ color: C.inkSoft }}>—</span>}
                       </td>
 
-                      {/* 🔵 Inscription */}
-                      <td style={{ padding: "12px 14px", textAlign: "center", borderLeft: "1px solid rgba(59,130,246,0.1)" }}>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: regColor, background: `${regColor}20`, border: `1px solid ${regColor}44`, padding: "3px 9px", borderRadius: 6 }}>
-                          {regLabel}
-                        </span>
-                        {(summary.registrationFeeRemaining || 0) > 0 && (
-                          <div style={{ fontSize: 10.5, color: "#f87171", fontWeight: 700, marginTop: 3 }}>
-                            {DA(summary.registrationFeeRemaining)} {L("متبقي", "restant")}
-                          </div>
-                        )}
+                      {/* 🔵 Frais d'inscription 500 DA (Case وحدها مع زر تبديل مباشر) */}
+                      <td style={{
+                        padding: "10px 14px",
+                        textAlign: "center",
+                        borderLeft: "1.5px solid rgba(59,130,246,0.25)",
+                        background: activeSection === "reg_unpaid" ? "rgba(59,130,246,0.05)" : "transparent"
+                      }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                          <span style={{
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: regColor,
+                            background: `${regColor}20`,
+                            border: `1px solid ${regColor}44`,
+                            padding: "3px 10px",
+                            borderRadius: 8,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4
+                          }}>
+                            {isRegPaid ? (
+                              <>
+                                <Check size={12} />
+                                {L("مسدد 500 DA", "Payé 500 DA")}
+                              </>
+                            ) : (
+                              <>
+                                <X size={12} />
+                                {L("غير مسدد (500 DA)", "Non payé (500 DA)")}
+                              </>
+                            )}
+                          </span>
+
+                          {/* Quick Toggle Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleRegFee(st.id, isRegPaid);
+                            }}
+                            title={isRegPaid ? L("إلغاء التسديد", "Marquer impayé") : L("تسجيل الدفع 500 DA", "Marquer payé")}
+                            style={{
+                              background: isRegPaid ? "rgba(255,255,255,0.06)" : "rgba(59,130,246,0.25)",
+                              border: `1px solid ${isRegPaid ? "rgba(255,255,255,0.15)" : "#3b82f6"}`,
+                              borderRadius: 6,
+                              padding: "2px 8px",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: isRegPaid ? C.inkSoft : "#93c5fd",
+                              cursor: "pointer",
+                              transition: "all 0.15s",
+                            }}
+                          >
+                            {isRegPaid ? L("إلغاء", "Annuler") : L("تسديد 500 DA ⚡", "Régler 500 DA ⚡")}
+                          </button>
+                        </div>
                       </td>
 
-                      {/* 🟡 Frais cours */}
-                      <td style={{ padding: "12px 14px", textAlign: "center", borderLeft: "1px solid rgba(226,150,58,0.1)" }}>
+                      {/* 🟡 Frais de cours */}
+                      <td style={{ padding: "12px 14px", textAlign: "center", borderLeft: "1px solid rgba(226,150,58,0.15)" }}>
                         <div style={{ fontWeight: 700, color: C.accent }}>{DA(summary.currentFees)}</div>
-                        {(summary.currentFeesRemaining || 0) > 0 && (
-                          <div style={{ fontSize: 10.5, color: "#f87171", marginTop: 2 }}>
+                        {(summary.currentFeesRemaining || 0) > 0 ? (
+                          <div style={{ fontSize: 10.5, color: "#f87171", marginTop: 2, fontWeight: 700 }}>
                             {DA(summary.currentFeesRemaining)} {L("متبقي", "restant")}
                           </div>
+                        ) : (
+                          <div style={{ fontSize: 10, color: "#4ade80", marginTop: 2 }}>{L("مكتمل ✓", "Réglé ✓")}</div>
                         )}
                       </td>
 
+                      {/* Payé */}
                       <td style={{ padding: "12px 14px", textAlign: "center", color: "#4ade80", fontWeight: 700, borderLeft: `1px solid ${C.border}` }}>
                         {DA(summary.totalPaid)}
                       </td>
+
+                      {/* Restant */}
                       <td style={{ padding: "12px 14px", textAlign: "center", color: (summary.totalUnpaid || 0) > 0 ? "#f87171" : "#4ade80", fontWeight: 800 }}>
                         {(summary.totalUnpaid || 0) > 0 ? DA(summary.totalUnpaid) : "0 DA"}
                       </td>
+
+                      {/* Crédit */}
                       <td style={{ padding: "12px 14px", textAlign: "center", color: (summary.credit || 0) > 0 ? "#c084fc" : C.inkSoft, fontWeight: (summary.credit || 0) > 0 ? 800 : 400 }}>
                         {(summary.credit || 0) > 0 ? `+${DA(summary.credit)}` : "—"}
                       </td>
+
+                      {/* Details Modal */}
                       <td style={{ padding: "12px 14px", textAlign: "center" }}>
-                        <button onClick={e => { e.stopPropagation(); setDetailModalStudent(st); }}
-                          style={{ background: "rgba(226,150,58,0.15)", border: "1px solid rgba(226,150,58,0.4)", borderRadius: 8, padding: "4px 10px", color: C.accent, fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                        <button
+                          onClick={e => { e.stopPropagation(); setDetailModalStudent(st); }}
+                          style={{
+                            background: "rgba(226,150,58,0.15)",
+                            border: "1px solid rgba(226,150,58,0.4)",
+                            borderRadius: 8,
+                            padding: "4px 10px",
+                            color: C.accent,
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            cursor: "pointer"
+                          }}
+                        >
                           <History size={12} style={{ display: "inline", marginRight: 4 }} />
-                          {L("التفاصيل", "Details")}
+                          {L("التفاصيل", "Détails")}
                         </button>
                       </td>
                     </tr>
@@ -580,62 +833,71 @@ function StudentFinancialHistoryModal({ student, data, onClose }) {
   const grandTotalCredit = histories.reduce((acc, h) => acc + (Number(h?.summary?.credit) || 0), 0);
 
   return (
-    <Modal title={`${L("السجل المالي:", "Detail Financier:")} ${student.prenom || ""} ${student.nom || ""}`} onClose={onClose} wide>
+    <Modal title={`${L("السجل المالي التفصيلي:", "Détail Financier:")} ${student.prenom || ""} ${student.nom || ""}`} onClose={onClose} wide>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        {histories.map(({ year, summary }) => (
-          <div key={year?.id || Math.random()} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: C.accent }}>📅 {year?.name}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: summary.isEnrolled ? "#4ade80" : C.inkSoft }}>
-                {summary.isEnrolled ? `${L("مسجل —", "Inscrit —")} ${summary.group?.nom || "—"}` : L("غير مسجل", "Non inscrit")}
-              </span>
+        {histories.map(({ year, summary }) => {
+          const isRegPaid = (summary.registrationFeeRemaining || 0) === 0;
+          return (
+            <div key={year?.id || Math.random()} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: C.accent }}>📅 {year?.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: summary.isEnrolled ? "#4ade80" : C.inkSoft }}>
+                  {summary.isEnrolled ? `${L("مسجل —", "Inscrit —")} ${summary.group?.nom || "—"}` : L("غير مسجل", "Non inscrit")}
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
+                {/* 🔴 Dettes */}
+                <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.22)", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ color: "#f87171", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>🔴 {L("ديون سابقة", "Dettes ant.")}</div>
+                  <div style={{ fontWeight: 800, color: (summary.previousDebt || 0) > 0 ? "#f87171" : C.inkSoft }}>{DA(summary.previousDebt)}</div>
+                  {(summary.previousDebtRemaining || 0) > 0 && <div style={{ fontSize: 10.5, color: "#f87171" }}>{DA(summary.previousDebtRemaining)} {L("متبقي", "restant")}</div>}
+                </div>
+                {/* 🔵 Inscription */}
+                <div style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.22)", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ color: "#3b82f6", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>🔵 {L("رسوم تسجيل (500 DA)", "Inscription")}</div>
+                  <div style={{ fontWeight: 800, color: C.ink }}>{DA(summary.registrationFeeAmount)}</div>
+                  <div style={{ fontSize: 10.5, color: isRegPaid ? "#4ade80" : "#f87171", fontWeight: 700 }}>
+                    {isRegPaid ? L("مدفوع ✓", "Payé ✓") : L("لم يُدفع ✗", "Non payé ✗")}
+                  </div>
+                </div>
+                {/* 🟡 Frais cours */}
+                <div style={{ background: "rgba(226,150,58,0.08)", border: "1px solid rgba(226,150,58,0.22)", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ color: C.accent, fontWeight: 700, fontSize: 11, marginBottom: 4 }}>🟡 {L("رسوم دراسة", "Frais cours")}</div>
+                  <div style={{ fontWeight: 800, color: C.ink }}>{DA(summary.currentFees)}</div>
+                  {(summary.currentFeesRemaining || 0) > 0 && <div style={{ fontSize: 10.5, color: "#f87171" }}>{DA(summary.currentFeesRemaining)} {L("متبقي", "restant")}</div>}
+                </div>
+                {/* Payé */}
+                <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.22)", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ color: "#4ade80", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>{L("المدفوع", "Total payé")}</div>
+                  <div style={{ fontWeight: 800, color: "#4ade80" }}>{DA(summary.totalPaid)}</div>
+                </div>
+                {/* Restant */}
+                <div style={{ background: (summary.totalUnpaid || 0) > 0 ? "rgba(248,113,113,0.08)" : "rgba(74,222,128,0.08)", border: `1px solid ${(summary.totalUnpaid || 0) > 0 ? "rgba(248,113,113,0.22)" : "rgba(74,222,128,0.22)"}`, borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ color: (summary.totalUnpaid || 0) > 0 ? "#f87171" : "#4ade80", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>{L("المتبقي", "Restant")}</div>
+                  <div style={{ fontWeight: 800, color: (summary.totalUnpaid || 0) > 0 ? "#f87171" : "#4ade80" }}>
+                    {(summary.totalUnpaid || 0) > 0 ? DA(summary.totalUnpaid) : "0 DA"}
+                  </div>
+                </div>
+                {/* Crédit */}
+                {(summary.credit || 0) > 0 && (
+                  <div style={{ background: "rgba(192,132,252,0.08)", border: "1px solid rgba(192,132,252,0.22)", borderRadius: 10, padding: "10px 12px" }}>
+                    <div style={{ color: "#c084fc", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>{L("رصيد فائض", "Crédit")}</div>
+                    <div style={{ fontWeight: 800, color: "#c084fc" }}>+{DA(summary.credit)}</div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-              <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.22)", borderRadius: 10, padding: "10px 12px" }}>
-                <div style={{ color: "#f87171", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>🔴 {L("ديون سابقة", "Dettes ant.")}</div>
-                <div style={{ fontWeight: 800, color: (summary.previousDebt || 0) > 0 ? "#f87171" : C.inkSoft }}>{DA(summary.previousDebt)}</div>
-                {(summary.previousDebtRemaining || 0) > 0 && <div style={{ fontSize: 10.5, color: "#f87171" }}>{DA(summary.previousDebtRemaining)} {L("متبقي", "restant")}</div>}
-              </div>
-              <div style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.22)", borderRadius: 10, padding: "10px 12px" }}>
-                <div style={{ color: "#3b82f6", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>🔵 {L("رسوم تسجيل", "Inscription")}</div>
-                <div style={{ fontWeight: 800, color: C.ink }}>{DA(summary.registrationFeeAmount)}</div>
-                <div style={{ fontSize: 10.5, color: summary.registrationFeeStatus === "PAYE" ? "#4ade80" : "#f87171" }}>
-                  {summary.registrationFeeStatus || "NON PAYE"}
-                </div>
-              </div>
-              <div style={{ background: "rgba(226,150,58,0.08)", border: "1px solid rgba(226,150,58,0.22)", borderRadius: 10, padding: "10px 12px" }}>
-                <div style={{ color: C.accent, fontWeight: 700, fontSize: 11, marginBottom: 4 }}>🟡 {L("رسوم دراسة", "Frais cours")}</div>
-                <div style={{ fontWeight: 800, color: C.ink }}>{DA(summary.currentFees)}</div>
-                {(summary.currentFeesRemaining || 0) > 0 && <div style={{ fontSize: 10.5, color: "#f87171" }}>{DA(summary.currentFeesRemaining)} {L("متبقي", "restant")}</div>}
-              </div>
-              <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.22)", borderRadius: 10, padding: "10px 12px" }}>
-                <div style={{ color: "#4ade80", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>{L("المدفوع", "Total paye")}</div>
-                <div style={{ fontWeight: 800, color: "#4ade80" }}>{DA(summary.totalPaid)}</div>
-              </div>
-              <div style={{ background: (summary.totalUnpaid || 0) > 0 ? "rgba(248,113,113,0.08)" : "rgba(74,222,128,0.08)", border: `1px solid ${(summary.totalUnpaid || 0) > 0 ? "rgba(248,113,113,0.22)" : "rgba(74,222,128,0.22)"}`, borderRadius: 10, padding: "10px 12px" }}>
-                <div style={{ color: (summary.totalUnpaid || 0) > 0 ? "#f87171" : "#4ade80", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>{L("المتبقي", "Restant")}</div>
-                <div style={{ fontWeight: 800, color: (summary.totalUnpaid || 0) > 0 ? "#f87171" : "#4ade80" }}>
-                  {(summary.totalUnpaid || 0) > 0 ? DA(summary.totalUnpaid) : "0 DA"}
-                </div>
-              </div>
-              {(summary.credit || 0) > 0 && (
-                <div style={{ background: "rgba(192,132,252,0.08)", border: "1px solid rgba(192,132,252,0.22)", borderRadius: 10, padding: "10px 12px" }}>
-                  <div style={{ color: "#c084fc", fontWeight: 700, fontSize: 11, marginBottom: 4 }}>{L("رصيد فائض", "Credit")}</div>
-                  <div style={{ fontWeight: 800, color: "#c084fc" }}>+{DA(summary.credit)}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         <div style={{ background: "rgba(226,150,58,0.15)", border: "1px solid rgba(226,150,58,0.4)", borderRadius: 14, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700 }}>{L("إجمالي الديون التراكمية", "TOTAL DETTE CUMULEE TOUTES ANNEES")}</div>
+            <div style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700 }}>{L("إجمالي الديون التراكمية (كل السنوات)", "TOTAL DETTE CUMULÉE")}</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: grandTotalUnpaid > 0 ? "#f87171" : "#4ade80" }}>{DA(grandTotalUnpaid)}</div>
           </div>
           {grandTotalCredit > 0 && (
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700 }}>{L("رصيد فائض إجمالي", "CREDIT GLOBAL")}</div>
+              <div style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700 }}>{L("رصيد فائض إجمالي", "CRÉDIT GLOBAL")}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: "#c084fc" }}>+{DA(grandTotalCredit)}</div>
             </div>
           )}

@@ -223,82 +223,111 @@ export function getStudentFinancialSummary(data, studentId, activeYearId) {
   );
   carryOvers.forEach(c => previousDebt += (Number(c?.amount) || 0));
 
-  // 3. Registration Fee (Frais d'Inscription)
+  // 3. Registration Fee (Frais d'Inscription - 500 DA par défaut, indépendant)
   const defaultFeeSetting = data.settings?.enrollmentFee || 500;
-  const registrationFeeAmount = enrollment 
-    ? (enrollment.registrationFeeAmount ?? defaultFeeSetting) 
-    : (st.enrollmentPaid ? defaultFeeSetting : defaultFeeSetting);
+  const isExempt = !!(st.enrollmentFeeExempt || enrollment?.enrollmentFeeExempt);
+  const registrationFeeAmount = isExempt ? 0 : (
+    enrollment?.registrationFeeAmount !== undefined && enrollment?.registrationFeeAmount !== null
+      ? Number(enrollment.registrationFeeAmount)
+      : defaultFeeSetting
+  );
 
-  // 4. Current Course Fees for this year (Frais d'études)
+  // 4. Current Course Fees for this year (Frais d'études - السعر المتفق عليه)
   let currentFees = 0;
+  let cyclesCount = 1;
   if (sg && isEnrolled) {
     const doneSessions = sessions.filter(s => 
       s && s.groupId === sg.id && 
       s.status === "done" && 
       (!yearId || s.academicYearId === yearId || !s.academicYearId)
     ).length;
-    const cycles = Math.max(1, Math.floor(doneSessions / (sg.sessionsPerCycle || 4)));
-    currentFees = cycles * price;
+    cyclesCount = Math.max(1, Math.floor(doneSessions / (sg.sessionsPerCycle || 4)));
+    currentFees = cyclesCount * price;
   } else if (isEnrolled) {
     currentFees = price;
   }
 
-  // 5. Total Payments Recorded for this student in this academic year
-  let totalPaymentsFromRecords = 0;
-  let hasExplicitRegPmt = false;
-
+  // 5. Separate payments by type:
+  // - Registration payments (fees d'inscription)
+  // - Previous debt payments
+  // - Course / regular payments (frais de cours)
   const stPayments = payments.filter(p => 
     p && p.studentId === studentId && 
     (!yearId || p.academicYearId === yearId || !p.academicYearId)
   );
 
-  stPayments.forEach(p => {
-    const isReg = p?.type === "registration" || p?.type === "enrollment" || p?.feeType === "registration";
-    if (isReg) hasExplicitRegPmt = true;
+  let regPaymentsSum = 0;
+  let debtPaymentsSum = 0;
+  let coursePaymentsSum = 0;
+  let generalPaymentsSum = 0;
 
+  stPayments.forEach(p => {
     const expected = p?.expectedAmount || p?.amount || price;
     const paid = (p?.paid === true || p?.status === "paid") ? expected : (Number(p?.paidAmount) || 0);
-    totalPaymentsFromRecords += (Number(paid) || 0);
+    const numPaid = Number(paid) || 0;
+
+    const pType = String(p?.type || p?.feeType || "").toLowerCase();
+    if (pType === "registration" || pType === "enrollment" || pType === "inscription") {
+      regPaymentsSum += numPaid;
+    } else if (pType === "debt" || pType === "previous_debt" || pType === "dette") {
+      debtPaymentsSum += numPaid;
+    } else if (pType === "course" || pType === "cours" || pType === "session") {
+      coursePaymentsSum += numPaid;
+    } else {
+      generalPaymentsSum += numPaid;
+    }
   });
 
-  let totalPaid = totalPaymentsFromRecords;
+  // Check registration fee paid status (indépendant)
+  const isRegMarkedPaid = isExempt || !!(
+    st.enrollmentPaid ||
+    (enrollment?.registrationFeePaid !== undefined && enrollment.registrationFeePaid >= registrationFeeAmount) ||
+    enrollment?.registrationFeeStatus === "PAYÉ" ||
+    enrollment?.registrationFeeStatus === "PAYE" ||
+    regPaymentsSum >= registrationFeeAmount
+  );
 
-  // Add registration fee paid from student/enrollment status if NOT already recorded as a payment item in payments array
-  if (!hasExplicitRegPmt) {
-    if (enrollment?.registrationFeePaid !== undefined && enrollment?.registrationFeePaid !== null) {
-      totalPaid += Number(enrollment.registrationFeePaid) || 0;
-    } else if (enrollment?.registrationFeeStatus === "PAYÉ" || st.enrollmentPaid) {
-      totalPaid += registrationFeeAmount;
+  const registrationFeePaid = isExempt ? 0 : (isRegMarkedPaid ? registrationFeeAmount : regPaymentsSum);
+  const registrationFeeRemaining = Math.max(0, registrationFeeAmount - registrationFeePaid);
+  const registrationFeeStatus = (isExempt || registrationFeeRemaining === 0) 
+    ? "PAYÉ" 
+    : (registrationFeePaid > 0 ? "PARTIELLEMENT PAYÉ" : "NON PAYÉ");
+
+  // Previous Debt
+  let previousDebtPaid = Math.min(debtPaymentsSum, previousDebt);
+  let previousDebtRemaining = Math.max(0, previousDebt - previousDebtPaid);
+
+  // Course Fees
+  let currentFeesPaid = coursePaymentsSum;
+
+  // General payments: allocate to debt first, then course fees
+  if (generalPaymentsSum > 0) {
+    let unallocated = generalPaymentsSum;
+    if (previousDebtRemaining > 0) {
+      const takeDebt = Math.min(unallocated, previousDebtRemaining);
+      previousDebtPaid += takeDebt;
+      previousDebtRemaining -= takeDebt;
+      unallocated -= takeDebt;
+    }
+    if (unallocated > 0) {
+      currentFeesPaid += unallocated;
+      unallocated = 0;
     }
   }
 
-  // 6. Waterfall Payment Allocation (Previous Debt -> Registration Fee -> Course Fees -> Credit)
-  let unallocatedPaid = totalPaid;
-
-  // Step A: Previous Debt
-  const previousDebtPaid = Math.min(unallocatedPaid, previousDebt);
-  const previousDebtRemaining = previousDebt - previousDebtPaid;
-  unallocatedPaid -= previousDebtPaid;
-
-  // Step B: Registration Fee
-  const registrationFeePaid = Math.min(unallocatedPaid, registrationFeeAmount);
-  const registrationFeeRemaining = Math.max(0, registrationFeeAmount - registrationFeePaid);
-  unallocatedPaid -= registrationFeePaid;
-
-  let registrationFeeStatus = "NON PAYÉ";
-  if (registrationFeePaid >= registrationFeeAmount && registrationFeeAmount > 0) {
-    registrationFeeStatus = "PAYÉ";
-  } else if (registrationFeePaid > 0) {
-    registrationFeeStatus = "PARTIELLEMENT PAYÉ";
+  // Current fees remaining and credit
+  const currentFeesRemaining = Math.max(0, currentFees - currentFeesPaid);
+  const credit = Math.max(0, currentFeesPaid - currentFees);
+  if (credit > 0) {
+    currentFeesPaid = currentFees;
   }
 
-  // Step C: Current Course Fees
-  const currentFeesPaid = Math.min(unallocatedPaid, currentFees);
-  const currentFeesRemaining = Math.max(0, currentFees - currentFeesPaid);
-  unallocatedPaid -= currentFeesPaid;
-
-  // Step D: Credit (Excess payments after all obligations are cleared)
-  const credit = unallocatedPaid;
+  const totalPaid = (isRegMarkedPaid && regPaymentsSum === 0 && !isExempt ? registrationFeeAmount : 0) + 
+                    stPayments.reduce((acc, p) => {
+                      const exp = p?.expectedAmount || p?.amount || price;
+                      const pd = (p?.paid === true || p?.status === "paid") ? exp : (Number(p?.paidAmount) || 0);
+                      return acc + (Number(pd) || 0);
+                    }, 0);
 
   const totalExpected = previousDebt + registrationFeeAmount + currentFees;
   const totalUnpaid = previousDebtRemaining + registrationFeeRemaining + currentFeesRemaining;
