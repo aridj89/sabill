@@ -303,7 +303,49 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
       const resJson = await res.json();
       handleBackendScanEvent(resJson);
     } catch (err) {
-      console.warn("NFC scan error:", err);
+      console.warn("Backend NFC scan offline, processing via client state:", err);
+      // Client-side fallback
+      const cleanUid = trimmed.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      const currentData = dataRef.current;
+      const student = (currentData.students || []).find(s => 
+        (s.nfcCardId && s.nfcCardId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === cleanUid) ||
+        (s.studentCode && s.studentCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === cleanUid) ||
+        s.id === cleanUid
+      );
+
+      if (!student) {
+        handleBackendScanEvent({
+          success: false,
+          reason: "unregistered_card",
+          cardUid: cleanUid,
+        });
+        return;
+      }
+
+      const nowTime = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      const targetSession = (currentData.sessions || []).find(s => 
+        (s.groupId === student.groupId || s.subgroupId === student.groupId) && s.date === todayStr
+      );
+
+      const attRecord = {
+        id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        sessionId: targetSession ? targetSession.id : null,
+        studentId: student.id,
+        date: todayStr,
+        originalDate: todayStr,
+        time: nowTime,
+        present: true,
+        nfcVerified: true,
+        cardUid: cleanUid,
+        createdAt: new Date().toISOString(),
+      };
+
+      handleBackendScanEvent({
+        success: true,
+        student,
+        attendance: attRecord,
+        timestamp: nowTime,
+      });
     }
   };
 

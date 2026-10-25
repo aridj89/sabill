@@ -112,7 +112,8 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
       // Create session object so it shows up in calendar and student dashboard
       const sessionEntry = {
         id: es.id,
-        subgroupId: es.subgroupId,
+        groupId: es.subgroupId || subgroup.id,
+        subgroupId: es.subgroupId || subgroup.id,
         date: es.date,
         time: es.time,
         isExtra: true,
@@ -438,24 +439,65 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
   const todayStr = new Date().toISOString().slice(0, 10);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
   const [editDateStudent, setEditDateStudent] = useState(null); // { student, session, attendance }
+  const [showExtraModal, setShowExtraModal] = useState(false);
 
   // 1. Get real sessions for this group in the selected month
+  // 4 hisas f chahr baseline: if less than 4, complement to 4. If extra sessions added (5, 6...), display normally.
   const monthSessions = useMemo(() => {
     const list = (data.sessions || [])
-      .filter(s => s && s.groupId === subgroup.id && String(s.date || "").startsWith(selectedMonth))
-      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      .filter(s => s && (s.groupId === subgroup.id || s.subgroupId === subgroup.id) && String(s.date || "").startsWith(selectedMonth))
+      .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
     
-    // If no explicit sessions found, provide 4 placeholder dates based on the month
+    // Baseline 4 sessions for the month if none exist
     if (list.length === 0) {
       return [1, 2, 3, 4].map(idx => ({
         id: `virtual-${selectedMonth}-${idx}`,
-        date: `${selectedMonth}-${String(idx * 7 - 5).padStart(2, "0")}`,
+        date: `${selectedMonth}-${String(Math.min(28, Math.max(1, idx * 7 - 3))).padStart(2, "0")}`,
         time: subgroup.time || "10:00",
         virtualNum: idx,
       }));
     }
+
+    // Complement up to 4 baseline sessions if fewer than 4 recorded
+    if (list.length < 4) {
+      const result = [...list];
+      for (let idx = list.length + 1; idx <= 4; idx++) {
+        result.push({
+          id: `virtual-${selectedMonth}-${idx}`,
+          date: `${selectedMonth}-${String(Math.min(28, Math.max(1, idx * 7 - 3))).padStart(2, "0")}`,
+          time: subgroup.time || "10:00",
+          virtualNum: idx,
+        });
+      }
+      return result;
+    }
+
+    // 4 or more sessions (extra sessions like 5th session): seamlessly displayed!
     return list;
   }, [data.sessions, subgroup.id, selectedMonth, subgroup.time]);
+
+  const saveExtraSession = (es) => {
+    setData(d => {
+      const extraSessions = [...(d.extraSessions || []), es];
+      const sessionEntry = {
+        id: es.id,
+        groupId: subgroup.id,
+        subgroupId: subgroup.id,
+        date: es.date,
+        time: es.time,
+        isExtra: true,
+        price: es.price,
+        isGroupPrice: es.isGroupPrice,
+        note: es.note,
+        status: "planned",
+      };
+      const sessions = [...(d.sessions || []), sessionEntry];
+      const userNotifications = notifyExtraSessionAdded(d, subgroup.id, es, lang);
+      return { ...d, extraSessions, sessions, userNotifications };
+    });
+    setShowExtraModal(false);
+    if (toastFn) toastFn(lang === "ar" ? "تمت إضافة الحصة الإضافية لهذا الشهر بنجاح ✓" : "Séance suppl. ajoutée pour ce mois ✓");
+  };
 
   const toggleAttendance = (studentId, existingAtt, session) => {
     setData(d => {
@@ -549,10 +591,26 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
             {lang === "ar" ? "يعرض التواريخ الفعلية للحصص، مع إمكانية تعديل تاريخ حضور أي تلميذ (مثلاً حضر يوم 5 بدل 2)" : "Dates réelles et modification de date de présence par élève"}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "5px 12px" }}>
-          <Calendar size={15} color={C.accent} />
-          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
-            style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", cursor: "pointer", colorScheme: "dark" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => setShowExtraModal(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(168,85,247,0.18)", border: "1px solid rgba(168,85,247,0.45)",
+              color: "#d8b4fe", padding: "6px 14px", borderRadius: 10,
+              fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+              transition: "all 0.15s"
+            }}
+          >
+            <Plus size={14} />
+            {lang === "ar" ? "+ حصة إضافية لهذا الشهر" : "+ Séance suppl."}
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "5px 12px" }}>
+            <Calendar size={15} color={C.accent} />
+            <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+              style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", cursor: "pointer", colorScheme: "dark" }} />
+          </div>
         </div>
       </div>
 
@@ -565,10 +623,18 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
               </th>
               {monthSessions.map((sess, idx) => {
                 const dateStr = sess.date ? sess.date.slice(5) : `S${idx + 1}`;
+                const isExtra = !!sess.isExtra || idx >= 4;
                 return (
-                  <th key={sess.id || idx} style={{ textAlign: "center", padding: "10px 8px", color: C.ink, fontWeight: 700, fontSize: 12, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", minWidth: 95 }}>
-                    <div style={{ color: C.accent }}>{lang === "ar" ? `حصة ${idx + 1}` : `S${idx + 1}`}</div>
-                    <div style={{ fontSize: 10.5, color: C.inkSoft, marginTop: 2 }}>{dateStr}</div>
+                  <th key={sess.id || idx} style={{ textAlign: "center", padding: "10px 8px", color: C.ink, fontWeight: 700, fontSize: 12, borderBottom: `1px solid ${C.border}`, background: isExtra ? "rgba(168,85,247,0.07)" : "rgba(255,255,255,0.03)", minWidth: 95 }}>
+                    <div style={{ color: isExtra ? "#c084fc" : C.accent, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                      <span>{lang === "ar" ? `حصة ${idx + 1}` : `S${idx + 1}`}</span>
+                      {isExtra && (
+                        <span style={{ fontSize: 9, background: "rgba(168,85,247,0.25)", color: "#e9d5ff", padding: "1px 5px", borderRadius: 4, fontWeight: 800 }}>
+                          {lang === "ar" ? "إضافية" : "extra"}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: isExtra ? "#c084fc" : C.inkSoft, marginTop: 2 }}>{dateStr}</div>
                   </th>
                 );
               })}
@@ -698,6 +764,15 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
             onSave={handleSaveCustomDate}
           />
         </Modal>
+      )}
+
+      {/* Extra Session Modal for this Month */}
+      {showExtraModal && (
+        <ExtraSessionModal
+          subgroupId={subgroup.id}
+          onClose={() => setShowExtraModal(false)}
+          onSave={saveExtraSession}
+        />
       )}
     </div>
   );
@@ -931,7 +1006,8 @@ export default function SubgroupScreen({ groupId, subgroupId, catId, levelId, gr
       const extraSessions = [...(d.extraSessions || []), es];
       const sessionEntry = {
         id: es.id,
-        subgroupId: es.subgroupId,
+        groupId: es.subgroupId || sg.id,
+        subgroupId: es.subgroupId || sg.id,
         date: es.date,
         time: es.time,
         isExtra: true,

@@ -1,12 +1,14 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Menu, Search, CalendarClock, Users, MessageCircle, LogOut, Settings, ChevronDown, Bell, Radio } from "lucide-react";
-import { C, CAT_BY_ID, uid, generateSessions } from "../../theme/tokens";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Menu, Search, CalendarClock, Users, MessageCircle, LogOut, Settings, ChevronDown, Bell, Radio, CheckCircle2, AlertTriangle, XCircle, CreditCard, Sparkles, X } from "lucide-react";
+import { C, CAT_BY_ID, uid, generateSessions, getStudentFinancialSummary } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import IconBtn from "../../components/ui/IconBtn";
 import AvatarDisplay from "../../components/ui/AvatarDisplay";
 import LanguageToggle from "../../components/ui/LanguageToggle";
 import AppSidebar from "../../components/AppSidebar";
 import GlobalSearch from "../../components/GlobalSearch";
+import { useNfcReader } from "../../hooks/useNfcReader";
+import { API_ENDPOINTS } from "../../config/api";
 
 import DashboardScreen from "./DashboardScreen";
 import SchoolStructureScreen from "./SchoolStructureScreen";
@@ -21,6 +23,42 @@ import DebtsScreen from "./DebtsScreen";
 // Anciennes pages (conservées)
 import ParentsScreen from "./ParentsScreen";
 import SettingsScreen from "./SettingsScreen";
+
+/* ── Web Audio Beep generator for Global NFC ── */
+function playGlobalNfcTone(type = "success") {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === "success") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.28);
+    } else if (type === "warning") {
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    } else {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.setValueAtTime(164.81, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    }
+  } catch (_) {}
+}
 
 export default function AdminApp({ data, setData, onLogout, toastFn }) {
   const { t, isRTL, lang } = useLanguage();
@@ -40,6 +78,189 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const profileRef = useRef(null);
   const notifRef = useRef(null);
+
+  // ── Global NFC Auto-Attendance Engine ──
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  const nfcCooldownMap = useRef(new Map());
+  const [nfcBanner, setNfcBanner] = useState(null);
+  const nfcBannerTimer = useRef(null);
+
+  const handleGlobalNfcScan = useCallback((rawUid) => {
+    if (!rawUid) return;
+
+    // Check if an input for manual UID assignment or typing is currently focused
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+      const pl = (activeEl.placeholder || "").toLowerCase();
+      const nm = (activeEl.name || "").toLowerCase();
+      if (nm.includes("card") || nm.includes("nfc") || pl.includes("nfc") || pl.includes("مرر") || pl.includes("badge")) {
+        return;
+      }
+    }
+
+    const cleanUid = String(rawUid).replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    if (!cleanUid || cleanUid.length < 3) return;
+
+    const currentData = dataRef.current || data;
+    const now = Date.now();
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const timeStr = today.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+    // 1. Identify student
+    const student = (currentData.students || []).find(s =>
+      (s.nfcCardId && s.nfcCardId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === cleanUid) ||
+      (s.studentCode && s.studentCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() === cleanUid) ||
+      s.id === cleanUid
+    );
+
+    if (!student) {
+      playGlobalNfcTone("error");
+      if (nfcBannerTimer.current) clearTimeout(nfcBannerTimer.current);
+      setNfcBanner({
+        type: "unknown",
+        cleanUid,
+        time: timeStr,
+      });
+      nfcBannerTimer.current = setTimeout(() => setNfcBanner(null), 5000);
+      return;
+    }
+
+    // 2. Anti-duplicate cooldown (10s)
+    const lastScan = nfcCooldownMap.current.get(cleanUid);
+    if (lastScan && (now - lastScan) < 10000) {
+      playGlobalNfcTone("warning");
+      const remainingSec = Math.ceil((10000 - (now - lastScan)) / 1000);
+      if (nfcBannerTimer.current) clearTimeout(nfcBannerTimer.current);
+      setNfcBanner({
+        type: "duplicate",
+        student,
+        time: timeStr,
+        remainingSec,
+      });
+      nfcBannerTimer.current = setTimeout(() => setNfcBanner(null), 3500);
+      return;
+    }
+
+    nfcCooldownMap.current.set(cleanUid, now);
+
+    // 3. Find group & session
+    const studentGroup = (currentData.groups || []).find(g => g.id === student.groupId) ||
+                         (currentData.subgroups || []).find(sg => sg.id === (student.subgroupId || student.groupId));
+
+    const todaySession = (currentData.sessions || []).find(s =>
+      (s.groupId === studentGroup?.id || s.subgroupId === studentGroup?.id) &&
+      s.date === todayStr
+    );
+
+    const targetSessionId = todaySession ? todaySession.id : null;
+
+    // 4. Update attendance in state
+    setData(prev => {
+      const attendances = [...(prev.attendances || [])];
+      const existingIdx = attendances.findIndex(a =>
+        a.studentId === student.id && (a.date === todayStr || (targetSessionId && a.sessionId === targetSessionId))
+      );
+
+      const record = {
+        id: existingIdx >= 0 ? attendances[existingIdx].id : uid(),
+        studentId: student.id,
+        sessionId: targetSessionId,
+        date: todayStr,
+        originalDate: todayStr,
+        time: timeStr,
+        present: true,
+        nfcVerified: true,
+        cardUid: cleanUid,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (existingIdx >= 0) {
+        attendances[existingIdx] = record;
+      } else {
+        attendances.push(record);
+      }
+
+      let sessions = prev.sessions || [];
+      if (todaySession && todaySession.status === "planned") {
+        sessions = sessions.map(s => s.id === todaySession.id ? { ...s, status: "done" } : s);
+      }
+
+      const notif = {
+        id: uid(),
+        userId: student.id,
+        type: "presence",
+        title: "Pointage NFC validé ⏱️",
+        message: `تم تسجيل حضورك بنجاح عبر البطاقة الذكية (${studentGroup?.nom || ""}) بتاريخ ${todayStr} الساعة ${timeStr}.`,
+        date: todayStr,
+        time: timeStr,
+        read: false,
+        cardUid: cleanUid,
+      };
+
+      return {
+        ...prev,
+        attendances,
+        sessions,
+        userNotifications: [...(prev.userNotifications || []), notif],
+      };
+    });
+
+    // 5. Asynchronously notify backend API if running
+    try {
+      fetch(`${API_ENDPOINTS.nfc}/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardUid: cleanUid }),
+      }).catch(() => {});
+    } catch (_) {}
+
+    // 6. Audio chime & visual HUD banner
+    playGlobalNfcTone("success");
+    const fin = getStudentFinancialSummary(currentData, student.id, activeYearId);
+
+    if (nfcBannerTimer.current) clearTimeout(nfcBannerTimer.current);
+    setNfcBanner({
+      type: "success",
+      student,
+      group: studentGroup,
+      time: timeStr,
+      financial: fin,
+      cardUid: cleanUid,
+    });
+    nfcBannerTimer.current = setTimeout(() => setNfcBanner(null), 5000);
+  }, [activeYearId, setData]);
+
+  // Global Keyboard Wedge / HID NFC Listener
+  useNfcReader({
+    enabled: nav.screen !== "nfc",
+    onScan: handleGlobalNfcScan,
+  });
+
+  // Global SSE Listener
+  useEffect(() => {
+    let es = null;
+    try {
+      es = new EventSource(`${API_ENDPOINTS.nfc}/stream`);
+      es.addEventListener("card_scanned", (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload && (payload.cardUid || payload.uid)) {
+            if (nav.screen !== "nfc") {
+              handleGlobalNfcScan(payload.cardUid || payload.uid);
+            }
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
+    return () => {
+      if (es) es.close();
+    };
+  }, [handleGlobalNfcScan, nav.screen]);
 
   useEffect(() => {
     function handleClick(e) {
@@ -347,6 +568,143 @@ export default function AdminApp({ data, setData, onLogout, toastFn }) {
         {nav.screen === "parents" && <ParentsScreen data={data} setData={setData} toastFn={toastFn} openChat={(sid) => handleNav({ screen: "chat", studentId: sid, parentId: sid })} onBack={goBack} activeYearId={activeYearId} isReadOnlyYear={isReadOnlyYear} />}
         {nav.screen === "settings" && <SettingsScreen admin={data.admin} data={data} setData={setData} toastFn={toastFn} onSave={(a) => setData(d => ({ ...d, admin: a }))} onBack={goBack} />}
       </div>
+
+      {/* ── Global NFC Auto-Attendance HUD Banner ── */}
+      {nfcBanner && (
+        <div
+          style={{
+            position: "fixed",
+            top: 24,
+            right: isRTL ? "auto" : 24,
+            left: isRTL ? 24 : "auto",
+            zIndex: 9999,
+            minWidth: 320,
+            maxWidth: 420,
+            borderRadius: 18,
+            padding: "16px 20px",
+            background: nfcBanner.type === "success"
+              ? "linear-gradient(135deg, rgba(16,36,28,0.97) 0%, rgba(20,55,40,0.97) 100%)"
+              : nfcBanner.type === "duplicate"
+              ? "linear-gradient(135deg, rgba(50,38,15,0.97) 0%, rgba(65,45,18,0.97) 100%)"
+              : "linear-gradient(135deg, rgba(55,18,22,0.97) 0%, rgba(70,22,26,0.97) 100%)",
+            border: `1.5px solid ${
+              nfcBanner.type === "success"
+                ? "rgba(74,222,128,0.6)"
+                : nfcBanner.type === "duplicate"
+                ? "rgba(251,191,36,0.6)"
+                : "rgba(248,113,113,0.6)"
+            }`,
+            boxShadow: "0 20px 45px rgba(0,0,0,0.65), 0 0 25px rgba(74,222,128,0.18)",
+            backdropFilter: "blur(20px)",
+            color: "#fff",
+            animation: "fadeIn 0.25s ease-out",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  background: nfcBanner.type === "success"
+                    ? "rgba(74,222,128,0.2)"
+                    : nfcBanner.type === "duplicate"
+                    ? "rgba(251,191,36,0.2)"
+                    : "rgba(248,113,113,0.2)",
+                  border: `1px solid ${
+                    nfcBanner.type === "success"
+                      ? "rgba(74,222,128,0.4)"
+                      : nfcBanner.type === "duplicate"
+                      ? "rgba(251,191,36,0.4)"
+                      : "rgba(248,113,113,0.4)"
+                  }`,
+                }}
+              >
+                {nfcBanner.type === "success" && <CheckCircle2 size={24} color="#4ade80" />}
+                {nfcBanner.type === "duplicate" && <AlertTriangle size={24} color="#fbbf24" />}
+                {nfcBanner.type === "unknown" && <XCircle size={24} color="#f87171" />}
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: nfcBanner.type === "success" ? "#4ade80" : nfcBanner.type === "duplicate" ? "#fbbf24" : "#f87171" }}>
+                  {nfcBanner.type === "success" && (lang === "ar" ? "✅ تم تسجيل الحضور تلقائياً (NFC)" : "✅ Pointage NFC Enregistré")}
+                  {nfcBanner.type === "duplicate" && (lang === "ar" ? "⚠️ تسجيل مكرر تم مسبقاً" : "⚠️ Déjà Pointé")}
+                  {nfcBanner.type === "unknown" && (lang === "ar" ? "❌ بطاقة غير مسجلة!" : "❌ Badge Non Reconnu")}
+                </div>
+
+                {nfcBanner.type === "success" && (
+                  <>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginTop: 2 }}>
+                      {nfcBanner.student?.prenom} {nfcBanner.student?.nom}
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 2, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {nfcBanner.group?.nom && <span>🏷️ {nfcBanner.group.nom}</span>}
+                      <span>⏱️ {nfcBanner.time}</span>
+                    </div>
+
+                    {/* Financial status pill */}
+                    <div style={{ marginTop: 8 }}>
+                      {(nfcBanner.financial?.totalUnpaid || 0) <= 0 ? (
+                        <span style={{ fontSize: 11, background: "rgba(74,222,128,0.2)", border: "1px solid rgba(74,222,128,0.4)", color: "#86efac", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>
+                          {lang === "ar" ? "💚 الحساب مسدد بالكامل" : "💚 À jour de paiement"}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, background: "rgba(248,113,113,0.2)", border: "1px solid rgba(248,113,113,0.4)", color: "#fca5a5", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>
+                          {lang === "ar" ? `⚠️ عليه مستحقات: ${nfcBanner.financial.totalUnpaid} DA` : `⚠️ Reste dû : ${nfcBanner.financial.totalUnpaid} DA`}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {nfcBanner.type === "duplicate" && (
+                  <div style={{ fontSize: 13, color: "#fff", marginTop: 4 }}>
+                    {lang === "ar" 
+                      ? `${nfcBanner.student?.prenom} ${nfcBanner.student?.nom} مسجل مسبقاً (انتظر ${nfcBanner.remainingSec}ث)`
+                      : `${nfcBanner.student?.prenom} a déjà été pointé (patienter ${nfcBanner.remainingSec}s)`}
+                  </div>
+                )}
+
+                {nfcBanner.type === "unknown" && (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ fontSize: 12.5, color: "#fff" }}>
+                      {lang === "ar" ? `الرمز: ${nfcBanner.cleanUid}` : `UID: ${nfcBanner.cleanUid}`}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setNfcBanner(null);
+                        setNav({ screen: "nfc" });
+                      }}
+                      style={{
+                        marginTop: 6, padding: "5px 10px", borderRadius: 8,
+                        background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)",
+                        color: "#fff", fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+                      }}
+                    >
+                      {lang === "ar" ? "ربط البطاقة بتلميذ ←" : "Associer la carte ←"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setNfcBanner(null)}
+              style={{
+                background: "transparent", border: "none", color: "rgba(255,255,255,0.5)",
+                cursor: "pointer", padding: 2, display: "flex", alignItems: "center",
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

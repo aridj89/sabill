@@ -296,9 +296,31 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
   /* ── SESSIONS & ATTENDANCES BY MONTH (المقررة والمحضورة حسب الشهر) ── */
   const monthData = useMemo(() => {
     // 1. All group sessions in this month
-    const groupSessions = (data.sessions || [])
-      .filter(s => s && s.groupId === st.groupId && String(s.date || "").startsWith(selectedMonth))
-      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    const rawSessions = (data.sessions || [])
+      .filter(s => s && (s.groupId === st.groupId || s.subgroupId === st.groupId) && String(s.date || "").startsWith(selectedMonth))
+      .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+
+    // Ensure 4 baseline sessions per month, plus any extra sessions added
+    let groupSessions = [...rawSessions];
+    if (groupSessions.length === 0) {
+      groupSessions = [1, 2, 3, 4].map(idx => ({
+        id: `virtual-${selectedMonth}-${idx}`,
+        groupId: st.groupId,
+        date: `${selectedMonth}-${String(Math.min(28, Math.max(1, idx * 7 - 3))).padStart(2, "0")}`,
+        time: "10:00",
+        status: "planned",
+      }));
+    } else if (groupSessions.length < 4) {
+      for (let idx = groupSessions.length + 1; idx <= 4; idx++) {
+        groupSessions.push({
+          id: `virtual-${selectedMonth}-${idx}`,
+          groupId: st.groupId,
+          date: `${selectedMonth}-${String(Math.min(28, Math.max(1, idx * 7 - 3))).padStart(2, "0")}`,
+          time: "10:00",
+          status: "planned",
+        });
+      }
+    }
 
     // 2. Map group sessions with student's attendance records
     const list = groupSessions.map(sess => {
