@@ -437,22 +437,96 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
   const currentMonthStr = new Date().toISOString().slice(0, 7);
   const todayStr = new Date().toISOString().slice(0, 10);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  const [editDateStudent, setEditDateStudent] = useState(null); // { student, session, attendance }
 
-  const toggleAttendance = (studentId, existingAtt, idx) => {
+  // 1. Get real sessions for this group in the selected month
+  const monthSessions = useMemo(() => {
+    const list = (data.sessions || [])
+      .filter(s => s && s.groupId === subgroup.id && String(s.date || "").startsWith(selectedMonth))
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    
+    // If no explicit sessions found, provide 4 placeholder dates based on the month
+    if (list.length === 0) {
+      return [1, 2, 3, 4].map(idx => ({
+        id: `virtual-${selectedMonth}-${idx}`,
+        date: `${selectedMonth}-${String(idx * 7 - 5).padStart(2, "0")}`,
+        time: subgroup.time || "10:00",
+        virtualNum: idx,
+      }));
+    }
+    return list;
+  }, [data.sessions, subgroup.id, selectedMonth, subgroup.time]);
+
+  const toggleAttendance = (studentId, existingAtt, session) => {
     setData(d => {
       let newAtt;
       if (existingAtt) {
-        // Remove existing attendance
-        newAtt = d.attendances.filter(a => a.id !== existingAtt.id);
+        newAtt = (d.attendances || []).filter(a => a.id !== existingAtt.id);
       } else {
-        // Add new attendance
-        // Ensure date falls within selected month (use today if in current month, else 1st of month)
-        const dateToUse = todayStr.startsWith(selectedMonth) ? todayStr : `${selectedMonth}-01`;
-        newAtt = [...(d.attendances || []), { id: uid(), studentId, date: dateToUse, present: true }];
+        const dateToUse = session?.date || (todayStr.startsWith(selectedMonth) ? todayStr : `${selectedMonth}-01`);
+        newAtt = [
+          ...(d.attendances || []),
+          {
+            id: uid(),
+            studentId,
+            sessionId: session?.id?.startsWith("virtual") ? null : session?.id,
+            date: dateToUse,
+            originalDate: session?.date || dateToUse,
+            present: true,
+          }
+        ];
       }
       return { ...d, attendances: newAtt };
     });
   };
+
+  const handleSaveCustomDate = ({ customDate, present, note }) => {
+    if (!editDateStudent) return;
+    const { student, session, attendance } = editDateStudent;
+
+    setData(d => {
+      let attendances = [...(d.attendances || [])];
+      const scheduledDate = session?.date;
+      const isCustom = customDate !== scheduledDate;
+
+      const existingIdx = attendances.findIndex(a =>
+        a.studentId === student.id &&
+        ((session?.id && a.sessionId === session.id) || a.date === scheduledDate || a.originalDate === scheduledDate)
+      );
+
+      if (existingIdx >= 0) {
+        attendances[existingIdx] = {
+          ...attendances[existingIdx],
+          date: customDate,
+          customDate: isCustom ? customDate : null,
+          originalDate: scheduledDate,
+          present,
+          note: note || (isCustom ? `حضر يوم ${customDate} بدل ${scheduledDate}` : ""),
+        };
+      } else {
+        attendances.push({
+          id: uid(),
+          sessionId: session?.id?.startsWith("virtual") ? null : session?.id,
+          studentId: student.id,
+          date: customDate,
+          customDate: isCustom ? customDate : null,
+          originalDate: scheduledDate,
+          present,
+          note: note || (isCustom ? `حضر يوم ${customDate} بدل ${scheduledDate}` : ""),
+        });
+      }
+
+      return { ...d, attendances };
+    });
+
+    setEditDateStudent(null);
+    if (toastFn) {
+      toastFn(lang === "ar" ? `تم تحديث تاريخ الحضور: ${customDate} ✓` : `Date enregistrée : ${customDate} ✓`);
+    }
+  };
+
+  const [selY, selM] = selectedMonth.split("-").map(Number);
+  const formattedMonth = new Date(selY, selM - 1, 1).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR", { month: "long", year: "numeric" });
 
   return (
     <div>
@@ -467,13 +541,18 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
       </div>
       
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ fontSize: 13, color: C.inkSoft, fontWeight: 700 }}>
-          {lang === "ar" ? "سجل الحضور - 4 حصص شهرياً" : "Registre de présence (4 séances/mois)"}
+        <div>
+          <div style={{ fontSize: 15, color: C.ink, fontWeight: 800 }}>
+            {lang === "ar" ? `سجل الحضور الشهري — ${formattedMonth}` : `Registre de présence mensuel — ${formattedMonth}`}
+          </div>
+          <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>
+            {lang === "ar" ? "يعرض التواريخ الفعلية للحصص، مع إمكانية تعديل تاريخ حضور أي تلميذ (مثلاً حضر يوم 5 بدل 2)" : "Dates réelles et modification de date de présence par élève"}
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "5px 10px" }}>
-          <Calendar size={14} color={C.accent} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "5px 12px" }}>
+          <Calendar size={15} color={C.accent} />
           <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
-            style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", colorScheme: "dark" }} />
+            style={{ background: "transparent", border: "none", color: C.ink, fontSize: 13, outline: "none", cursor: "pointer", colorScheme: "dark" }} />
         </div>
       </div>
 
@@ -481,18 +560,22 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: "10px 12px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
+              <th style={{ textAlign: "left", padding: "12px 14px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
                 {lang === "ar" ? "التلميذ" : "Élève"}
               </th>
-              {[1, 2, 3, 4].map(num => (
-                <th key={num} style={{ textAlign: "center", padding: "8px 6px", color: C.inkSoft, fontWeight: 600, fontSize: 11, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", width: 70 }}>
-                  {lang === "ar" ? `حصة ${num}` : `S${num}`}
-                </th>
-              ))}
-              <th style={{ textAlign: "center", padding: "8px 10px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
+              {monthSessions.map((sess, idx) => {
+                const dateStr = sess.date ? sess.date.slice(5) : `S${idx + 1}`;
+                return (
+                  <th key={sess.id || idx} style={{ textAlign: "center", padding: "10px 8px", color: C.ink, fontWeight: 700, fontSize: 12, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", minWidth: 95 }}>
+                    <div style={{ color: C.accent }}>{lang === "ar" ? `حصة ${idx + 1}` : `S${idx + 1}`}</div>
+                    <div style={{ fontSize: 10.5, color: C.inkSoft, marginTop: 2 }}>{dateStr}</div>
+                  </th>
+                );
+              })}
+              <th style={{ textAlign: "center", padding: "10px 10px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", width: 60 }}>
                 %
               </th>
-              <th style={{ textAlign: "center", padding: "8px 10px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)" }}>
+              <th style={{ textAlign: "center", padding: "10px 10px", color: C.inkSoft, fontWeight: 700, borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", width: 75 }}>
                 {lang === "ar" ? "إجراء" : "Action"}
               </th>
             </tr>
@@ -500,17 +583,18 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
           <tbody>
             {students.map(st => {
               // Get attendances for this student in the selected month
-              const stAttendances = (data.attendances || [])
-                .filter(a => a.studentId === st.id && a.date.startsWith(selectedMonth))
-                .sort((a, b) => a.date.localeCompare(b.date));
+              const stAttendances = (data.attendances || []).filter(a =>
+                a && a.studentId === st.id && String(a.customDate || a.date || "").startsWith(selectedMonth)
+              );
               
               const presentCount = stAttendances.filter(a => a.present).length;
+              const totalSessionsCount = Math.max(monthSessions.length, 1);
 
               return (
                 <tr key={st.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.06)`, transition: "background 0.12s" }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "10px 12px", color: C.ink, whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "10px 14px", color: C.ink, whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 32, height: 32, borderRadius: 8, background: C.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, color: C.accent, flexShrink: 0 }}>
                         {st.prenom?.[0]}{st.nom?.[0]}
@@ -519,30 +603,65 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
                         <div style={{ fontWeight: 700 }}>{st.prenom} {st.nom}</div>
                         <div style={{ fontSize: 10.5, color: C.inkSoft, display: "flex", gap: 6, marginTop: 2 }}>
                           {st.phone && <span>{st.phone}</span>}
-                          {st.nfcCardId && <span style={{ color: "#4ade80" }}>NFC ✓</span>}
+                          {st.studentCode && <span style={{ color: "#818cf8", fontFamily: "monospace" }}>{st.studentCode}</span>}
                         </div>
                       </div>
                     </div>
                   </td>
-                  {[0, 1, 2, 3].map(idx => {
-                    const att = stAttendances[idx]; // Chronological mapping
-                    const isPresent = att ? att.present : false;
+
+                  {/* Render cells for each session in this month */}
+                  {monthSessions.map((sess, idx) => {
+                    const att = (data.attendances || []).find(a =>
+                      a && a.studentId === st.id &&
+                      ((sess.id && a.sessionId === sess.id) || a.date === sess.date || a.originalDate === sess.date)
+                    );
+                    const isPresent = att ? !!att.present : false;
+                    const isCustom = !!(att?.customDate && att.customDate !== sess.date);
+
                     return (
-                      <td key={idx} style={{ textAlign: "center", padding: "8px 6px" }}>
-                        <div style={{ display: "flex", justifyContent: "center" }}>
-                          <input 
-                            type="checkbox" 
-                            className="theme-checkbox" 
-                            checked={isPresent} 
-                            onChange={() => toggleAttendance(st.id, att, idx)} 
-                            style={{ width: 20, height: 20, cursor: "pointer" }}
-                          />
+                      <td key={sess.id || idx} style={{ textAlign: "center", padding: "8px 6px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <input 
+                              type="checkbox" 
+                              className="theme-checkbox" 
+                              checked={isPresent} 
+                              onChange={() => toggleAttendance(st.id, att, sess)} 
+                              style={{ width: 18, height: 18, cursor: "pointer" }}
+                            />
+                            {/* Edit date button for this student/session */}
+                            <button
+                              type="button"
+                              onClick={() => setEditDateStudent({ student: st, session: sess, attendance: att })}
+                              title={lang === "ar" ? "تعديل تاريخ الحضور (مثلاً حضر يوم 5 بدل 2)" : "Modifier la date (ex: présent le 5 au lieu du 2)"}
+                              style={{
+                                background: isCustom ? "rgba(59,130,246,0.2)" : "rgba(255,255,255,0.05)",
+                                border: `1px solid ${isCustom ? "#3b82f6" : "rgba(255,255,255,0.15)"}`,
+                                borderRadius: 5, padding: "2px 4px", color: isCustom ? "#60a5fa" : C.inkSoft,
+                                cursor: "pointer", display: "flex", alignItems: "center"
+                              }}
+                            >
+                              <Edit2 size={10} />
+                            </button>
+                          </div>
+
+                          {/* Badge if attended on different date */}
+                          {isCustom && (
+                            <span style={{
+                              fontSize: 9.5, fontWeight: 800, color: "#60a5fa",
+                              background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)",
+                              padding: "1px 5px", borderRadius: 4, whiteSpace: "nowrap"
+                            }}>
+                              {att.customDate.slice(8)} بدل {sess.date.slice(8)}
+                            </span>
+                          )}
                         </div>
                       </td>
                     );
                   })}
-                  <td style={{ textAlign: "center", padding: "8px 10px", fontWeight: 700, color: presentCount >= 3 ? "#4ade80" : (presentCount > 0 ? "#fbbf24" : "#f87171"), fontSize: 13 }}>
-                    {Math.round((presentCount / 4) * 100)}%
+
+                  <td style={{ textAlign: "center", padding: "8px 10px", fontWeight: 800, color: presentCount >= 3 ? "#4ade80" : (presentCount > 0 ? "#fbbf24" : "#f87171"), fontSize: 13 }}>
+                    {Math.round((presentCount / totalSessionsCount) * 100)}%
                   </td>
                   <td style={{ textAlign: "center", padding: "8px 10px" }}>
                     <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
@@ -555,13 +674,157 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
             })}
             {students.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", color: C.inkSoft, padding: "30px 0" }}>
-                  {lang === "ar" ? "لا يوجد تلاميذ" : "Aucun élève"}
+                <td colSpan={monthSessions.length + 3} style={{ textAlign: "center", color: C.inkSoft, padding: "30px 0" }}>
+                  {lang === "ar" ? "لا يوجد تلاميذ مسجلين في هذا الفوج" : "Aucun élève dans ce groupe"}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Edit Attendance Date Modal */}
+      {editDateStudent && (
+        <Modal
+          title={lang === "ar" ? "تعديل تاريخ حضور التلميذ" : "Modifier la date de présence"}
+          onClose={() => setEditDateStudent(null)}
+        >
+          <EditDateInGroupModalContent
+            student={editDateStudent.student}
+            session={editDateStudent.session}
+            attendance={editDateStudent.attendance}
+            lang={lang}
+            onCancel={() => setEditDateStudent(null)}
+            onSave={handleSaveCustomDate}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ── Modal Content Helper ─────────────────────────────────────── */
+function EditDateInGroupModalContent({ student, session, attendance, lang, onCancel, onSave }) {
+  const [customDate, setCustomDate] = useState(
+    attendance?.customDate || attendance?.date || session?.date || new Date().toISOString().slice(0, 10)
+  );
+  const [present, setPresent] = useState(attendance ? !!attendance.present : true);
+  const [note, setNote] = useState(attendance?.note || "");
+
+  const scheduledDate = session?.date;
+  const isChanged = customDate !== scheduledDate;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px" }}>
+        <div style={{ fontSize: 11.5, color: C.inkSoft }}>{lang === "ar" ? "التلميذ:" : "Élève :"}</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.ink }}>{student?.prenom} {student?.nom}</div>
+        {scheduledDate && (
+          <div style={{ fontSize: 12, color: C.accent, marginTop: 4, fontWeight: 600 }}>
+            📅 {lang === "ar" ? `التاريخ المبرمج أصلاً للحصة: ${scheduledDate}` : `Date prévue : ${scheduledDate}`}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700, display: "block", marginBottom: 6 }}>
+          {lang === "ar" ? "حالة الحضور:" : "Statut :"}
+        </label>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setPresent(true)}
+            style={{
+              flex: 1, padding: "9px 12px", borderRadius: 10,
+              border: `1.5px solid ${present ? "#4ade80" : C.border}`,
+              background: present ? "rgba(74,222,128,0.15)" : "transparent",
+              color: present ? "#4ade80" : C.inkSoft,
+              fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6
+            }}
+          >
+            <CheckCircle2 size={15} /> {lang === "ar" ? "حاضر" : "Présent"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPresent(false)}
+            style={{
+              flex: 1, padding: "9px 12px", borderRadius: 10,
+              border: `1.5px solid ${!present ? "#f87171" : C.border}`,
+              background: !present ? "rgba(248,113,113,0.15)" : "transparent",
+              color: !present ? "#f87171" : C.inkSoft,
+              fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6
+            }}
+          >
+            <XCircle size={15} /> {lang === "ar" ? "غائب" : "Absent"}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700, display: "block", marginBottom: 6 }}>
+          {lang === "ar" ? "تاريخ الحضور الفعلي (مثال: حضر يوم 5 بدل 2):" : "Date réelle :"}
+        </label>
+        <input
+          type="date"
+          value={customDate}
+          onChange={e => setCustomDate(e.target.value)}
+          style={{
+            width: "100%", padding: "10px 14px",
+            background: "rgba(255,255,255,0.06)",
+            border: `1.5px solid ${isChanged ? "#3b82f6" : C.border}`,
+            borderRadius: 10, color: C.ink, fontSize: 14, fontWeight: 700,
+            outline: "none", colorScheme: "dark"
+          }}
+        />
+        {isChanged && (
+          <div style={{ fontSize: 11.5, color: "#3b82f6", fontWeight: 700, marginTop: 5 }}>
+            {lang === "ar"
+              ? `🔄 سيتم تسجيل حضور التلميذ يوم ${customDate} بدل ${scheduledDate}`
+              : `Présence le ${customDate} au lieu de ${scheduledDate}`}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label style={{ fontSize: 12, color: C.inkSoft, fontWeight: 700, display: "block", marginBottom: 6 }}>
+          {lang === "ar" ? "ملاحظة (سبب التغيير / تعويض):" : "Remarque :"}
+        </label>
+        <input
+          type="text"
+          placeholder={lang === "ar" ? "مثال: حضر يوم 5 بدل 2" : "ex: Présent le 5 au lieu du 2"}
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          style={{
+            width: "100%", padding: "10px 14px",
+            background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+            borderRadius: 10, color: C.ink, fontSize: 13, outline: "none"
+          }}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            flex: 1, padding: "10px 16px", borderRadius: 10,
+            border: `1px solid ${C.border}`, background: "transparent",
+            color: C.inkSoft, fontWeight: 700, cursor: "pointer"
+          }}
+        >
+          {lang === "ar" ? "إلغاء" : "Annuler"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSave({ customDate, present, note })}
+          style={{
+            flex: 1.5, padding: "10px 16px", borderRadius: 10,
+            border: "none", background: C.accent,
+            color: "#fff", fontWeight: 800, cursor: "pointer"
+          }}
+        >
+          {lang === "ar" ? "حفظ التغييرات" : "Enregistrer"}
+        </button>
       </div>
     </div>
   );
