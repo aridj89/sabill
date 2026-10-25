@@ -136,6 +136,17 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
     if (toastFn) toastFn(lang === "ar" ? "تمت إضافة الحصة الإضافية وإشعار جميع التلاميذ بنجاح ✓" : "Séance suppl. ajoutée et élèves notifiés ✓");
   };
 
+  const deleteExtraSession = (sessId) => {
+    if (!window.confirm(lang === "ar" ? "هل أنت متأكد من حذف هذه الحصة الإضافية؟" : "Supprimer cette séance supplémentaire ?")) return;
+    setData(d => ({
+      ...d,
+      sessions: (d.sessions || []).filter(s => s.id !== sessId),
+      extraSessions: (d.extraSessions || []).filter(es => es.id !== sessId),
+      attendances: (d.attendances || []).filter(a => a.sessionId !== sessId),
+    }));
+    if (toastFn) toastFn(lang === "ar" ? "تم حذف الحصة الإضافية بنجاح ✓" : "Séance supplémentaire supprimée ✓");
+  };
+
   return (
     <>
       {/* ── Sessions List ── */}
@@ -180,7 +191,7 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
                 {sess.note && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sess.note}</div>}
                 {isRescheduled && sess.originalDate && (
                   <div style={{ fontSize: 11, color: "rgba(168,85,247,0.7)", marginTop: 2 }}>
-                    {lang === "ar" ? `الأصلي: ${sess.originalDate}` : `Original : ${sess.originalDate}`}
+                    {lang === "ar" ? `الأصلي: ${sess.originalDate}` : `Original : ${sess.originalDate}`}
                   </div>
                 )}
               </div>
@@ -188,6 +199,35 @@ function SessionsList({ sessions, subgroup, students, data, setData, toastFn }) 
                 <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>
                   {presentCnt}/{sgStudents}
                 </span>
+              )}
+              {isExtra && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteExtraSession(sess.id);
+                  }}
+                  title={lang === "ar" ? "حذف الحصة الإضافية" : "Supprimer la séance supplémentaire"}
+                  style={{
+                    background: "rgba(248,113,113,0.14)",
+                    border: "1px solid rgba(248,113,113,0.4)",
+                    borderRadius: 8,
+                    padding: "5px 10px",
+                    color: "#f87171",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.25)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(248,113,113,0.14)"}
+                >
+                  <Trash2 size={13} />
+                  <span>{lang === "ar" ? "حذف" : "Supprimer"}</span>
+                </button>
               )}
               {!isExtra && <ChevronRight size={14} color={C.inkSoft} />}
             </div>
@@ -499,6 +539,42 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
     if (toastFn) toastFn(lang === "ar" ? "تمت إضافة الحصة الإضافية لهذا الشهر بنجاح ✓" : "Séance suppl. ajoutée pour ce mois ✓");
   };
 
+  const extraSessionsThisMonth = useMemo(() => {
+    return (data.sessions || []).filter(s => 
+      s && s.isExtra && 
+      (s.groupId === subgroup.id || s.subgroupId === subgroup.id) && 
+      String(s.date || "").startsWith(selectedMonth)
+    );
+  }, [data.sessions, subgroup.id, selectedMonth]);
+
+  const deleteExtraSession = (sess) => {
+    if (!sess) return;
+    const sessDate = sess.date;
+    const confirmMsg = lang === "ar"
+      ? `هل أنت متأكد من حذف الحصة الإضافية (${sessDate})؟`
+      : `Supprimer cette séance supplémentaire (${sessDate}) ?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setData(d => ({
+      ...d,
+      sessions: (d.sessions || []).filter(s => {
+        if (sess.id && s.id === sess.id) return false;
+        if (s.isExtra && s.date === sessDate && (s.groupId === subgroup.id || s.subgroupId === subgroup.id)) return false;
+        return true;
+      }),
+      extraSessions: (d.extraSessions || []).filter(es => {
+        if (sess.id && es.id === sess.id) return false;
+        if (es.date === sessDate && (es.subgroupId === subgroup.id || es.groupId === subgroup.id)) return false;
+        return true;
+      }),
+      attendances: (d.attendances || []).filter(a => a.sessionId !== sess.id),
+    }));
+
+    if (toastFn) {
+      toastFn(lang === "ar" ? "تم حذف الحصة الإضافية بنجاح ✓" : "Séance supplémentaire supprimée ✓");
+    }
+  };
+
   const toggleAttendance = (studentId, existingAtt, session) => {
     setData(d => {
       let newAtt;
@@ -614,6 +690,44 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
         </div>
       </div>
 
+      {/* ── Extra Sessions Summary & Delete Bar ── */}
+      {extraSessionsThisMonth.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14, padding: "10px 14px", background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", borderRadius: 12 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#d8b4fe" }}>
+            ⚡ {lang === "ar" ? "الحصص الإضافية لهذا الشهر:" : "Séances suppl. de ce mois :"}
+          </span>
+          {extraSessionsThisMonth.map((es, eIdx) => (
+            <div key={es.id || eIdx} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(168,85,247,0.2)", border: "1px solid rgba(168,85,247,0.45)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "#fff" }}>
+              <span>📅 {es.date} {es.time ? `(${es.time})` : ""}</span>
+              <button
+                type="button"
+                onClick={() => deleteExtraSession(es)}
+                title={lang === "ar" ? "حذف هذه الحصة الإضافية" : "Supprimer la séance supplémentaire"}
+                style={{
+                  background: "rgba(248,113,113,0.25)",
+                  border: "1px solid rgba(248,113,113,0.5)",
+                  borderRadius: 6,
+                  padding: "2px 6px",
+                  color: "#fca5a5",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.4)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(248,113,113,0.25)"}
+              >
+                <Trash2 size={11} />
+                <span>{lang === "ar" ? "حذف الحصة" : "Supprimer"}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{ overflowX: "auto", borderRadius: 14, border: `1px solid ${C.border}` }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
@@ -635,6 +749,36 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
                       )}
                     </div>
                     <div style={{ fontSize: 10.5, color: isExtra ? "#c084fc" : C.inkSoft, marginTop: 2 }}>{dateStr}</div>
+                    {isExtra && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteExtraSession(sess);
+                        }}
+                        title={lang === "ar" ? "حذف هذه الحصة الإضافية" : "Supprimer la séance supplémentaire"}
+                        style={{
+                          marginTop: 4,
+                          background: "rgba(248,113,113,0.18)",
+                          border: "1px solid rgba(248,113,113,0.45)",
+                          borderRadius: 6,
+                          padding: "2px 7px",
+                          color: "#f87171",
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(248,113,113,0.3)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "rgba(248,113,113,0.18)"}
+                      >
+                        <Trash2 size={10} />
+                        <span>{lang === "ar" ? "حذف" : "Suppr."}</span>
+                      </button>
+                    )}
                   </th>
                 );
               })}

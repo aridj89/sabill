@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   ArrowLeft, Edit2, CheckCircle2, XCircle, CreditCard, CalendarDays,
   TrendingUp, Shield, Key, Radio, Calendar, ChevronLeft, ChevronRight,
-  Clock, Plus, RotateCcw, AlertCircle, Check, X,
+  Clock, Plus, RotateCcw, AlertCircle, Check, X, Trash2,
 } from "lucide-react";
 import { C, CAT_BY_ID, computeCycles, getStudentFinancialSummary, uid } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -513,6 +513,30 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
     }
   };
 
+  /* ── Delete Extra / Custom Session ─────────────────────────────── */
+  const handleDeleteExtraSession = (sessionInfo) => {
+    const sDate = sessionInfo.actualDate || sessionInfo.scheduledDate;
+    const confirmMsg = lang === "ar"
+      ? `هل أنت متأكد من حذف هذه الحصة (${sDate})؟`
+      : `Supprimer cette séance (${sDate}) ?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setData(d => ({
+      ...d,
+      sessions: (d.sessions || []).filter(s => s.id !== sessionInfo.session?.id),
+      extraSessions: (d.extraSessions || []).filter(es => es.id !== sessionInfo.session?.id),
+      attendances: (d.attendances || []).filter(a => {
+        if (sessionInfo.session?.id && a.sessionId === sessionInfo.session.id) return false;
+        if (sessionInfo.attendance?.id && a.id === sessionInfo.attendance.id) return false;
+        return true;
+      }),
+    }));
+
+    if (toastFn) {
+      toastFn(lang === "ar" ? "تم حذف الحصة بنجاح ✓" : "Séance supprimée ✓");
+    }
+  };
+
   const payments = (data.payments || []).filter(p => p.studentId === st.id).sort((a, b) => (a.cycleNum || 0) - (b.cycleNum || 0));
   const studentPrice = st.monthlyPrice || st.montant || 0;
 
@@ -983,6 +1007,24 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
                       <Edit2 size={12} />
                       {lang === "ar" ? "تغيير التاريخ" : "Changer date"}
                     </button>
+
+                    {/* Delete button if extra or custom session */}
+                    {(item.session?.isExtra || item.attendance?.note?.includes("تعويضية") || item.attendance?.note?.includes("خاصة")) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExtraSession(item)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5,
+                          padding: "6px 10px", borderRadius: 8,
+                          background: "rgba(248,113,113,0.14)", border: "1px solid rgba(248,113,113,0.35)",
+                          color: "#f87171", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                        }}
+                        title={lang === "ar" ? "حذف هذه الحصة" : "Supprimer"}
+                      >
+                        <Trash2 size={12} />
+                        {lang === "ar" ? "حذف" : "Supprimer"}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
