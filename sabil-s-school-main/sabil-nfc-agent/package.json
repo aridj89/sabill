@@ -1,0 +1,23 @@
+{
+  "name": "sabil-nfc-agent",
+  "version": "1.0.0",
+  "description": "Windows background agent that reads PC/SC NFC readers (ACR122U…) and sends card scans to the hosted Sabil School API.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "supervise": "node src/supervisor.js",
+    "setup": "node src/index.js --setup",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "nfc-pcsc": "^0.8.1"
+  },
+  "allowScripts": {
+    "@pokusew/pcsclite@0.6.0": true
+  }
+}

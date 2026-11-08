@@ -1,0 +1,8 @@
+{
+  "apiBaseUrl": "https://caring-nature-production-c5b4.up.railway.app",
+  "deviceId": "SABIL-CLIENT-01",
+  "heartbeatIntervalMs": 15000,
+  "duplicateWindowMs": 3000,
+  "maxRetryAgeMs": 300000,
+  "statusPort": 47800
+}
