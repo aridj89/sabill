@@ -1,18 +1,29 @@
 import dotenv from "dotenv";
 import HID from "node-hid";
+import https from "https";
 
 dotenv.config();
 
-const NFC_BACKEND_URL = (process.env.NFC_BACKEND_URL || "https://sabill-volume.up.railway.app").replace(/\/+$/, "");
+const NFC_BACKEND_URL = (process.env.NFC_BACKEND_URL || "https://caring-nature-production-c5b4.up.railway.app").replace(/\/+$/, "");
 const SCAN_ENDPOINT = `${NFC_BACKEND_URL}/api/nfc/scan`;
 const DEBOUNCE_MS = parseInt(process.env.SCAN_DEBOUNCE_MS || "3000", 10);
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "60", 10);
 
 const VENDOR_ID = 0x0483;
 const PRODUCT_ID = 0x4343;
 
+// Persistent HTTPS agent for ultra-low latency
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000,
+  maxSockets: 10,
+  timeout: 5000,
+});
+
 console.log("=================================================");
-console.log("           NFC Agent started");
+console.log("       ⚡ Sabil School — High-Speed NFC Agent");
 console.log(` Target Railway URL : ${NFC_BACKEND_URL}`);
+console.log(` Poll Frequency     : ${POLL_INTERVAL_MS}ms`);
 console.log("=================================================\n");
 
 // ── Helpers & Protocol ──
@@ -82,7 +93,6 @@ let pollTimer = null;
 let isConnected = false;
 let rxBuf = Buffer.alloc(0);
 
-// Read query frame (strictly non-destructive command 0x0083)
 const queryPayload = Buffer.from([0x01, 0x01, 0x00, 0x00, 0x00, 0x00]);
 const queryFrame = makeFrame(0x0083, queryPayload);
 
@@ -97,18 +107,24 @@ async function onRealCardDetected(rawUid) {
   lastCardUid = uid;
   lastScanTime = now;
 
+  const t0 = performance.now();
   console.log(`Card detected: ${uid}`);
-  console.log("Sending UID to Railway...");
 
   try {
     const response = await fetch(SCAN_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Connection": "keep-alive"
+      },
       body: JSON.stringify({ uid, cardUid: uid }),
+      agent: httpsAgent,
     });
 
+    const elapsed = Math.round(performance.now() - t0);
+
     if (!response.ok) {
-      console.warn(`Railway server returned status ${response.status}`);
+      console.warn(`Railway server returned status ${response.status} in ${elapsed}ms`);
       return;
     }
 
@@ -116,15 +132,15 @@ async function onRealCardDetected(rawUid) {
 
     if (data.success && data.student) {
       const studentName = data.student.name || `${data.student.prenom || ""} ${data.student.nom || ""}`.trim();
-      console.log(`Student found: ${studentName}`);
+      console.log(`Student found: ${studentName} (${elapsed}ms)`);
       console.log("Attendance marked successfully\n");
     } else if (data.isDuplicate) {
-      console.log(`Duplicate scan ignored (already recorded, cooldown: ${data.remainingSeconds || 10}s)\n`);
+      console.log(`Duplicate scan ignored (${elapsed}ms, cooldown: ${data.remainingSeconds || 10}s)\n`);
     } else if (data.reason === "CARD_NOT_REGISTERED" || data.reason === "unregistered_card" || !data.success) {
-      console.log(`Card not registered: ${uid}`);
+      console.log(`Card not registered: ${uid} (${elapsed}ms)`);
       console.log("(Assign this card to a student in the admin panel)\n");
     } else {
-      console.log("Response from server:", data);
+      console.log(`Response from server (${elapsed}ms):`, data);
     }
   } catch (err) {
     console.error("Railway backend unavailable");
@@ -172,7 +188,6 @@ function connectReader() {
         if (f.cmd === 0x0083 && f.payload.length >= 4) {
           const status = f.payload.readUInt32LE(0);
           if (status === 4 && f.payload.length >= 48) {
-            // Locate 7-byte UID starting with 0x04
             let uidStart = 41;
             if (f.payload[41] !== 0x04 && f.payload[42] === 0x04) uidStart = 42;
             else if (f.payload[40] === 0x04) uidStart = 40;
@@ -181,8 +196,7 @@ function connectReader() {
             const uidHex = rawUid.toString("hex").toUpperCase();
             onRealCardDetected(uidHex);
           } else {
-            // Card removed from field
-            if (lastCardUid !== null && (Date.now() - lastScanTime) > 1000) {
+            if (lastCardUid !== null && (Date.now() - lastScanTime) > 600) {
               lastCardUid = null;
             }
           }
@@ -194,6 +208,7 @@ function connectReader() {
       disconnectReader();
     });
 
+    // High frequency query frame transmission (60ms instead of 300ms)
     pollTimer = setInterval(() => {
       if (!device) return;
       try {
@@ -201,7 +216,7 @@ function connectReader() {
       } catch {
         disconnectReader();
       }
-    }, 300);
+    }, POLL_INTERVAL_MS);
 
   } catch (err) {
     disconnectReader();
@@ -223,16 +238,14 @@ function disconnectReader() {
   }
 }
 
-// Initial start
 console.log("Searching for NFC reader...");
 connectReader();
 
-// Continuous watchdog: auto-connect when reader is plugged in
 setInterval(() => {
   if (!isConnected) {
     connectReader();
   }
-}, 2500);
+}, 1500);
 
 process.on("SIGINT", () => {
   console.log("\nStopping NFC Agent...");

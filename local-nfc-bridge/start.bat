@@ -7,12 +7,30 @@ echo   Sabil School - Local NFC USB Bridge Agent
 echo ===================================================
 echo.
 
+where node >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Node.js is not installed or not in PATH!
+    echo Please install Node.js (LTS version) from: https://nodejs.org/
+    echo.
+    pause
+    exit /b 1
+)
+
 if not exist node_modules (
     echo [1/2] Installing local bridge dependencies...
-    npm install
+    call npm install --no-audit --no-fund
+    if errorlevel 1 (
+        echo [ERROR] Dependency installation failed!
+        pause
+        exit /b 1
+    )
     echo.
 )
 
 echo [2/2] Starting NFC Bridge Agent...
 node bridge.js
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Agent terminated with an error.
+)
 pause

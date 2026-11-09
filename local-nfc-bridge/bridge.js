@@ -1,24 +1,36 @@
 import dotenv from "dotenv";
 import HID from "node-hid";
+import https from "https";
 
 dotenv.config();
 
-const API_BASE_URL = (process.env.API_BASE_URL || "http://localhost:5000").replace(/\/+$/, "");
+const API_BASE_URL = (process.env.API_BASE_URL || "https://caring-nature-production-c5b4.up.railway.app").replace(/\/+$/, "");
 const SCAN_ENDPOINT = `${API_BASE_URL}/api/nfc/scan`;
 const COOLDOWN_MS = parseInt(process.env.SCAN_COOLDOWN_MS || "1500", 10);
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "60", 10); // Optimized ultra-fast polling
+
+// High-performance persistent HTTPS agent (eliminates TLS renegotiation per card scan)
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000,
+  maxSockets: 10,
+  timeout: 5000,
+});
 
 console.log("==================================================================");
-console.log("      🚀 SABIL SCHOOL — LOCAL NFC USB BRIDGE AGENT");
+console.log("      🚀 SABIL SCHOOL — HIGH-SPEED NFC USB BRIDGE AGENT");
 console.log("==================================================================");
 console.log(`🌐 Target Cloud API : ${SCAN_ENDPOINT}`);
+console.log(`⚡ Poll Interval   : ${POLL_INTERVAL_MS}ms (High Speed)`);
 console.log(`⏱  Scan Cooldown   : ${COOLDOWN_MS}ms`);
 console.log("==================================================================\n");
 
 // ── State ──
 let lastCardUid = null;
 let lastScanTime = 0;
+let isPosting = false;
 
-// ── Post Card to Cloud API ──
+// ── Fast Post Card to Cloud API ──
 async function postCardToCloud(cardUid) {
   const now = Date.now();
   if (cardUid === lastCardUid && (now - lastScanTime) < COOLDOWN_MS) {
@@ -27,30 +39,37 @@ async function postCardToCloud(cardUid) {
   lastCardUid = cardUid;
   lastScanTime = now;
 
-  console.log(`📡 [NFC READ] UID: ${cardUid} -> Sending to ${SCAN_ENDPOINT}...`);
+  const t0 = performance.now();
+  console.log(`⚡ [FAST SCAN] UID: ${cardUid} -> Sending to cloud...`);
 
   try {
     const response = await fetch(SCAN_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardUid }),
+      headers: {
+        "Content-Type": "application/json",
+        "Connection": "keep-alive"
+      },
+      body: JSON.stringify({ cardUid, uid: cardUid }),
+      agent: httpsAgent,
     });
 
+    const elapsed = Math.round(performance.now() - t0);
+
     if (!response.ok) {
-      console.warn(`⚠ Server responded with status ${response.status} ${response.statusText}`);
+      console.warn(`⚠ Server responded with status ${response.status} in ${elapsed}ms`);
       return;
     }
 
     const data = await response.json();
 
     if (data.success && data.student) {
-      console.log(`✅ [ATTENDANCE VALIDATED] Élève: ${data.student.prenom} ${data.student.nom} (${data.student.phone || "No phone"})`);
+      console.log(`✅ [ATTENDANCE VALIDATED] (${elapsed}ms) Élève: ${data.student.prenom} ${data.student.nom} (${data.student.phone || "No phone"})`);
     } else if (data.isDuplicate) {
-      console.log(`ℹ [DUPLICATE SCAN] ${data.message || "Déjà pointé récemment"}`);
-    } else if (data.reason === "unregistered_card" || !data.success) {
-      console.log(`⚠ [CARD NOT ASSIGNED] ${data.message || "Carte non attribuée à un élève"}`);
+      console.log(`ℹ [DUPLICATE SCAN] (${elapsed}ms) ${data.message || "Déjà pointé récemment"}`);
+    } else if (data.reason === "CARD_NOT_REGISTERED" || data.reason === "unregistered_card" || !data.success) {
+      console.log(`⚠ [CARD NOT ASSIGNED] (${elapsed}ms) ${data.message || "Carte non attribuée à un élève"}`);
     } else {
-      console.log(`ℹ [RESPONSE]`, data);
+      console.log(`ℹ [RESPONSE] (${elapsed}ms)`, data);
     }
   } catch (err) {
     console.error(`❌ Network error while posting to cloud API: ${err.message}`);
@@ -170,6 +189,7 @@ function start5YoaReader() {
         cleanupDevice();
       });
 
+      // Optimized high-frequency polling: 60ms instead of 300ms
       pollTimer = setInterval(() => {
         if (!device) return;
         try {
@@ -177,7 +197,7 @@ function start5YoaReader() {
         } catch {
           cleanupDevice();
         }
-      }, 300);
+      }, POLL_INTERVAL_MS);
 
       return true;
     } catch (err) {
@@ -196,18 +216,16 @@ function start5YoaReader() {
     }
   }
 
-  // Initial connect attempt
   const found = tryConnect();
   if (!found) {
     console.log("ℹ 5YOA HID Reader not detected yet. Watching for USB connection...");
   }
 
-  // Continuous auto-reconnect watchdog
   setInterval(() => {
     if (!device) {
       tryConnect();
     }
-  }, 3000);
+  }, 1500);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -234,7 +252,6 @@ async function tryStartPcscReader() {
               const apduGetUid = Buffer.from([0xFF, 0xCA, 0x00, 0x00, 0x00]);
               reader.transmit(apduGetUid, 40, protocol, (err, data) => {
                 if (!err && data && data.length >= 2) {
-                  // Last 2 bytes are SW1, SW2 (0x90 0x00 for success)
                   const sw1 = data[data.length - 2];
                   const sw2 = data[data.length - 1];
                   if (sw1 === 0x90 && sw2 === 0x00) {
@@ -257,7 +274,7 @@ async function tryStartPcscReader() {
       console.warn("⚠ [PC/SC] Daemon error:", err.message);
     });
   } catch (_) {
-    // PC/SC not installed or unavailable
+    // PC/SC optional fallback
   }
 }
 
