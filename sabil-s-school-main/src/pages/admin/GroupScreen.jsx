@@ -274,6 +274,10 @@ function PayEditModal({ student, subgroup, payment, month, onClose, onSave }) {
 
   const handleSave = () => {
     const finalPaid = status === "paid" ? price : status === "partial" ? Number(paidAmount) : 0;
+    const finalPaidDate = status !== "unpaid" ? paidDate : null;
+    // Exact time of payment: keep the previous timestamp if nothing changed, otherwise record now
+    const unchanged = payment?.paidAt && payment?.paidDate === finalPaidDate && Number(payment?.paidAmount) === finalPaid;
+    const paidAt = !finalPaidDate ? null : unchanged ? payment.paidAt : new Date().toISOString();
     onSave({
       id: payment?.id || uid(),
       studentId: student.id,
@@ -282,7 +286,8 @@ function PayEditModal({ student, subgroup, payment, month, onClose, onSave }) {
       expectedAmount: price,
       paidAmount: finalPaid,
       status,
-      paidDate: status !== "unpaid" ? paidDate : null,
+      paidDate: finalPaidDate,
+      paidAt,
     });
   };
 
@@ -591,6 +596,7 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
             date: dateToUse,
             originalDate: session?.date || dateToUse,
             present: true,
+            markedAt: new Date().toISOString(),
           }
         ];
       }
@@ -619,6 +625,7 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
           customDate: isCustom ? customDate : null,
           originalDate: scheduledDate,
           present,
+          markedAt: new Date().toISOString(),
           note: note || (isCustom ? `حضر يوم ${customDate} بدل ${scheduledDate}` : ""),
         };
       } else {
@@ -630,6 +637,7 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
           customDate: isCustom ? customDate : null,
           originalDate: scheduledDate,
           present,
+          markedAt: new Date().toISOString(),
           note: note || (isCustom ? `حضر يوم ${customDate} بدل ${scheduledDate}` : ""),
         });
       }
@@ -648,16 +656,6 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
 
   return (
     <div>
-      <div style={{ marginBottom: 30 }}>
-        <NfcAttendanceScreen 
-          data={data} 
-          setData={setData} 
-          toastFn={toastFn} 
-          embeddedSubgroupId={subgroup.id} 
-          onNav={onNav} 
-        />
-      </div>
-      
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
         <div>
           <div style={{ fontSize: 15, color: C.ink, fontWeight: 800 }}>
@@ -891,6 +889,16 @@ function PresencesTab({ subgroup, students, data, setData, toastFn, onNav, onEdi
             )}
           </tbody>
         </table>
+      </div>
+
+      <div style={{ marginTop: 30 }}>
+        <NfcAttendanceScreen 
+          data={data} 
+          setData={setData} 
+          toastFn={toastFn} 
+          embeddedSubgroupId={subgroup.id} 
+          onNav={onNav} 
+        />
       </div>
 
       {/* Edit Attendance Date Modal */}

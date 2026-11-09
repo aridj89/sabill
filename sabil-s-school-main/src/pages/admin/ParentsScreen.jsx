@@ -441,7 +441,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
       if (isNowPaid) {
         const existingRegPmt = updatedPayments.find(p => p.studentId === student.id && (p.type === "registration" || p.type === "enrollment"));
         if (existingRegPmt) {
-          updatedPayments = updatedPayments.map(p => p.id === existingRegPmt.id ? { ...p, paid: true, status: "paid", paidAmount: feeAmount, amount: feeAmount, paidDate: todayStr } : p);
+          updatedPayments = updatedPayments.map(p => p.id === existingRegPmt.id ? { ...p, paid: true, status: "paid", paidAmount: feeAmount, amount: feeAmount, paidDate: todayStr, paidAt: new Date().toISOString() } : p);
         } else {
           updatedPayments.push({
             id: uid(),
@@ -453,6 +453,7 @@ export default function ParentsScreen({ data, setData, toastFn, openChat, onBack
             paid: true,
             status: "paid",
             paidDate: todayStr,
+            paidAt: new Date().toISOString(),
             date: todayStr,
             label: lang === "ar" ? "حقوق التسجيل" : "Frais d'inscription",
           });

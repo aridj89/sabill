@@ -405,6 +405,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
           customDate: isCustom ? actualDate : null,
           originalDate: scheduledDate,
           present,
+          markedAt: new Date().toISOString(),
           note: note || (isCustom ? `حضر يوم ${actualDate} بدل ${scheduledDate}` : ""),
         };
       } else {
@@ -416,6 +417,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
           customDate: isCustom ? actualDate : null,
           originalDate: scheduledDate,
           present,
+          markedAt: new Date().toISOString(),
           note: note || (isCustom ? `حضر يوم ${actualDate} بدل ${scheduledDate}` : ""),
         });
       }
@@ -462,6 +464,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
         attendances[existingIdx] = {
           ...attendances[existingIdx],
           present: newPresent,
+          markedAt: new Date().toISOString(),
         };
       } else {
         attendances.push({
@@ -471,6 +474,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
           date: sessionInfo.actualDate || scheduledDate,
           originalDate: scheduledDate,
           present: newPresent,
+          markedAt: new Date().toISOString(),
         });
       }
 
@@ -500,6 +504,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
         customDate: date,
         originalDate: date,
         present: true,
+        markedAt: new Date().toISOString(),
         note: note || (lang === "ar" ? "حصة تعويضية خاصة" : "Rattrapage"),
       };
       return {
@@ -584,7 +589,8 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
         payments: d.payments.map(p => p.id === pId ? {
           ...p,
           paid: isNowPaid,
-          paidDate: isNowPaid ? new Date().toISOString().slice(0, 10) : null
+          paidDate: isNowPaid ? new Date().toISOString().slice(0, 10) : null,
+          paidAt: isNowPaid ? new Date().toISOString() : null,
         } : p),
         userNotifications: notifs,
       };

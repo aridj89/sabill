@@ -41,13 +41,17 @@ export default function SessionDetailModal({ session, group, students, attendanc
 
   const handleSave = () => {
     // Build attendance records
+    const nowIso = new Date().toISOString();
     const newAttendances = students.map(s => {
       const existing = attendances.find(a => a.sessionId === session.id && a.studentId === s.id);
+      const present = attMap[s.id] ?? true;
       return {
         id: existing?.id || uid(),
         sessionId: session.id,
         studentId: s.id,
-        present: attMap[s.id] ?? true,
+        present,
+        // Keep the original marking time if the status did not change
+        markedAt: existing && existing.present === present ? (existing.markedAt || existing.createdAt || nowIso) : nowIso,
       };
     });
 

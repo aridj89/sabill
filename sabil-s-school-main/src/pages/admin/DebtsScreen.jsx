@@ -234,6 +234,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
         type: "debt",
         note: `Versement initial dette (${addForm.debtYear} - ${addForm.level})`,
         paidDate: new Date().toISOString().slice(0, 10),
+        paidAt: new Date().toISOString(),
         month: new Date().toISOString().slice(0, 7),
         academicYearId: activeYearId || null,
       };
@@ -282,6 +283,7 @@ export default function DebtsScreen({ data, setData, toastFn, onNav, activeYearI
       type: "debt",
       note: `Versement dette (${payModal.debtYear || "Dette"})`,
       paidDate: new Date().toISOString().slice(0, 10),
+      paidAt: new Date().toISOString(),
       month: new Date().toISOString().slice(0, 7),
       academicYearId: activeYearId || null,
     };
