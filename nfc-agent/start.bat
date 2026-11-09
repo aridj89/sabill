@@ -3,7 +3,7 @@ title Sabil School - Local NFC Bridge Agent
 cd /d "%~dp0"
 
 echo ===================================================
-echo   Sabil School - Windows USB NFC Agent
+echo   Sabil School - Local NFC USB Bridge Agent
 echo ===================================================
 echo.
 
@@ -26,6 +26,9 @@ if not exist node_modules (
     )
     echo.
 )
+
+REM Close any background ghost instances to prevent USB port contention
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { ($_.CommandLine -like '*supervisor.js*' -or $_.CommandLine -like '*agent.js*') -and $_.ProcessId -ne $PID } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
 
 echo [2/2] Starting NFC Bridge Agent...
 node agent.js

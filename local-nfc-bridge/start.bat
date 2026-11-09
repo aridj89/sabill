@@ -27,6 +27,9 @@ if not exist node_modules (
     echo.
 )
 
+REM Close any background ghost instances to prevent USB port contention
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { ($_.CommandLine -like '*supervisor.js*' -or $_.CommandLine -like '*bridge.js*') -and $_.ProcessId -ne $PID } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
+
 echo [2/2] Starting NFC Bridge Agent...
 node bridge.js
 if errorlevel 1 (

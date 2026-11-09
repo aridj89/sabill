@@ -7,12 +7,12 @@ dotenv.config();
 const NFC_BACKEND_URL = (process.env.NFC_BACKEND_URL || "https://caring-nature-production-c5b4.up.railway.app").replace(/\/+$/, "");
 const SCAN_ENDPOINT = `${NFC_BACKEND_URL}/api/nfc/scan`;
 const DEBOUNCE_MS = parseInt(process.env.SCAN_DEBOUNCE_MS || "3000", 10);
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "60", 10);
+// 250ms polling allows full ISO14443-A RF anti-collision cycle without jamming
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "250", 10);
 
 const VENDOR_ID = 0x0483;
 const PRODUCT_ID = 0x4343;
 
-// Persistent HTTPS agent for ultra-low latency
 const httpsAgent = new https.Agent({
   keepAlive: true,
   keepAliveMsecs: 30000,
@@ -21,12 +21,11 @@ const httpsAgent = new https.Agent({
 });
 
 console.log("=================================================");
-console.log("       ⚡ Sabil School — High-Speed NFC Agent");
+console.log("       ⚡ Sabil School — Instant NFC Agent");
 console.log(` Target Railway URL : ${NFC_BACKEND_URL}`);
-console.log(` Poll Frequency     : ${POLL_INTERVAL_MS}ms`);
+console.log(` Poll Frequency     : ${POLL_INTERVAL_MS}ms (Calibrated)`);
 console.log("=================================================\n");
 
-// ── Helpers & Protocol ──
 function normalizeCardUid(rawUid) {
   if (!rawUid || typeof rawUid !== "string") return "";
   return rawUid.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
@@ -60,6 +59,7 @@ function parseFrames(buf) {
     if (i + 7 > buf.length) break;
     const cmd = (buf[i + 1] << 8) | buf[i + 2];
     const length = (buf[i + 3] << 8) | buf[i + 4];
+    if (length > 256) { i++; continue; }
     const end = i + 5 + length + 2;
     if (end > buf.length) break;
     const payload = buf.subarray(i + 5, i + 5 + length);
@@ -85,7 +85,36 @@ function sendOutputReport(device, frame) {
   }
 }
 
-// ── State ──
+function extractUidFromPayload(payload) {
+  if (!payload || payload.length < 12) return null;
+
+  for (let i = 8; i <= payload.length - 7; i++) {
+    if (payload[i] === 0x04) {
+      const candidate = payload.subarray(i, i + 7);
+      if (!candidate.every(b => b === 0) && !candidate.every(b => b === 0xff)) {
+        return candidate.toString("hex").toUpperCase();
+      }
+    }
+  }
+
+  if (payload.length >= 48) {
+    let uidStart = 41;
+    if (payload[41] !== 0x04 && payload[42] === 0x04) uidStart = 42;
+    else if (payload[40] === 0x04) uidStart = 40;
+    const raw7 = payload.subarray(uidStart, uidStart + 7);
+    if (!raw7.every(b => b === 0)) return raw7.toString("hex").toUpperCase();
+  }
+
+  if (payload.length >= 44) {
+    const raw4 = payload.subarray(40, 44);
+    if (!raw4.every(b => b === 0) && !raw4.every(b => b === 0xff)) {
+      return raw4.toString("hex").toUpperCase();
+    }
+  }
+
+  return null;
+}
+
 let lastCardUid = null;
 let lastScanTime = 0;
 let device = null;
@@ -100,7 +129,6 @@ async function onRealCardDetected(rawUid) {
   const uid = normalizeCardUid(rawUid);
   const now = Date.now();
 
-  // Local anti-duplicate protection
   if (uid === lastCardUid && (now - lastScanTime) < DEBOUNCE_MS) {
     return;
   }
@@ -108,7 +136,7 @@ async function onRealCardDetected(rawUid) {
   lastScanTime = now;
 
   const t0 = performance.now();
-  console.log(`Card detected: ${uid}`);
+  console.log(`⚡ [DETECTED] Card UID: ${uid}`);
 
   try {
     const response = await fetch(SCAN_ENDPOINT, {
@@ -132,19 +160,19 @@ async function onRealCardDetected(rawUid) {
 
     if (data.success && data.student) {
       const studentName = data.student.name || `${data.student.prenom || ""} ${data.student.nom || ""}`.trim();
-      console.log(`Student found: ${studentName} (${elapsed}ms)`);
-      console.log("Attendance marked successfully\n");
+      console.log(`✅ Student found: ${studentName} (${elapsed}ms)`);
+      console.log("   Attendance marked successfully\n");
     } else if (data.isDuplicate) {
-      console.log(`Duplicate scan ignored (${elapsed}ms, cooldown: ${data.remainingSeconds || 10}s)\n`);
+      console.log(`ℹ Duplicate scan ignored (${elapsed}ms, cooldown: ${data.remainingSeconds || 10}s)\n`);
     } else if (data.reason === "CARD_NOT_REGISTERED" || data.reason === "unregistered_card" || !data.success) {
-      console.log(`Card not registered: ${uid} (${elapsed}ms)`);
-      console.log("(Assign this card to a student in the admin panel)\n");
+      console.log(`⚠ Card not registered: ${uid} (${elapsed}ms)`);
+      console.log("   (Assign this card to a student in the admin panel)\n");
     } else {
-      console.log(`Response from server (${elapsed}ms):`, data);
+      console.log(`ℹ Response from server (${elapsed}ms):`, data);
     }
   } catch (err) {
-    console.error("Railway backend unavailable");
-    console.error(`(${err.message})\n`);
+    console.error("❌ Railway backend unavailable");
+    console.error(`   (${err.message})\n`);
   }
 }
 
@@ -176,25 +204,25 @@ function connectReader() {
     isConnected = true;
     rxBuf = Buffer.alloc(0);
 
-    console.log("NFC Reader connected");
+    console.log("✔ NFC Reader connected");
     console.log("Waiting for card...\n");
 
     device.on("data", (data) => {
       rxBuf = Buffer.concat([rxBuf, data]);
+      if (rxBuf.length > 512) {
+        rxBuf = rxBuf.subarray(rxBuf.length - 256);
+      }
       const { frames, rest } = parseFrames(rxBuf);
       rxBuf = rest;
 
       for (const f of frames) {
         if (f.cmd === 0x0083 && f.payload.length >= 4) {
           const status = f.payload.readUInt32LE(0);
-          if (status === 4 && f.payload.length >= 48) {
-            let uidStart = 41;
-            if (f.payload[41] !== 0x04 && f.payload[42] === 0x04) uidStart = 42;
-            else if (f.payload[40] === 0x04) uidStart = 40;
-
-            const rawUid = f.payload.subarray(uidStart, uidStart + 7);
-            const uidHex = rawUid.toString("hex").toUpperCase();
-            onRealCardDetected(uidHex);
+          if (status === 4) {
+            const detectedUid = extractUidFromPayload(f.payload);
+            if (detectedUid) {
+              onRealCardDetected(detectedUid);
+            }
           } else {
             if (lastCardUid !== null && (Date.now() - lastScanTime) > 600) {
               lastCardUid = null;
@@ -208,7 +236,6 @@ function connectReader() {
       disconnectReader();
     });
 
-    // High frequency query frame transmission (60ms instead of 300ms)
     pollTimer = setInterval(() => {
       if (!device) return;
       try {

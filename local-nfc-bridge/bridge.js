@@ -7,9 +7,9 @@ dotenv.config();
 const API_BASE_URL = (process.env.API_BASE_URL || "https://caring-nature-production-c5b4.up.railway.app").replace(/\/+$/, "");
 const SCAN_ENDPOINT = `${API_BASE_URL}/api/nfc/scan`;
 const COOLDOWN_MS = parseInt(process.env.SCAN_COOLDOWN_MS || "1500", 10);
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "60", 10); // Optimized ultra-fast polling
+// Hardware optimal RF polling: 250ms allows the RFID carrier anti-collision sequence to finish cleanly without packet jamming
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "250", 10);
 
-// High-performance persistent HTTPS agent (eliminates TLS renegotiation per card scan)
 const httpsAgent = new https.Agent({
   keepAlive: true,
   keepAliveMsecs: 30000,
@@ -18,10 +18,10 @@ const httpsAgent = new https.Agent({
 });
 
 console.log("==================================================================");
-console.log("      🚀 SABIL SCHOOL — HIGH-SPEED NFC USB BRIDGE AGENT");
+console.log("      🚀 SABIL SCHOOL — INSTANT NFC USB BRIDGE AGENT");
 console.log("==================================================================");
 console.log(`🌐 Target Cloud API : ${SCAN_ENDPOINT}`);
-console.log(`⚡ Poll Interval   : ${POLL_INTERVAL_MS}ms (High Speed)`);
+console.log(`⚡ Poll Interval   : ${POLL_INTERVAL_MS}ms (Hardware Calibrated)`);
 console.log(`⏱  Scan Cooldown   : ${COOLDOWN_MS}ms`);
 console.log("==================================================================\n");
 
@@ -30,7 +30,7 @@ let lastCardUid = null;
 let lastScanTime = 0;
 let isPosting = false;
 
-// ── Fast Post Card to Cloud API ──
+// ── Post Card to Cloud API ──
 async function postCardToCloud(cardUid) {
   const now = Date.now();
   if (cardUid === lastCardUid && (now - lastScanTime) < COOLDOWN_MS) {
@@ -40,7 +40,7 @@ async function postCardToCloud(cardUid) {
   lastScanTime = now;
 
   const t0 = performance.now();
-  console.log(`⚡ [FAST SCAN] UID: ${cardUid} -> Sending to cloud...`);
+  console.log(`⚡ [INSTANT SCAN] UID: ${cardUid} -> Envoi vers Railway...`);
 
   try {
     const response = await fetch(SCAN_ENDPOINT, {
@@ -56,24 +56,24 @@ async function postCardToCloud(cardUid) {
     const elapsed = Math.round(performance.now() - t0);
 
     if (!response.ok) {
-      console.warn(`⚠ Server responded with status ${response.status} in ${elapsed}ms`);
+      console.warn(`⚠ Serveur a répondu avec le statut ${response.status} en ${elapsed}ms`);
       return;
     }
 
     const data = await response.json();
 
     if (data.success && data.student) {
-      console.log(`✅ [ATTENDANCE VALIDATED] (${elapsed}ms) Élève: ${data.student.prenom} ${data.student.nom} (${data.student.phone || "No phone"})`);
+      console.log(`✅ [PRÉSENCE VALIDÉE] (${elapsed}ms) Élève: ${data.student.prenom} ${data.student.nom} (${data.student.phone || "Sans téléphone"})`);
     } else if (data.isDuplicate) {
-      console.log(`ℹ [DUPLICATE SCAN] (${elapsed}ms) ${data.message || "Déjà pointé récemment"}`);
+      console.log(`ℹ [DOUBLE SCAN IGNORÉ] (${elapsed}ms) ${data.message || "Déjà pointé récemment"}`);
     } else if (data.reason === "CARD_NOT_REGISTERED" || data.reason === "unregistered_card" || !data.success) {
-      console.log(`⚠ [CARD NOT ASSIGNED] (${elapsed}ms) ${data.message || "Carte non attribuée à un élève"}`);
+      console.log(`⚠ [CARTE NON ATTRIBUÉE] (${elapsed}ms) ${data.message || "Carte non attribuée à un élève"}`);
     } else {
-      console.log(`ℹ [RESPONSE] (${elapsed}ms)`, data);
+      console.log(`ℹ [RÉPONSE] (${elapsed}ms)`, data);
     }
   } catch (err) {
-    console.error(`❌ Network error while posting to cloud API: ${err.message}`);
-    console.error(`   Make sure your server is reachable at: ${API_BASE_URL}`);
+    console.error(`❌ Erreur réseau lors du pointage: ${err.message}`);
+    console.error(`   Vérifiez que l'API est accessible sur: ${API_BASE_URL}`);
   }
 }
 
@@ -111,6 +111,13 @@ function parseFrames(buf) {
     if (i + 7 > buf.length) break;
     const cmd = (buf[i + 1] << 8) | buf[i + 2];
     const length = (buf[i + 3] << 8) | buf[i + 4];
+    
+    // Safety check: 5YOA query responses are never larger than 256 bytes
+    if (length > 256) {
+      i++;
+      continue;
+    }
+
     const end = i + 5 + length + 2;
     if (end > buf.length) break;
     const payload = buf.subarray(i + 5, i + 5 + length);
@@ -136,6 +143,40 @@ function sendOutputReport(device, frame) {
   }
 }
 
+function extractUidFromPayload(payload) {
+  if (!payload || payload.length < 12) return null;
+
+  // Pattern 1: 7-byte UID starting with 0x04 (NTAG / Ultralight)
+  for (let i = 8; i <= payload.length - 7; i++) {
+    if (payload[i] === 0x04) {
+      const candidate = payload.subarray(i, i + 7);
+      // Verify non-zero and reasonable entropy
+      if (!candidate.every(b => b === 0) && !candidate.every(b => b === 0xff)) {
+        return candidate.toString("hex").toUpperCase();
+      }
+    }
+  }
+
+  // Pattern 2: Standard 5YOA offset 40-48
+  if (payload.length >= 48) {
+    let uidStart = 41;
+    if (payload[41] !== 0x04 && payload[42] === 0x04) uidStart = 42;
+    else if (payload[40] === 0x04) uidStart = 40;
+    const raw7 = payload.subarray(uidStart, uidStart + 7);
+    if (!raw7.every(b => b === 0)) return raw7.toString("hex").toUpperCase();
+  }
+
+  // Pattern 3: 4-byte UID (Mifare Classic 1K)
+  if (payload.length >= 44) {
+    const raw4 = payload.subarray(40, 44);
+    if (!raw4.every(b => b === 0) && !raw4.every(b => b === 0xff)) {
+      return raw4.toString("hex").toUpperCase();
+    }
+  }
+
+  return null;
+}
+
 function start5YoaReader() {
   let device = null;
   let pollTimer = null;
@@ -155,29 +196,32 @@ function start5YoaReader() {
       device = new HID.HID(devInfo.path);
       rxBuf = Buffer.alloc(0);
 
-      console.log(`✔ [5YOA HID] Connected: ${devInfo.product || "5YOA NFC Reader"} (Path: ${devInfo.path})`);
+      console.log(`✔ [5YOA HID] Lecteur connecté : ${devInfo.product || "5YOA NFC Reader"}`);
 
       device.on("data", (data) => {
         rxBuf = Buffer.concat([rxBuf, data]);
+        
+        // Prevent buffer bloat if packets are malformed
+        if (rxBuf.length > 512) {
+          rxBuf = rxBuf.subarray(rxBuf.length - 256);
+        }
+
         const { frames, rest } = parseFrames(rxBuf);
         rxBuf = rest;
 
         for (const f of frames) {
           if (f.cmd === 0x0083 && f.payload.length >= 4) {
             const status = f.payload.readUInt32LE(0);
-            if (status === 4 && f.payload.length >= 48) {
-              let uidStart = 41;
-              if (f.payload[41] !== 0x04 && f.payload[42] === 0x04) uidStart = 42;
-              else if (f.payload[40] === 0x04) uidStart = 40;
-
-              const rawUid = f.payload.subarray(uidStart, uidStart + 7);
-              const uidHex = rawUid.toString("hex").toUpperCase();
-
-              if (currentCardUid !== uidHex) {
-                currentCardUid = uidHex;
-                postCardToCloud(uidHex);
+            if (status === 4) {
+              const detectedUid = extractUidFromPayload(f.payload);
+              if (detectedUid) {
+                if (currentCardUid !== detectedUid) {
+                  currentCardUid = detectedUid;
+                  postCardToCloud(detectedUid);
+                }
               }
             } else {
+              // Card removed
               currentCardUid = null;
             }
           }
@@ -185,11 +229,11 @@ function start5YoaReader() {
       });
 
       device.on("error", (err) => {
-        console.warn("⚠ [5YOA HID] Device error:", err.message);
+        console.warn("⚠ [5YOA HID] Erreur périphérique:", err.message);
         cleanupDevice();
       });
 
-      // Optimized high-frequency polling: 60ms instead of 300ms
+      // Calibrated 250ms polling: fast response (<0.3s) without jamming RF carrier
       pollTimer = setInterval(() => {
         if (!device) return;
         try {
@@ -218,7 +262,7 @@ function start5YoaReader() {
 
   const found = tryConnect();
   if (!found) {
-    console.log("ℹ 5YOA HID Reader not detected yet. Watching for USB connection...");
+    console.log("ℹ Lecteur 5YOA HID non détecté. En attente de connexion USB...");
   }
 
   setInterval(() => {
@@ -240,7 +284,7 @@ async function tryStartPcscReader() {
     const pcsc = pcsclite();
 
     pcsc.on("reader", (reader) => {
-      console.log(`✔ [PC/SC] Reader detected: ${reader.name}`);
+      console.log(`✔ [PC/SC] Lecteur détecté : ${reader.name}`);
 
       reader.on("status", (status) => {
         const changes = reader.state ^ status.state;
@@ -266,21 +310,20 @@ async function tryStartPcscReader() {
       });
 
       reader.on("end", () => {
-        console.log(`⚠ [PC/SC] Reader disconnected: ${reader.name}`);
+        console.log(`⚠ [PC/SC] Lecteur déconnecté : ${reader.name}`);
       });
     });
 
     pcsc.on("error", (err) => {
-      console.warn("⚠ [PC/SC] Daemon error:", err.message);
+      console.warn("⚠ [PC/SC] Erreur PC/SC:", err.message);
     });
   } catch (_) {
     // PC/SC optional fallback
   }
 }
 
-// Start listeners
 start5YoaReader();
 tryStartPcscReader();
 
-console.log("Ready! Tap a card on your USB NFC reader anytime.");
-console.log("Press Ctrl+C to stop.\n");
+console.log("Prêt ! Présentez une carte sur votre lecteur NFC.");
+console.log("Appuyez sur Ctrl+C pour arrêter.\n");
