@@ -3,53 +3,44 @@ title Sabil NFC Agent - Auto-Start Setup
 cd /d "%~dp0"
 
 echo ===================================================
-echo   Sabil School - NFC Agent Auto-Start Installer
+echo   Sabil School - NFC Agent Auto-Start Setup
 echo ===================================================
 echo.
 
-where node >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Node.js is not found in PATH!
-    echo Please install Node.js (LTS version) from https://nodejs.org/
-    echo.
-    pause
-    exit /b 1
-)
+node -v >nul 2>&1
+if %errorlevel% neq 0 goto no_node
 
-if not exist node_modules (
-    echo [1/3] Installing agent dependencies...
-    call npm install --no-audit --no-fund
-    if errorlevel 1 (
-        echo [ERROR] Failed to install npm dependencies.
-        pause
-        exit /b 1
-    )
-    echo.
-) else (
-    echo [1/3] Dependencies already installed.
-)
-
-echo [2/3] Configuring silent auto-start on Windows boot...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$dir = (Get-Location).Path; $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\Sabil-NFC-Bridge.lnk'; $ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut($shortcut); $s.TargetPath = 'wscript.exe'; $s.Arguments = '\"' + (Join-Path $dir 'silent-launcher.vbs') + '\"'; $s.WorkingDirectory = $dir; $s.WindowStyle = 7; $s.Save()"
-
-if errorlevel 1 (
-    echo [ERROR] Could not create startup shortcut.
-    pause
-    exit /b 1
-)
+echo [1/3] Fermeture des anciennes fenetres et processus...
+taskkill /F /IM node.exe /FI "WINDOWTITLE eq Sabil*" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*supervisor.js*' -or $_.CommandLine -like '*bridge.js*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
 
 echo.
-echo [3/3] Launching background NFC Agent right now...
+echo [2/3] Configuration du demarrage automatique avec Windows...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$dir = (Get-Location).Path; $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\Sabil-NFC-Bridge.lnk'; $ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut($shortcut); $s.TargetPath = 'wscript.exe'; $s.Arguments = '"' + (Join-Path $dir 'silent-launcher.vbs') + '"'; $s.WorkingDirectory = $dir; $s.Save(); Write-Host '[OK] Raccourci cree dans le dossier Demarrage Windows.'"
+
+echo.
+echo [3/3] Lancement de l agent en arriere-plan (mode invisible)...
 wscript.exe "%~dp0silent-launcher.vbs"
 
 echo.
-echo ===================================================
-echo   SUCCESS! Sabil NFC Agent is now installed.
-echo ===================================================
-echo - It is now running silently in the background.
-echo - It will automatically launch whenever Windows starts.
-echo - It runs without opening any black terminal windows.
-echo - Logs are saved to: %~dp0agent.log
+echo ========================================================
+echo   SUCCES TOTAL ! L agent NFC est installe et actif.
+echo ========================================================
 echo.
-echo You can close this window now.
+echo - Il tourne maintenant silencieusement en arriere-plan.
+echo - Il redemarrera tout seul a chaque allumage du PC.
+echo - Plus besoin d ouvrir de terminal ni de double-cliquer.
+echo - Vous pouvez approcher une carte NFC maintenant pour tester.
+echo.
+goto finish
+
+:no_node
+echo.
+echo [ERREUR] Node.js n est pas installe sur ce PC !
+echo Veuillez installer Node.js depuis https://nodejs.org/
+echo.
+goto finish
+
+:finish
+echo Appuyez sur Entree pour fermer cette fenetre.
 pause

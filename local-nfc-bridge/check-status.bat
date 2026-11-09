@@ -1,21 +1,17 @@
 @echo off
-title Sabil NFC Agent - Status Check
+title Sabil NFC Agent - Verification du Statut
 cd /d "%~dp0"
-
 echo ===================================================
-echo   Sabil School - NFC Agent Status Check
+echo   Sabil School - Verification NFC en arriere-plan
 echo ===================================================
 echo.
-
-powershell -NoProfile -Command "$procs = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*bridge.js*' -or $_.CommandLine -like '*supervisor.js*' }; if ($procs) { Write-Host 'Status: RUNNING IN BACKGROUND (PID: ' ($procs.ProcessId -join ', ') ')' -ForegroundColor Green } else { Write-Host 'Status: STOPPED' -ForegroundColor Red }"
-
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$procs = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*bridge.js*' -or $_.CommandLine -like '*supervisor.js*' }; if ($procs) { Write-Host '[STATUT] L agent tourne bien en arriere-plan (PID: ' ($procs.ProcessId -join ', ') ')' -ForegroundColor Green } else { Write-Host '[STATUT] L agent est arrete.' -ForegroundColor Red }"
 echo.
 if exist agent.log (
-    echo --- Last 15 lines of agent.log ---
-    powershell -NoProfile -Command "Get-Content agent.log -Tail 15"
+    echo --- Dernieres lignes de agent.log ---
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content agent.log -Tail 10"
 ) else (
-    echo (No agent.log file found yet)
+    echo (Aucun fichier log pour l instant)
 )
-
 echo.
 pause
