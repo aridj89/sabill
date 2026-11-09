@@ -1,0 +1,34 @@
+name: Build Sabil NFC Agent (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["nfc-agent-v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: sabil-s-school-main/sabil-nfc-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sabil-s-school-main/sabil-nfc-agent/package-lock.json
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+        shell: powershell
+      - name: Install dependencies and run unit tests
+        run: |
+          npm ci
+          npm rebuild @pokusew/pcsclite
+          npm test
+      - name: Build installer
+        run: powershell -ExecutionPolicy Bypass -File installer\build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SabilNfcAgentSetup
+          path: sabil-s-school-main/sabil-nfc-agent/dist/SabilNfcAgentSetup.exe
