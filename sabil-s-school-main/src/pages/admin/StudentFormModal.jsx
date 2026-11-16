@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Radio, CheckCircle2, Usb, AlertTriangle } from "lucide-react";
-import { C, inputStyle, uid } from "../../theme/tokens";
+import { C, inputStyle, uid, genPassword } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
 import Field from "../../components/ui/Field";
@@ -52,7 +52,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
     nom: initial.nom,
     prenom: initial.prenom,
     phone: initial.phone || "",
-    password: initial.password || "",
+    password: initial.password && !String(initial.password).startsWith("$2") ? initial.password : "",
     school: initial.school || "",
     studyClass: initial.studyClass || "",
     nfcCardId: initial.nfcCardId || "",
@@ -67,7 +67,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
     nom: "",
     prenom: "",
     phone: "",
-    password: "",
+    password: genPassword(),
     nfcCardId: "",
     enrollmentPaid: false,
     enrollmentFeeExempt: false,
@@ -80,7 +80,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
 
   const [nfcConnected, setNfcConnected] = useState(false);
   const [justScanned, setJustScanned] = useState(false);
-  const [showPassword, setShowPassword] = useState(!isEdit);
+  const [showPassword, setShowPassword] = useState(true);
   const justScannedTimer = useRef(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -193,12 +193,19 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
   const handleSave = () => {
     if (!form.nom.trim() || !form.prenom.trim() || !form.phone.trim()) return;
     if (nfcDuplicate) return;
+    const typedPw = (form.password || "").trim();
     const student = {
       id: initial?.id || uid(),
       nom: form.nom.trim(),
       prenom: form.prenom.trim(),
       phone: form.phone.trim(),
-      password: form.password || form.phone.trim(),
+      // New student: send the auto-generated password.
+      // Edit: never send a fallback password — the server does not return passwords to the
+      // browser, so an empty field here would otherwise overwrite the real password.
+      // The server keeps the existing hashed password when no password is sent.
+      ...(isEdit
+        ? (typedPw ? { password: typedPw } : {})
+        : { password: typedPw || genPassword() }),
       school: form.school?.trim() || "",
       studyClass: form.studyClass?.trim() || "",
       nfcCardId: (form.nfcCardId || "").trim().toUpperCase(),
@@ -214,6 +221,14 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
       lastModified: new Date().toISOString(),
     };
     onSave(student);
+
+    // Show the login credentials once: passwords are stored hashed on the server
+    // and cannot be displayed again after the page is reloaded.
+    if (student.password && (!isEdit || student.password !== (initial?.password || ""))) {
+      window.alert(lang === "ar"
+        ? `✅ معلومات دخول التلميذ ${student.prenom} ${student.nom}\n\n• اسم المستخدم (رقم الهاتف): ${student.phone}\n• كلمة المرور: ${student.password}\n\nاحتفظ بها: لن تظهر كلمة المرور مرة أخرى بعد تحديث الصفحة.`
+        : `✅ Identifiants de ${student.prenom} ${student.nom}\n\n• Identifiant (téléphone) : ${student.phone}\n• Mot de passe : ${student.password}\n\nNotez-les : le mot de passe ne sera plus affiché après actualisation de la page.`);
+    }
   };
 
   const isValid = form.nom.trim() && form.prenom.trim() && form.phone.trim() && !nfcDuplicate;
@@ -304,11 +319,9 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
             <input
               style={{ ...inputStyle, fontFamily: "monospace", letterSpacing: 2, paddingRight: 70 }}
               type={showPassword ? "text" : "password"}
-              readOnly={isEdit}
               value={form.password}
-              onChange={e => {
-                if (!isEdit) set("password", e.target.value);
-              }}
+              placeholder={isEdit ? "••••••" : ""}
+              onChange={e => set("password", e.target.value)}
             />
             <div style={{ position: "absolute", right: 4, top: 4, bottom: 4, display: "flex", gap: 2 }}>
               <button
@@ -319,7 +332,7 @@ export default function StudentFormModal({ groupId, initial, enrollmentFee, onCl
                 {showPassword ? "👁" : "👁‍🗨"}
               </button>
               <button
-                onClick={() => set("password", uid().slice(0, 6))}
+                onClick={() => set("password", genPassword())}
                 style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, color: C.inkSoft, cursor: "pointer", padding: "0 6px", fontSize: 12, fontWeight: 700 }}
                 title={lang === "ar" ? "توليد كلمة مرور جديدة" : "Générer"}
               >

@@ -4,7 +4,7 @@ import {
   TrendingUp, Shield, Key, Radio, Calendar, ChevronLeft, ChevronRight,
   Clock, Plus, RotateCcw, AlertCircle, Check, X, Trash2,
 } from "lucide-react";
-import { C, CAT_BY_ID, computeCycles, getStudentFinancialSummary, uid } from "../../theme/tokens";
+import { C, CAT_BY_ID, computeCycles, getStudentFinancialSummary, uid, genPassword } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
 import Modal from "../../components/ui/Modal";
 import StudentFormModal from "./StudentFormModal";
@@ -605,7 +605,7 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
   };
 
   const resetPassword = () => {
-    const newPw = uid().slice(0, 6);
+    const newPw = genPassword();
     setData(d => {
       const notifs = notifyAccountUpdated(d, st.id, lang === "ar" ? "تم إعادة تعيين كلمة المرور الخاصة بك. كلمة المرور الجديدة: " + newPw : "Votre mot de passe a été réinitialisé. Nouveau: " + newPw, lang);
       return {
@@ -713,8 +713,21 @@ export default function StudentScreen({ studentId, data, setData, toastFn, onBac
                 <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                   <td style={{ padding: "14px 20px", color: C.inkSoft, fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>{lang === "ar" ? "كلمة المرور (Password)" : "Mot de passe"}</td>
                   <td style={{ padding: "14px 20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ color: C.ink, fontWeight: 700, letterSpacing: 2 }}>••••••••</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <span className="f-mono" style={{ color: C.accent, fontWeight: 800, fontSize: 15, letterSpacing: 1.5, background: "rgba(226,150,58,0.12)", border: "1px solid rgba(226,150,58,0.3)", padding: "4px 10px", borderRadius: 8 }}>
+                        {st.password && !String(st.password).startsWith("$2") ? st.password : "••••••••"}
+                      </span>
+                      {st.password && !String(st.password).startsWith("$2") && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard?.writeText(String(st.password).trim());
+                            if (toastFn) toastFn(lang === "ar" ? `تم نسخ كلمة المرور: ${st.password} ✓` : `Mot de passe copié : ${st.password} ✓`);
+                          }}
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 700, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.07)", color: C.ink, cursor: "pointer", transition: "all 0.15s" }}
+                        >
+                          {lang === "ar" ? "نسخ" : "Copier"}
+                        </button>
+                      )}
                       <button
                         onClick={resetPassword}
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, fontSize: 11.5, fontWeight: 700, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.07)", color: C.inkSoft, cursor: "pointer", transition: "all 0.15s" }}

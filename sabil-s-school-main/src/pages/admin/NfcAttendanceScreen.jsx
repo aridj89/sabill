@@ -282,7 +282,8 @@ export default function NfcAttendanceScreen({ data, setData, toastFn, onBack, on
       if (inputRef.current && document.activeElement !== inputRef.current && !assignModalStudent) {
         const tag = document.activeElement?.tagName?.toLowerCase();
         if (tag !== "input" && tag !== "textarea" && tag !== "select") {
-          inputRef.current.focus();
+          // preventScroll: keep the reader input focused without jumping the page down to it
+          inputRef.current.focus({ preventScroll: true });
         }
       }
     }, 2000);

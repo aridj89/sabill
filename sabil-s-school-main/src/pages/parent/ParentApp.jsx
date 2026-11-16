@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { GraduationCap, Bell, MessageCircle, LogOut, CheckCircle2, XCircle } from "lucide-react";
 import { C } from "../../theme/tokens";
 import { useLanguage } from "../../context/LanguageContext";
@@ -13,6 +13,21 @@ export default function ParentApp({ data, setData, parentId, onLogout, toastFn }
   const { t, isRTL, lang } = useLanguage();
   const [screen, setScreen] = useState("dashboard");
   const [showNotifs, setShowNotifs] = useState(false);
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false);
+    }
+    if (showNotifs) {
+      document.addEventListener("mousedown", handleClick);
+      document.addEventListener("touchstart", handleClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("touchstart", handleClick);
+    };
+  }, [showNotifs]);
   const parent = data.parents.find(p => p.id === parentId);
   const student = data.students.find(s => s.id === parent?.studentId);
   const group = student ? data.groups.find(g => g.id === student.groupId) : null;
@@ -51,32 +66,34 @@ export default function ParentApp({ data, setData, parentId, onLogout, toastFn }
           <div style={{ fontWeight: 700, color: C.ink }}>{t("parentPortalTitle")}</div>
           <div style={{ marginLeft: isRTL ? 0 : "auto", marginRight: isRTL ? "auto" : 0, position: "relative", display: "flex", gap: 6, alignItems: "center" }}>
             <LanguageToggle />
-            <IconBtn icon={Bell} onClick={openNotifs} badge={unread} title={t("notifications")} />
+            <div ref={notifRef} style={{ position: "relative" }}>
+              <IconBtn icon={Bell} onClick={openNotifs} badge={unread} title={t("notifications")} />
+              {showNotifs && (
+                <div style={{
+                  position: "absolute", top: 46, right: isRTL ? "auto" : 0, left: isRTL ? 0 : "auto", width: 300,
+                  ...C.glassStyle,
+                  borderRadius: 14,
+                  boxShadow: "0 16px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.15)",
+                  maxHeight: 320, overflowY: "auto",
+                  zIndex: 60,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
+                  <div style={{ padding: "12px 14px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: C.ink }}>{t("notifications")}</span>
+                    {unread > 0 && <span style={{ fontSize: 11, background: C.accent, color: "#fff", padding: "2px 7px", borderRadius: 999, fontWeight: 700 }}>{unread} {t("notificationsBadgeNew")}</span>}
+                  </div>
+                  {myNotifs.length === 0 && <div style={{ padding: 16, color: C.inkSoft, fontSize: 13, textAlign: "center" }}>{t("noNotifications")}</div>}
+                  {myNotifs.map(n => (
+                    <div key={n.id} style={{ padding: "12px 14px", borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.ink, background: n.read ? "transparent" : "rgba(226,150,58,0.12)" }}>
+                      <div style={{ color: "#ffffff", fontWeight: n.read ? 400 : 600 }}>{n.text}</div>
+                      <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 4 }}>{new Date(n.ts).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR")}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <IconBtn icon={MessageCircle} onClick={() => setScreen(screen === "chat" ? "dashboard" : "chat")} active={screen === "chat"} title={t("messagesNav")} />
             <IconBtn icon={LogOut} onClick={onLogout} title={t("logout")} />
-            {showNotifs && (
-              <div style={{
-                position: "absolute", top: 46, right: isRTL ? "auto" : 0, left: isRTL ? 0 : "auto", width: 300,
-                ...C.glassStyle,
-                borderRadius: 14,
-                boxShadow: "0 16px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.15)",
-                maxHeight: 320, overflowY: "auto",
-                zIndex: 60,
-                textAlign: isRTL ? "right" : "left",
-              }}>
-                <div style={{ padding: "12px 14px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: C.ink }}>{t("notifications")}</span>
-                  {unread > 0 && <span style={{ fontSize: 11, background: C.accent, color: "#fff", padding: "2px 7px", borderRadius: 999, fontWeight: 700 }}>{unread} {t("notificationsBadgeNew")}</span>}
-                </div>
-                {myNotifs.length === 0 && <div style={{ padding: 16, color: C.inkSoft, fontSize: 13, textAlign: "center" }}>{t("noNotifications")}</div>}
-                {myNotifs.map(n => (
-                  <div key={n.id} style={{ padding: "12px 14px", borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.ink, background: n.read ? "transparent" : "rgba(226,150,58,0.12)" }}>
-                    <div style={{ color: "#ffffff", fontWeight: n.read ? 400 : 600 }}>{n.text}</div>
-                    <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 4 }}>{new Date(n.ts).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR")}</div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -179,9 +179,7 @@ export function saveDatabase(data) {
       if (Array.isArray(data.students)) {
         db.prepare("DELETE FROM students").run();
         for (const st of data.students) {
-          const pw = st.password
-            ? (st.password.startsWith("$2") ? st.password : hashPasswordSync(st.password))
-            : hashPasswordSync("000000");
+          const pw = st.password ? String(st.password).trim() : (st.phone ? String(st.phone).trim() : "000000");
           db.prepare(`INSERT INTO students (id, nom, prenom, phone, password, nfcCardId, enrollmentPaid, enrollmentDate, lastModified, createdAt, accountStatus, studentCode)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(st.id, st.nom, st.prenom, st.phone || null, pw,

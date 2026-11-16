@@ -389,6 +389,9 @@ export const AVATAR_EMOJIS = ["🧑‍🏫", "👩‍🏫", "🧑‍💼", "👨
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
+/** Auto-generated student password: 6 digits (easy to type on a phone, no l/1 or o/0 confusion) */
+export const genPassword = () => String(Math.floor(100000 + Math.random() * 900000));
+
 export const inputStyle = {
   width: "100%",
   padding: "10px 12px",

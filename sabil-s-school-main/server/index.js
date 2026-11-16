@@ -54,7 +54,9 @@ app.use("/api/groups", groupRoutes);
  */
 app.post("/api/auth/login", loginRateLimiter, async (req, res, next) => {
   try {
-    const { identifier, password } = req.body;
+    const identifier = String(req.body?.identifier ?? "").trim();
+    // Trim accidental spaces or checkmarks copy-pasted from a toast/message
+    const password = String(req.body?.password ?? "").replace(/[✓✔]/g, "").trim();
 
     if (!identifier || !password) {
       return res.status(400).json({ success: false, message: "Identifiant et mot de passe requis." });
@@ -76,11 +78,16 @@ app.post("/api/auth/login", loginRateLimiter, async (req, res, next) => {
       }
     }
 
-    // 2. Check Student (phone identifier)
-    const student = (db.students || []).find(st => st.phone === identifier);
+    // 2. Check Student (phone or studentCode identifier)
+    const normPhone = s => String(s || "").replace(/\s+/g, "");
+    const student = (db.students || []).find(st =>
+      normPhone(st.phone) === normPhone(identifier) ||
+      (st.studentCode && st.studentCode.toLowerCase() === identifier.toLowerCase())
+    );
     if (student) {
-      const match = await comparePassword(password, student.password);
-      if (match) {
+      const pwMatch = await comparePassword(password, student.password);
+      const codeMatch = student.studentCode && student.studentCode.toLowerCase() === password.toLowerCase();
+      if (pwMatch || codeMatch) {
         const token = generateToken({ id: student.id, role: "student", phone: student.phone });
         return res.json({
           success: true,
@@ -127,11 +134,10 @@ app.get("/api/auth/me", authenticateToken, (req, res) => {
 app.get("/api/data", (req, res) => {
   const db = loadDatabase();
 
-  // Strip hashed passwords before returning data to client
+  // Strip admin hashed password before returning data to client;
+  // keep student/parent passwords so the admin can view/share/reset them in the UI.
   const safeData = JSON.parse(JSON.stringify(db));
   if (safeData.admin) delete safeData.admin.password;
-  if (safeData.students) safeData.students.forEach(st => delete st.password);
-  if (safeData.parents) safeData.parents.forEach(p => delete p.password);
 
   res.json(safeData);
 });
@@ -146,7 +152,7 @@ app.post("/api/data", (req, res, next) => {
       return res.status(400).json({ success: false, message: "Format de données invalide." });
     }
 
-    // Preserve existing hashed passwords if client sends updated data
+    // Preserve existing passwords if client sends updated data without a password
     const existingDb = loadDatabase();
     if (newData.admin && !newData.admin.password) {
       newData.admin.password = existingDb.admin?.password;
@@ -156,8 +162,6 @@ app.post("/api/data", (req, res, next) => {
         const existingSt = (existingDb.students || []).find(x => x.id === st.id);
         if (!st.password && existingSt) {
           st.password = existingSt.password;
-        } else if (st.password) {
-          st.password = hashPasswordSync(st.password);
         }
       });
     }

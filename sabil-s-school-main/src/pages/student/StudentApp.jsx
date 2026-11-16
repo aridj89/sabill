@@ -59,14 +59,22 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
   const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     function handleClick(e) {
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     }
-    if (profileOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [profileOpen]);
+    if (profileOpen || notifOpen) {
+      document.addEventListener("mousedown", handleClick);
+      document.addEventListener("touchstart", handleClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("touchstart", handleClick);
+    };
+  }, [profileOpen, notifOpen]);
 
   const student = (data.students || []).find(s => s.id === studentId);
   const enrollment = (data.enrollments || []).find(e => e.studentId === studentId);
@@ -145,7 +153,7 @@ export default function StudentApp({ data, setData, studentId, onLogout, toastFn
             <LanguageToggle />
             
             {/* ── Notifications Dropdown ── */}
-            <div style={{ position: "relative" }}>
+            <div ref={notifRef} style={{ position: "relative" }}>
               <IconBtn icon={Bell} onClick={() => { setNotifOpen(!notifOpen); markNotifsRead(); }} title={lang === "ar" ? "الإشعارات" : "Notifications"} badge={unreadNotifs} />
               
               {notifOpen && (
